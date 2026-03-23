@@ -1,0 +1,48 @@
+# 02_vars_and_anchors — configuration
+#
+# Demonstrates two YAML reuse patterns:
+#   1. Variables — ${VAR:-default} for environment-driven config
+#   2. Anchors   — &anchor / *anchor for DRY (Don't Repeat Yourself) blocks
+#
+# Try overriding at runtime:
+#   MODEL=us.anthropic.claude-sonnet-4-6-v1:0 uv run python examples/02_vars_and_anchors/main.py
+#   TONE=formal uv run python examples/02_vars_and_anchors/main.py
+
+vars:
+  # Read MODEL from env; fall back to a default when not set.
+  MODEL:     ${MODEL:-openai.gpt-oss-20b-1:0}
+
+  # Read TONE from env; controls the assistant's personality.
+  TONE:      ${TONE:-friendly}
+
+  # Read LOG_LEVEL from env; default to WARNING.
+  LOG_LEVEL: ${LOG_LEVEL:-WARNING}
+
+# Define a shared system prompt template using YAML anchors
+# This avoids repeating the same boilerplate in multiple agents
+x-base_prompt: &base_prompt |
+  You are a ${TONE} assistant.
+  Keep answers clear and concise.
+  Follow these principles:
+    - Be helpful and direct
+    - Use examples when needed
+    - Ask clarifying questions if unclear
+
+# Define shared model params using YAML anchors
+# Note: integer values (max_tokens) are preserved as integers, unlike vars which become strings!
+x-model_params: &model_params
+  max_tokens: 512
+
+models:
+  default:
+    provider: bedrock
+    model_id: ${MODEL}
+    params: *model_params
+
+agents:
+  assistant:
+    model: default
+    system_prompt: *base_prompt   # Alias: reference the anchor defined above
+
+entry: assistant
+log_level: ${LOG_LEVEL}

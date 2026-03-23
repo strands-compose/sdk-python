@@ -1,0 +1,9 @@
+models:
+  bedrock_model:
+    provider: bedrock
+    model_id: anthropic.claude-3-haiku-20240307-v1:0
+agents:
+  assistant:
+    model: bedrock_model
+    system_prompt: "You are a helpful assistant."
+entry: assistant

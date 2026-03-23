@@ -1,0 +1,55 @@
+# 09_graph — Graph Pipeline
+#
+# Graph orchestration: deterministic DAG with explicit edges.
+# Execution order is fixed by the edges — no agent-driven handoffs.
+# Nodes at the same depth can execute in parallel (strands handles this).
+#
+# Run:
+#   uv run python examples/09_graph/main.py
+
+models:
+  default:
+    provider: bedrock
+    model_id: openai.gpt-oss-20b-1:0
+
+agents:
+  content_strategist:
+    model: default
+    system_prompt: |
+      You are a content strategist. Given a blog post topic, produce:
+        - A clear title
+        - A target audience description (one sentence)
+        - A structured outline with 4-5 section headings and a bullet point per section
+      Output only the title, audience, and outline — nothing else.
+
+  content_writer:
+    model: default
+    system_prompt: |
+      You are a content writer. You receive a topic and outline.
+      Write a complete blog post following the outline exactly.
+      Use clear, engaging prose. Include an introduction and conclusion.
+      Output the full post in markdown format.
+
+  copy_editor:
+    model: default
+    system_prompt: |
+      You are a copy editor. You receive a draft blog post.
+      Review and improve it for:
+        - Grammar and spelling
+        - Sentence variety and flow
+        - Consistent tone (professional but approachable)
+        - Header formatting in markdown
+      Return the polished final version of the post.
+
+orchestrations:
+  blog_pipeline:
+    mode: graph
+    # entry_name must be a node with no incoming edges (the pipeline start).
+    entry_name: content_strategist
+    edges:
+      - from: content_strategist
+        to: content_writer
+      - from: content_writer
+        to: copy_editor
+
+entry: blog_pipeline

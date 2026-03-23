@@ -1,0 +1,105 @@
+# 10_nested — Nested Orchestration
+#
+# A Swarm embedded as a named target inside a Delegate orchestration.
+# strands-compose topological sort builds content_team before pipeline.
+#
+# Namespace rule: agents and orchestrations share a single namespace —
+# 'content_team' here cannot be both an agent name and an orchestration name.
+#
+# Run:
+#   uv run python examples/10_nested/main.py
+
+models:
+  default:
+    provider: bedrock
+    model_id: openai.gpt-oss-20b-1:0
+
+x-hooks: &hooks
+  - type: strands_compose.hooks:MaxToolCallsGuard
+    params: { max_calls: 20 }
+  - type: strands_compose.hooks:ToolNameSanitizer
+
+agents:
+  # ── Content production swarm agents ──────────────────────────────────────
+  researcher:
+    model: default
+    description: "Research the topic and gather structured facts."
+    hooks: *hooks
+    system_prompt: |
+      You are a research analyst. Given a topic:
+        1. Identify the 2-3 most important aspects to cover.
+        2. Provide factual, structured information for each aspect.
+        3. Note any key statistics, dates, or authoritative sources.
+      Hand off to reviewer when your research briefing is complete.
+
+  reviewer:
+    model: default
+    description: "Review and improve content for quality and accuracy."
+    hooks: *hooks
+    system_prompt: |
+      You are a senior editor. Review the submitted draft for:
+        - Technical accuracy and completeness
+        - Logical flow and structure
+        - Clarity and readability
+      If it is publication-ready, output the final improved version and stop.
+
+  # ── Quality assurance agent ───────────────────────────────────────────────
+  qa_bot:
+    model: default
+    description: "Run a final quality check on the produced content."
+    hooks: *hooks
+    system_prompt: |
+      You are a QA specialist. Review the provided content and check for:
+        - Factual claims that seem unsupported or exaggerated
+        - Missing sections promised in the introduction
+        - Formatting issues (broken markdown, inconsistent headings)
+        - Overall readability score (Good / Needs Work / Poor)
+      You must be provided with specific content/document to review.
+      If you don't receive any content, respond with "No content received for QA."
+      Do not make assumptions or generate content on your own.
+      Return a short QA report followed by the approved content.
+
+  # ── Coordinator ───────────────────────────────────────────────────────────
+  coordinator:
+    model: default
+    hooks: *hooks
+    conversation_manager:
+      type: strands.agent:SlidingWindowConversationManager
+      params:
+        window_size: 40
+        should_truncate_results: false
+    system_prompt: |
+      You orchestrate the full content production pipeline and make final decisions.
+      For every request:
+        1. Delegate to content_team to research and prepare the content.
+        2. Pass their output to qa_bot for quality assurance validation.
+          MANDATORY! Include exactly what you received from content_team.
+        3. EVALUATE qa_bot's assessment:
+          - If QA approves: Return the final approved content to the user immediately.
+          - If QA identifies issues: Decide whether to:
+            a) Send the content back to content_team with specific QA feedback for revision, OR
+            b) Reject and ask the user to clarify the request.
+      You do not produce content yourself. Your role is to orchestrate,
+      validate, and make final approval decisions.
+
+# ── Orchestrations ────────────────────────────────────────────────────────────
+orchestrations:
+  # Inner: autonomous peer swarm for content production
+  content_team:
+    mode: swarm
+    agents: [researcher, reviewer]
+    entry_name: researcher
+    max_handoffs: 10
+
+  # Outer: coordinator delegates to the swarm + QA agent
+  manager:
+    mode: delegate
+    entry_name: coordinator
+    connections:
+      # content_team references the orchestration above — not a plain agent.
+      - agent: content_team
+        description: "Content production team: researches and prepares the content."
+      - agent: qa_bot
+        description: "Quality assurance: checks the final content for accuracy and completeness."
+
+entry: manager

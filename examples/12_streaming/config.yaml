@@ -1,0 +1,59 @@
+# 12_streaming — Streaming Agent Output
+#
+# A delegate orchestration with three agents: researcher, analyst, coordinator.
+# The example shows how to stream all agent lifecycle events in real time
+# using make_event_queue() from strands_compose.
+#
+# Run:
+#   uv run python examples/12_streaming/main.py
+
+models:
+  default:
+    provider: bedrock
+    model_id: openai.gpt-oss-20b-1:0
+
+agents:
+  researcher:
+    model: default
+    hooks:
+      - type: strands_compose.hooks:ToolNameSanitizer
+    system_prompt: |
+      You are a research analyst. Given a topic:
+        1. Identify the 5-7 most relevant facts.
+        2. Present them as concise, numbered bullet points.
+      Return only your factual briefing — nothing else.
+
+  analyst:
+    model: default
+    hooks:
+      - type: strands_compose.hooks:ToolNameSanitizer
+    system_prompt: |
+      You are an insights analyst. Given a research briefing:
+        1. Surface 2-3 actionable insights or emerging trends.
+        2. Explain the "so what" for a practitioner in plain language.
+      Return only your analysis — nothing else.
+
+  coordinator:
+    model: default
+    hooks:
+      - type: strands_compose.hooks:ToolNameSanitizer
+    system_prompt: |
+      You orchestrate a two-step research -> analysis.
+      For every request:
+        1. Call researcher to gather the relevant facts.
+        2. Pass those facts to analyst for interpretation.
+        3. Study the analyst's output and prepare final response.
+      Delegate all work you can, your job is to coordinate and synthesize,
+      not to research or analyze yourself.
+
+orchestrations:
+  main:
+    mode: delegate
+    entry_name: coordinator
+    connections:
+      - agent: researcher
+        description: "Research the topic and return a factual briefing."
+      - agent: analyst
+        description: "Analyse the briefing and return key practitioner insights."
+
+entry: main

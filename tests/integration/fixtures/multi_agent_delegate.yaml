@@ -1,0 +1,13 @@
+agents:
+  researcher:
+    system_prompt: "You are a research assistant."
+  writer:
+    system_prompt: "You are a technical writer."
+entry: coordinator
+orchestrations:
+  coordinator:
+    mode: delegate
+    entry_name: writer
+    connections:
+      - agent: researcher
+        description: "Research a topic in depth."

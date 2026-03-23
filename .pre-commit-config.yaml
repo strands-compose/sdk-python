@@ -1,0 +1,48 @@
+# https://pre-commit.com
+# https://pre-commit.com/hooks.html
+
+# Use the active venv Python — avoids path issues on Windows where
+# pre-commit looks for python3.12 at ~/.local/bin/python.exe
+default_language_version:
+  python: python3
+
+# Stages wired to git events:
+#   pre-commit  -> runs on every `git commit`
+#   pre-push    -> runs on every `git push`
+# install-hooks in justfile registers both:
+#   uv run pre-commit install --hook-type=pre-push
+#   uv run pre-commit install --hook-type=commit-msg
+default_stages: [pre-commit, pre-push]
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: 'v5.0.0'
+    hooks:
+      - id: check-added-large-files
+      - id: check-case-conflict
+      - id: check-merge-conflict
+      - id: check-toml
+      - id: check-yaml
+      - id: debug-statements
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+      - id: trailing-whitespace
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: 'v0.9.9'
+    hooks:
+      - id: ruff          # lint  — commit + push
+      - id: ruff-format   # format — commit + push
+
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: ['--baseline', '.secrets.baseline']
+        files: \.py$
+
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: 'v4.4.1'
+    hooks:
+      - id: commitizen         # validates commit message format
+        stages: [commit-msg]   # only on commit-msg event, not push

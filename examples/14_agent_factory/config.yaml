@@ -1,0 +1,23 @@
+# 14_agent_factory — Custom Agent Factory
+#
+# Use `type:` to plug in your own agent factory instead of the default
+# strands.Agent constructor. Pass extra parameters via `agent_kwargs:`.
+#
+# Run:
+#   uv run python examples/14_agent_factory/main.py
+
+models:
+  default:
+    provider: bedrock
+    model_id: openai.gpt-oss-20b-1:0
+
+agents:
+  assistant:
+    type: ./factory.py:create_agent     # custom factory replaces Agent()
+    model: default
+    system_prompt: You are a helpful assistant.
+    agent_kwargs:                        # extra kwargs forwarded to factory
+      greeting: "Ahoy, captain!"
+      personality: pirate
+
+entry: assistant

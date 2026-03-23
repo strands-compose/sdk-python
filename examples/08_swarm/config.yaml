@@ -1,0 +1,52 @@
+# 08_swarm — Agent Swarm
+#
+# Swarm orchestration: peer agents with autonomous handoffs.
+# strands injects handoff_to_agent() into every agent automatically.
+# No coordinator — agents decide on their own when to pass the baton.
+#
+# Run:
+#   uv run python examples/08_swarm/main.py
+
+models:
+  default:
+    provider: bedrock
+    model_id: openai.gpt-oss-20b-1:0
+
+agents:
+  drafter:
+    model: default
+    description: "Writes initial code drafts from a given specification."
+    system_prompt: |
+      You are a software developer. Write clean, working Python code.
+      When you have produced a draft, hand off to reviewer for a code review.
+      Address any issues raised by reviewer and hand back to reviewer again.
+      When reviewer approves, hand off to tech_lead for final sign-off.
+
+  reviewer:
+    model: default
+    description: "Reviews code drafts for correctness, style, and edge cases."
+    system_prompt: |
+      You are a senior code reviewer. Review the submitted code for:
+        - Correctness and logic errors
+        - Edge cases not handled
+        - PEP 8 style adherence
+        - Missing docstrings or type hints
+      If you find issues, hand back to drafter with specific feedback.
+      If the code looks good, hand off to tech_lead for final approval.
+
+  tech_lead:
+    model: default
+    description: "Makes final approval decisions on reviewed code."
+    system_prompt: |
+      You are the tech lead. Review the code and the review discussion.
+      Make a final decision: approve or request one last round of changes.
+      Provide a brief verdict and summarise the final version of the code.
+
+orchestrations:
+  review_team:
+    mode: swarm
+    agents: [drafter, reviewer, tech_lead]
+    entry_name: drafter
+    max_handoffs: 10
+
+entry: review_team
