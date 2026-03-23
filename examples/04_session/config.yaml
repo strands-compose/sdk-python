@@ -1,0 +1,32 @@
+# 04_session — Persistent Memory
+#
+# The session_manager persists conversation history to disk.
+# The agent remembers everything you said across turns — and across restarts.
+#
+# Run:
+#   uv run python examples/04_session/main.py
+#
+# Sessions are stored in .sessions/ (relative to where you run the command).
+# Delete that folder to start fresh.
+
+models:
+  default:
+    provider: bedrock
+    model_id: openai.gpt-oss-20b-1:0
+
+session_manager:
+  provider: file
+  params:
+    storage_dir: ./.sessions
+    session_id: example-04
+
+agents:
+  assistant:
+    model: default
+    system_prompt: |
+      You are a personal assistant with memory.
+      Remember everything the user tells you about themselves — name, job,
+      preferences, ongoing projects — and refer back to it naturally.
+      If you have no prior context about the user, ask for their name first.
+
+entry: assistant

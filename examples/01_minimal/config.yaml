@@ -1,0 +1,22 @@
+# 01_minimal — Hello, Agent
+#
+# The absolute minimum strands-compose config:
+# a model, one agent, and an entry point.
+#
+# Run:
+#   uv run python examples/01_minimal/main.py
+
+models:
+  default:
+    provider: bedrock
+    model_id: openai.gpt-oss-20b-1:0
+
+agents:
+  assistant:
+    model: default
+    system_prompt: |
+      You are a concise and helpful assistant.
+      Answer questions clearly and to the point.
+      If you don't know something, say so.
+
+entry: assistant

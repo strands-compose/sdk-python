@@ -1,0 +1,17 @@
+agents:
+  collector:
+    system_prompt: "You collect data."
+  analyzer:
+    system_prompt: "You analyze data."
+  summarizer:
+    system_prompt: "You summarize results."
+entry: pipeline
+orchestrations:
+  pipeline:
+    mode: graph
+    entry_name: collector
+    edges:
+      - from: collector
+        to: analyzer
+      - from: analyzer
+        to: summarizer

@@ -1,0 +1,50 @@
+vars:
+  default_model: anthropic.claude-3-haiku-20240307-v1:0
+
+models:
+  fast_model:
+    provider: bedrock
+    model_id: "${default_model}"
+  smart_model:
+    provider: bedrock
+    model_id: anthropic.claude-3-sonnet-20240229-v1:0
+
+agents:
+  researcher:
+    model: fast_model
+    system_prompt: "You are a research specialist."
+    description: "Researches topics and gathers information."
+  writer:
+    model: smart_model
+    system_prompt: "You are a professional writer."
+    description: "Writes polished content."
+    hooks:
+      - type: strands_compose.hooks:MaxToolCallsGuard
+        params:
+          max_calls: 10
+  editor:
+    model: fast_model
+    system_prompt: "You edit content for clarity."
+    description: "Edits and improves text."
+  reviewer:
+    model: smart_model
+    system_prompt: "You review content quality."
+    description: "Final review and approval."
+
+entry: content_pipeline
+
+orchestrations:
+  writing_team:
+    mode: delegate
+    entry_name: writer
+    connections:
+      - agent: researcher
+        description: "Research the topic first."
+  content_pipeline:
+    mode: graph
+    entry_name: writing_team
+    edges:
+      - from: writing_team
+        to: editor
+      - from: editor
+        to: reviewer

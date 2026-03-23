@@ -1,0 +1,23 @@
+agents:
+  researcher:
+    system_prompt: "You research topics."
+  writer:
+    system_prompt: "You write content."
+  editor:
+    system_prompt: "You edit and improve content."
+  reviewer:
+    system_prompt: "You review final content."
+entry: full_pipeline
+orchestrations:
+  writing_team:
+    mode: delegate
+    entry_name: writer
+    connections:
+      - agent: researcher
+        description: "Research a topic."
+  full_pipeline:
+    mode: delegate
+    entry_name: reviewer
+    connections:
+      - agent: writing_team
+        description: "Run the full writing pipeline."

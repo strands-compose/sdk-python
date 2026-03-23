@@ -1,0 +1,75 @@
+# Continuous Integration — runs on every push and pull request.
+
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # ── Quality checks (format · lint · type · security) ──────────────────────
+  check:
+    name: Quality checks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install just
+        uses: extractions/setup-just@v3
+
+      - name: Install dev deps
+        run: uv sync --all-groups --all-extras
+
+      - name: Ruff — format check
+        run: uv run just check-format
+
+      - name: Ruff — lint
+        run: uv run just check-code
+
+      - name: ty — type check
+        run: uv run just check-type
+
+      - name: Bandit — security scan
+        run: uv run just check-security
+
+  # ── Tests ──────────────────────────────────────────────────────────────────
+  test:
+    name: Tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install just
+        uses: extractions/setup-just@v3
+
+      - name: Install dev deps
+        run: uv sync --all-groups --all-extras
+
+      - name: pytest with coverage
+        run: uv run just test

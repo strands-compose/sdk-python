@@ -1,0 +1,105 @@
+[project]
+name = "strands-compose"
+version = "0.1.0"
+description = "Zero-code YAML-driven agent orchestration over strands-agents"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "strands-agents~=1.32.0",
+    "pydantic>=2.12.5",
+    "pyyaml>=6.0.0",
+    "mcp>=1.24.0",
+]
+
+[project.optional-dependencies]
+agentcore-memory = [
+    "bedrock-agentcore>=1.4.0",
+]
+ollama = [
+    "strands-agents[ollama]~=1.32.0",
+]
+openai = [
+    "strands-agents[openai]~=1.32.0",
+]
+gemini = [
+    "strands-agents[gemini]~=1.32.0",
+]
+
+[dependency-groups]
+dev = [
+    "ty>=0.0.17",
+    "bandit>=1.9.2",
+    "coverage>=7.12.0",
+    "pytest-asyncio>=1.2.0",
+    "pytest-cov>=7.0.0",
+    "pytest-mock>=3.15.1",
+    "pytest-xdist>=3.8.0",
+    "pytest>=9.0.2",
+    "ruff>=0.14.8",
+    "rust-just>=1.42.4",
+    "commitizen>=4.8.4",
+    "pre-commit>=4.3.0",
+    "starlette>=0.27.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/strands_compose"]
+
+[tool.bandit]
+targets = ["src/strands_compose"]
+
+[tool.bandit.assert_used]
+skips = ['*_test.py', '*/test_*.py']
+
+[tool.coverage.run]
+branch = true
+source = ["src/strands_compose"]
+omit = ["__main__.py"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+norecursedirs = ["__pycache__"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+markers = [
+    "integration: Integration tests (full pipeline)",
+    "ollama: Tests requiring local Ollama",
+    "bedrock: Tests requiring AWS Bedrock",
+]
+asyncio_mode = "auto"
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+version_provider = "pep621"
+version_files = [
+    "pyproject.toml:^version",
+]
+tag_format = "v$version"
+update_changelog_on_bump = true
+changelog_file = "CHANGELOG.md"
+changelog_incremental = true
+major_version_zero = true
+
+[tool.ruff]
+fix = true
+indent-width = 4
+line-length = 100
+
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["D100", "D101", "D102", "D103", "ANN", "S101"]
+"examples/**/*.py" = ["D100", "D103", "D104", "ANN", "INP001", "T201"]
+
+[tool.pyright]
+reportInvalidTypeForm = "none"

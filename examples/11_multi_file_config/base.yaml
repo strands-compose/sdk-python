@@ -1,0 +1,19 @@
+# 11_multi_file_config — base configuration
+#
+# Infrastructure only: variables and model definitions.
+# This file is intentionally incomplete — it has no agents and no entry point.
+# Pair it with agents.yaml to get a runnable config:
+#
+#   load(["base.yaml", "agents.yaml"])
+#
+# Values can be overridden by environment variables at startup:
+#   MODEL=us.anthropic.claude-sonnet-4-6-v1:0 uv run python examples/11_multi_file_config/main.py
+
+vars:
+  # Read MODEL from env; fall back to a default when not set.
+  MODEL: ${MODEL:-openai.gpt-oss-20b-1:0}
+
+models:
+  default:
+    provider: bedrock
+    model_id: ${MODEL}

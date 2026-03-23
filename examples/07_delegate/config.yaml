@@ -1,0 +1,57 @@
+# 07_delegate — Multi-Agent Delegation
+#
+# Delegate orchestration: a new agent is forked from coordinator's blueprint
+# with researcher and writer attached as @tool functions.
+# The original coordinator agent is never mutated.
+#
+# Run:
+#   uv run python examples/07_delegate/main.py
+
+models:
+  default:
+    provider: bedrock
+    model_id: openai.gpt-oss-20b-1:0
+
+agents:
+  researcher:
+    model: default
+    description: "Research a topic and return structured facts with sources."
+    system_prompt: |
+      You are a research specialist. Given a topic, produce a structured briefing:
+      - 2-3 key facts with clear explanations
+      - Any important caveats or nuances
+      - A one-paragraph summary at the end
+      Be factual, concise, and well-organised.
+
+  writer:
+    model: default
+    description: "Write a polished, well-structured report from provided facts."
+    system_prompt: |
+      You are a technical writer. Given research material, produce a clear report:
+      - An informative title
+      - An executive summary (2-3 sentences)
+      - Well-structured body sections with headings
+      - A brief conclusion
+      Write in a professional but accessible tone.
+
+  coordinator:
+    model: default
+    system_prompt: |
+      You coordinate a research and writing pipeline.
+      For every task:
+        1. Call researcher to gather facts on the topic.
+        2. Pass the facts to writer to produce the final report.
+        3. Return the writer's output as your response.
+      Do not write content yourself — delegate all work.
+
+orchestrations:
+  main:
+    mode: delegate
+    entry_name: coordinator
+    connections:
+      - agent: researcher
+        description: "Research a topic and return structured facts with sources."
+      - agent: writer
+        description: "Write a polished report from the provided research material."
+
+entry: main

@@ -1,0 +1,57 @@
+.env
+.claude
+.sessions
+
+# Ignore Python cache and compiled files
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.ruff_cache
+
+# Ignore virtual environments
+venv/
+env/
+.venv/
+.env/
+
+# Ignore Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Existing rules
+python/*
+.req.txt
+*.egg-info/
+dist/
+build/
+requirements.txt
+*.log
+.logs/
+
+# Pytest cache
+.pytest_cache/
+.coverage*
+htmlcov/
+.tox/
+.nox/
+
+# VS Code settings
+.vscode/
+
+# Visual Studio files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# JetBrains IDEs (PyCharm, IntelliJ, etc.)
+.idea/
+*.iml
+
+# Sublime Text
+*.sublime-workspace
+*.sublime-project
+
+# MacOS and Windows system files
+.DS_Store
+Thumbs.db
