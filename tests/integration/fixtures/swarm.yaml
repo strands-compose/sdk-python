@@ -1,0 +1,12 @@
+agents:
+  analyst:
+    system_prompt: "You are a data analyst."
+  reporter:
+    system_prompt: "You are a reporter."
+entry: team
+orchestrations:
+  team:
+    mode: swarm
+    agents: [analyst, reporter]
+    entry_name: analyst
+    max_handoffs: 10

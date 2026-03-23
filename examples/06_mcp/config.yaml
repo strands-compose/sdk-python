@@ -1,0 +1,68 @@
+# 06_mcp — MCP: All Connection Modes in One Example
+#
+# Shows all three ways to wire MCP tools to an agent:
+#
+#   1. mcp_servers: + server:  — launch a local Python server (managed lifecycle)
+#   2. url:                    — connect to a real external MCP server over HTTP
+#   3. command: (commented)    — spawn a stdio subprocess that speaks MCP
+#
+# Both live clients are attached to a single agent, giving it calculator tools
+# from the local server AND AWS documentation tools from the remote server.
+#
+# Run:
+#   uv run python examples/06_mcp/main.py
+
+models:
+  default:
+    provider: bedrock
+    model_id: openai.gpt-oss-20b-1:0
+
+# ── Local server (managed lifecycle) ─────────────────────────────────────────
+# strands-compose calls create(**params) -> starts the server before load() returns.
+mcp_servers:
+  calculator:
+    type: ./server.py:create
+    params:
+      port: 9001
+
+# ── Clients ───────────────────────────────────────────────────────────────────
+mcp_clients:
+
+  # Mode 1 — server: reference — connects to an mcp_servers entry above
+  calc_client:
+    server: calculator
+    params:
+      prefix: calc                        # tools: calc_add, calc_multiply, calc_percentage
+
+  # Mode 2 — url: — connects to a real external server over Streamable HTTP.
+  # AWS publicly hosts a Knowledge MCP server; no API key required.
+  aws_knowledge:
+    url: https://knowledge-mcp.global.api.aws
+    transport: streamable-http
+    params:
+      prefix: aws                         # tools: aws_search, aws_read_doc, …
+      startup_timeout: 30
+
+  # Mode 3 — command: — spawn a local CLI tool that speaks MCP over stdio.
+  # (uncomment to try; requires npx)
+  # fs_tools:
+  #   command: ["npx", "-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
+  #   params:
+  #     prefix: fs
+
+# ── Agent ─────────────────────────────────────────────────────────────────────
+# Both clients are attached — the agent gets calc_* AND aws_* tools.
+agents:
+  assistant:
+    model: default
+    mcp:
+      - calc_client
+      - aws_knowledge
+    system_prompt: |
+      You are a helpful assistant with two sets of tools:
+        - calc_*  — arithmetic (add, multiply, percentage). Always use them for maths.
+        - aws_*   — live AWS documentation search. Use them for any AWS questions.
+      Cite the documentation source when answering AWS questions.
+      Never calculate by hand when a calc tool is available.
+
+entry: assistant

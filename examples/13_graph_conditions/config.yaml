@@ -1,0 +1,55 @@
+# 13_graph_conditions — Graph with Conditional Edges
+#
+# A write -> review -> publish pipeline with a conditional retry loop.
+# The reviewer can send content back to the writer or forward it to the publisher.
+#
+# Run:
+#   uv run python examples/13_graph_conditions/main.py
+
+models:
+  default:
+    provider: bedrock
+    model_id: openai.gpt-oss-20b-1:0
+
+agents:
+  writer:
+    model: default
+    system_prompt: |
+      You are a technical writer. Write clear, well-structured content on the given topic.
+      If you receive revision feedback, incorporate it and rewrite the content.
+      Output only the content — no meta-commentary.
+
+  reviewer:
+    model: default
+    system_prompt: |
+      You are an editor. Review the submitted content for clarity, accuracy, and completeness.
+      If it needs work, start your response with "REVISE:" followed by specific feedback.
+      If it is ready, start your response with "APPROVED:" followed by the final content.
+      You must always start with either REVISE: or APPROVED: — no exceptions.
+
+  publisher:
+    model: default
+    system_prompt: |
+      You are a publisher. You receive approved content.
+      Format it nicely with a title and clean markdown. Add a brief editor's note at the top.
+      Output only the final published version.
+
+orchestrations:
+  pipeline:
+    mode: graph
+    entry_name: writer
+    reset_on_revisit: true
+    max_node_executions: 6
+    edges:
+      # writer always sends to reviewer
+      - from: writer
+        to: reviewer
+      # reviewer routes conditionally
+      - from: reviewer
+        to: writer
+        condition: ./conditions.py:needs_revision
+      - from: reviewer
+        to: publisher
+        condition: ./conditions.py:is_approved
+
+entry: pipeline

@@ -1,0 +1,4 @@
+agents:
+  greeter:
+    system_prompt: "You are a helpful assistant."
+entry: greeter

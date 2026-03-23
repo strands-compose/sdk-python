@@ -1,0 +1,8 @@
+agents:
+  assistant:
+    system_prompt: "You are helpful."
+    hooks:
+      - type: strands_compose.hooks:MaxToolCallsGuard
+        params:
+          max_calls: 5
+entry: assistant

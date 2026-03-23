@@ -1,0 +1,40 @@
+# 05_hooks — Hooks
+#
+# Hooks are middleware attached to each agent that fire at lifecycle events.
+# They are declared under each agent; multiple hooks compose in order.
+#
+# Run:
+#   uv run python examples/05_hooks/main.py
+
+models:
+  default:
+    provider: bedrock
+    model_id: openai.gpt-oss-20b-1:0
+
+agents:
+  researcher:
+    model: default
+    tools:
+      - ./custom_tools.py
+    hooks:
+      # Two-phase tool-call cap: first violation tells the LLM to stop and write
+      # a final answer; if it ignores that and calls another tool, the loop is terminated.
+      - type: strands_compose.hooks:MaxToolCallsGuard
+        params:
+          max_calls: 5
+
+      # Some models inject extra tokens into tool names (e.g. "search<|x|>" instead of "search").
+      # Strands can't look up the tool when that happens — this hook strips the artifacts.
+      - type: strands_compose.hooks:ToolNameSanitizer
+
+      # Custom hook — counts tool calls and prints a summary after each invocation.
+      # Shows how to write and wire your own HookProvider from a local file.
+      - type: ./hooks.py:FingerprintHook
+
+    system_prompt: |
+      You are a research assistant.
+      When asked about a topic, use your search and facts tools to gather
+      information before writing your answer.
+      Try to make multiple tool calls to cover different angles.
+
+entry: researcher

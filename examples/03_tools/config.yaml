@@ -1,0 +1,35 @@
+# 03_tools — Python Tools
+#
+# Attach Python functions to an agent via the tools: list.
+# Paths are resolved relative to this config file.
+#
+# Tool spec formats supported:
+#   ./tools.py           -> all @tool-decorated functions in the file
+#   ./tools.py:func_name -> one specific function
+#   ./tools/             -> all .py files in a directory (skips _-prefixed)
+#   my_package           -> all tools from an installed package
+#   my_package:func_name -> one specific function from a package
+#
+# Run:
+#   uv run python examples/03_tools/main.py
+
+models:
+  default:
+    provider: bedrock
+    model_id: openai.gpt-oss-20b-1:0
+
+x-system_prompt: &system_prompt |
+  You are a text analysis assistant.
+  You have tools to count words, count characters, extract sentences,
+  and reverse word order in text.
+  Always use your tools when analysing text — never estimate by eye.
+  Report results clearly with the exact numbers from the tool output.
+
+agents:
+  analyst:
+    model: default
+    tools:
+      - ./tools.py
+    system_prompt: *system_prompt
+
+entry: analyst
