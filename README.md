@@ -13,6 +13,9 @@
   </p>
 </div>
 
+> [!NOTE]
+> Community project — not affiliated with AWS or the strands-agents team. Bugs here? [Open an issue](https://github.com/galuszkm/strands-compose/issues). Bugs in the underlying SDK? Head to [strands-agents](https://github.com/strands-agents/sdk-python).
+
 ## What is this?
 
 > **Think Docker Compose, but for AI agents**
