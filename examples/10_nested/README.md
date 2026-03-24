@@ -5,15 +5,15 @@
 ## What this shows
 
 - **Referencing an orchestration inside another orchestration** — `content_team` (swarm)
-  is used as a child node in `pipeline` (delegate)
-- **Topological sort** — strands-compose builds `content_team` before `pipeline` automatically
+  is used as a child node in `manager` (delegate)
+- **Topological sort** — strands-compose builds `content_team` before `manager` automatically
 - How agents, swarms, and graphs all become first-class nodes in a larger system
 
 ## How it works
 
 ```
-pipeline (delegate)
-  ├── content_team (swarm)  — researcher ↔ writer ↔ reviewer
+manager (delegate)
+  ├── content_team (swarm)  — researcher ↔ reviewer
   └── qa_bot        (agent) — quality-checks the final output
 ```
 
@@ -25,22 +25,22 @@ swarm and quality assurance to `qa_bot`. From the coordinator's perspective,
 orchestrations:
   content_team:
     mode: swarm
-    agents: [researcher, writer, reviewer]
+    agents: [researcher, reviewer]
     entry_name: researcher
-    max_handoffs: 15
+    max_handoffs: 10
 
-  pipeline:
+  manager:
     mode: delegate
+    entry_name: coordinator
     connections:
-      coordinator:
-        - agent: content_team     # ← references the swarm above
-          description: "Content production team."
-        - agent: qa_bot
-          description: "Quality assurance check."
+      - agent: content_team     # ← references the swarm above
+        description: "Content production team: researches and prepares the content."
+      - agent: qa_bot
+        description: "Quality assurance: checks the final content for accuracy and completeness."
 ```
 
 strands-compose topologically sorts the orchestrations: `content_team` is built first,
-then `pipeline` wraps it as a delegate tool.
+then `manager` wraps it as a delegate tool.
 
 ## Good to know
 

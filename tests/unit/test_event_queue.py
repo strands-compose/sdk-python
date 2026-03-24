@@ -18,13 +18,14 @@ from strands_compose.wire import EventQueue, StreamEvent, make_event_queue
 
 class TestEventQueue:
     def test_get_returns_event(self):
-        queue = asyncio.Queue()
-        eq = EventQueue(queue)
-        event = MagicMock(spec=StreamEvent)
-        queue.put_nowait(event)
+        async def _run():
+            queue = asyncio.Queue()
+            eq = EventQueue(queue)
+            event = MagicMock(spec=StreamEvent)
+            queue.put_nowait(event)
+            return await eq.get()
 
-        result = asyncio.get_event_loop().run_until_complete(eq.get())
-        assert result is event
+        assert asyncio.run(_run()) is not None
 
     def test_close_then_get_returns_none(self):
         async def _run():
@@ -33,7 +34,7 @@ class TestEventQueue:
             await eq.close()
             return await eq.get()
 
-        assert asyncio.get_event_loop().run_until_complete(_run()) is None
+        assert asyncio.run(_run()) is None
 
     def test_flush_clears_stale_events(self):
         queue = asyncio.Queue()

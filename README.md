@@ -9,12 +9,12 @@
     <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.11+-blue.svg" alt="Python 3.11+"></a>
     <a href="https://pypi.org/project/strands-compose/"><img src="https://img.shields.io/pypi/v/strands-compose.svg" alt="PyPI version"></a>
     <a href="https://github.com/strands-agents/sdk-python"><img src="https://img.shields.io/badge/strands--agents-1.32.0-green.svg" alt="Strands Agents"></a>
-    <a href="LICENSE"><img src="https://img.shields.io/github/license/strands-compose/sdk-python" alt="License"></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" alt="License"></a>
   </p>
 </div>
 
 > [!IMPORTANT]
-> Community project — not affiliated with AWS or the strands-agents team. Bugs here? [Open an issue](https://github.com/galuszkm/strands-compose/issues). Bugs in the underlying SDK? Head to [strands-agents](https://github.com/strands-agents/sdk-python).
+> Community project — not affiliated with AWS or the strands-agents team. Bugs here? [Open an issue](https://github.com/strands-compose/sdk-python/issues). Bugs in the underlying SDK? Head to [strands-agents](https://github.com/strands-agents/sdk-python).
 
 ## What is this?
 
@@ -180,13 +180,16 @@ Split large configs across files — models in one, agents in another, MCP in a 
 
 ## Getting started
 
+Install with [uv](https://docs.astral.sh/uv/):
+
 ```bash
-git clone https://github.com/strands-compose/sdk-python
-cd sdk-python
-uv sync --all-groups --all-extras
+uv add strands-compose                   # Bedrock (default)
+uv add strands-compose[ollama]           # + Ollama
+uv add strands-compose[openai]           # + OpenAI
+uv add strands-compose[gemini]           # + Gemini
 ```
 
-Install from PyPI:
+Or with pip:
 
 ```bash
 pip install strands-compose              # Bedrock (default)
@@ -221,6 +224,27 @@ resolved = load("config.yaml")
 with resolved.mcp_lifecycle:
     result = resolved.entry("Hello!")
     print(result)
+```
+
+### CLI
+
+strands-compose ships a CLI to validate and debug configs without writing Python.
+
+**`check`** — fast, static validation (YAML syntax, schema, variable interpolation, cross-references). No side-effects, safe for CI. Will **not** catch runtime issues like bad credentials, unreachable MCP servers, or missing Python modules.
+
+```bash
+strands-compose check config.yaml
+strands-compose check base.yaml agents.yaml   # merge multiple files
+strands-compose check config.yaml --json       # JSON output for scripts
+strands-compose check config.yaml --quiet      # exit code only
+```
+
+**`load`** *(recommended)* — full end-to-end validation. Builds real Python objects, starts MCP servers, and probes connectivity. Catches everything `check` catches plus import errors, auth failures, and MCP health issues.
+
+```bash
+strands-compose load config.yaml
+strands-compose load config.yaml --json
+strands-compose load config.yaml --quiet
 ```
 
 ---
@@ -323,7 +347,7 @@ orchestrations:
     connections:
       - agent: content_team     # Nested swarm as a delegate tool
         description: "Content creation team."
-      - agent: qa_bot           # Neasted agent as a delegate tool
+      - agent: qa_bot           # Nested agent as a delegate tool
         description: "Quality assurance."
 
 entry: team_leader
@@ -363,7 +387,7 @@ async def main():
 asyncio.run(main())
 ```
 
-Event types: `TOKEN`, `REASONING`, `TOOL_START`, `TOOL_END`, `NODE_START`, `NODE_STOP`, `HANDOFF`, `COMPLETE` — each carrying `{type, agent_name, timestamp, data}`. Enough for a real-time frontend, a log aggregator, or a debugging dashboard. The `AnsiRenderer` gives you coloured terminal output out of the box — agent names, tool calls, reasoning traces, all streaming live.
+Event types: `AGENT_START`, `TOKEN`, `REASONING`, `TOOL_START`, `TOOL_END`, `NODE_START`, `NODE_STOP`, `HANDOFF`, `COMPLETE`, `MULTIAGENT_START`, `MULTIAGENT_COMPLETE`, `ERROR` — each carrying `{type, agent_name, timestamp, data}`. Enough for a real-time frontend, a log aggregator, or a debugging dashboard. The `AnsiRenderer` gives you coloured terminal output out of the box — agent names, tool calls, reasoning traces, all streaming live.
 
 ---
 

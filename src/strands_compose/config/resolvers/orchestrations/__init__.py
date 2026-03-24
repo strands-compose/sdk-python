@@ -44,6 +44,14 @@ def resolve_orchestrations(
 ) -> dict[str, Node]:
     """Build all named orchestrations from config.
 
+    Args:
+        config: Full application config containing orchestration definitions.
+        agents: Resolved agent instances keyed by name.
+        agent_defs: Agent definition models keyed by name.
+        models: Resolved model instances keyed by name.
+        mcp_clients: Resolved MCP clients keyed by name.
+        session_manager: Optional shared session manager.
+
     Returns:
         Dict of orchestration name -> built Swarm/Graph/Agent.
         Empty dict when no orchestrations are defined.

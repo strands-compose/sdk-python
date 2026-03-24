@@ -102,6 +102,11 @@ class ToolNameSanitizer(HookProvider):
         try:
             return set(agent.tool_registry.registry.keys())
         except Exception:
+            logger.debug(
+                "agent=<%s> | failed to read tool registry",
+                getattr(agent, "name", "?"),
+                exc_info=True,
+            )
             return set()
 
     # -- Layer 1: fix names in the model response before tool lookup ----------
@@ -167,7 +172,9 @@ class ToolNameSanitizer(HookProvider):
                 if tool:
                     event.selected_tool = tool
             except Exception:  # nosec B110
-                pass
+                logger.debug(
+                    "tool=<%s> | failed to look up fixed tool in registry", fixed, exc_info=True
+                )
             return
 
         event.cancel_tool = (

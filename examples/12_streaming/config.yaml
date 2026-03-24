@@ -2,7 +2,7 @@
 #
 # A delegate orchestration with three agents: researcher, analyst, coordinator.
 # The example shows how to stream all agent lifecycle events in real time
-# using make_event_queue() from strands_compose.
+# using wire_event_queue() from strands_compose.
 #
 # Run:
 #   uv run python examples/12_streaming/main.py

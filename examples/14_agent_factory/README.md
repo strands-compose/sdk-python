@@ -46,7 +46,7 @@ Your factory must return a `strands.Agent` instance.
 ## Prerequisites
 
 ```bash
-pip install strands-agents strands-agents-builder strands-compose
+pip install strands-compose
 ```
 
 ## Run

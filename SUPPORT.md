@@ -20,6 +20,9 @@ If you encounter a bug or have a feature request:
 ## Security
 
 If you discover a potential security issue, please see [SECURITY.md](SECURITY.md).
+
+## Troubleshooting
+
 - If you see tool name errors, ensure the sanitizer is included in your hooks list
 
 **Import errors:**

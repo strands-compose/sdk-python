@@ -171,6 +171,14 @@ def resolve_agents(
     (``module.path:ClassName`` or ``./file.py:ClassName``) or inline HookDef
     objects -- resolved per-agent so each agent gets fresh hook instances.
 
+    Args:
+        agent_defs: Agent definitions keyed by name.
+        models: Resolved model instances keyed by name.
+        mcp_clients: Resolved MCP clients keyed by name.
+        session_manager: Optional shared session manager for all agents.
+        swarm_agent_names: Names of agents that participate in swarm orchestrations
+            (these agents must not have a session manager).
+
     Returns:
         Resolved agents dict keyed by name.
 

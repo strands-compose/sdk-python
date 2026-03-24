@@ -243,6 +243,7 @@ def build_swarm(
         config: Swarm orchestration config.
         nodes: Dict of name -> Agent or MultiAgentBase.
         entry_name: Name of the entry/starting agent.
+        session_manager: Optional session manager for the swarm.
 
     Returns:
         A strands Swarm instance — callable with ``swarm(task)``.
@@ -302,6 +303,7 @@ def build_graph(
         config: Graph orchestration config with edges.
         nodes: Dict of name -> Agent or MultiAgentBase.
         entry_name: Name of the entry node.
+        session_manager: Optional session manager for the graph.
 
     Returns:
         A strands Graph instance — callable with ``graph(task)``.

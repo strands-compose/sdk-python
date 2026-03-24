@@ -68,12 +68,12 @@ uv run just format       # auto-format with ruff
 
 ```
 src/strands_compose/
-├── __init__.py              # Public API — load(), ComposeResult
+├── __init__.py              # Public API — load(), ResolvedConfig
 ├── models.py                # Pydantic config models (AgentConfig, ModelConfig, …)
 ├── types.py                 # Shared type aliases
 ├── utils.py                 # Miscellaneous helpers
 ├── exceptions.py            # Custom exception hierarchy
-├── wire.py                  # Final assembly — wires all resolved objects into ComposeResult
+├── wire.py                  # Final assembly — wires all resolved objects into ResolvedConfig
 ├── config/                  # YAML loading, validation, interpolation
 │   ├── schema.py            # JSON-schema for config validation
 │   ├── interpolation.py     # ${VAR:-default} interpolation
