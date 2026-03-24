@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="docs/img/logo.png" width="180" alt="strands-compose">
+  <img src="https://raw.githubusercontent.com/strands-compose/sdk-python/main/docs/img/logo.png" width="180" alt="strands-compose">
 
   # Strands Compose
 
