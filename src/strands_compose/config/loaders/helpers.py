@@ -180,11 +180,14 @@ def _apply_rename(
 def is_fs_spec(spec: str) -> bool:
     """Return True if ``spec`` looks like a filesystem import path.
 
-    A spec is a filesystem path if the portion before the first ``:`` contains
-    ``/``, ``\\``, or ends with ``.py``.  These are the same rules used by
+    A spec is a filesystem path if the portion before the first ``:``
+    (ignoring a Windows drive prefix) contains ``/``, ``\\``, or ends
+    with ``.py``.  These are the same rules used by
     :func:`resolve_tool_spec` in ``tools.py``.
     """
-    path_part = spec.partition(":")[0]
+    drive = Path(spec).drive  # e.g. "C:" on Windows, "" on POSIX
+    after_drive = spec[len(drive) :]
+    path_part = after_drive.partition(":")[0]
     return "/" in path_part or "\\" in path_part or path_part.endswith(".py")
 
 

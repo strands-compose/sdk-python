@@ -72,20 +72,23 @@ class TestLoadToolFunction:
 
 
 class TestResolveToolSpec:
-    def test_resolve_file_spec(self, tools_dir):
+    def test_resolve_file_spec(self, tools_dir, monkeypatch):
+        monkeypatch.chdir(tools_dir.parent)
         tools = resolve_tool_spec(os.path.relpath(tools_dir / "greet.py"))
         assert len(tools) == 1
 
-    def test_resolve_directory_spec(self, tools_dir):
+    def test_resolve_directory_spec(self, tools_dir, monkeypatch):
+        monkeypatch.chdir(tools_dir.parent)
         tools = resolve_tool_spec(os.path.relpath(tools_dir) + os.sep)
         assert len(tools) >= 2
 
-    def test_resolve_file_with_function(self, tools_dir):
+    def test_resolve_file_with_function(self, tools_dir, monkeypatch):
+        monkeypatch.chdir(tools_dir.parent)
         file_path = os.path.relpath(tools_dir / "greet.py")
         tools = resolve_tool_spec(f"{file_path}:greet")
         assert len(tools) == 1
 
-    def test_resolve_file_colon_plain_function_autowraps(self, plain_tools_file, caplog):
+    def test_resolve_file_colon_plain_function_autowraps(self, plain_tools_file, caplog, monkeypatch):
         """Plain function named explicitly via file colon spec is auto-wrapped.
 
         The function must become an AgentTool and a warning must be logged
@@ -93,6 +96,7 @@ class TestResolveToolSpec:
         """
         import logging
 
+        monkeypatch.chdir(plain_tools_file.parent)
         file_path = os.path.relpath(plain_tools_file)
         with caplog.at_level(logging.WARNING, logger="strands_compose.tools"):
             tools = resolve_tool_spec(f"{file_path}:count_words")
@@ -157,8 +161,9 @@ class TestResolveToolSpecModuleBased:
 
         assert len(tools) == 2
 
-    def test_file_colon_nonexistent_attr_raises(self, tools_dir) -> None:
+    def test_file_colon_nonexistent_attr_raises(self, tools_dir, monkeypatch) -> None:
         """File colon spec with nonexistent function raises AttributeError."""
+        monkeypatch.chdir(tools_dir.parent)
         file_path = os.path.relpath(tools_dir / "greet.py")
         with pytest.raises(AttributeError, match="has no attribute"):
             resolve_tool_spec(f"{file_path}:nonexistent_func")
