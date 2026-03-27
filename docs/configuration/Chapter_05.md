@@ -16,7 +16,7 @@ agents:
       - ./utils/                            # All @tool functions from all .py files in dir
       - my_package.tools                    # All @tool functions from an installed module
       - my_package.tools:special_function   # One specific function from a module
-      - strands_tools:http_request          # A tool from strands' built-in tools
+      - strands_tools.http_request          # A tool from strands' built-in tools
     system_prompt: "You analyze text using your tools."
 ```
 
@@ -97,7 +97,7 @@ tools/
 > **Tips & Tricks**
 >
 > - Organize tools in a directory when you have many of them. One file per domain: `tools/math.py`, `tools/text.py`, `tools/database.py`.
-> - The `strands_tools` package has built-in tools like `http_request`, `file_read`, `shell` — use them with `strands_tools:http_request`.
+> - The `strands_tools` package has built-in tools like `http_request`, `file_read`, `shell` — use them with `strands_tools.http_request`.
 > - Each agent gets its own copy of tools. Two agents referencing the same file get independent tool instances.
 > - Tool function docstrings are sent to the LLM as the tool description. Write good docstrings — they directly affect how well the model uses your tools.
 > - Type hints on tool parameters become the JSON schema the LLM sees. Use `str`, `int`, `float`, `bool`, `list[str]`, etc. The more specific your types, the better the LLM calls your tools.

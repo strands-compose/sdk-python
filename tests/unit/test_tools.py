@@ -88,7 +88,9 @@ class TestResolveToolSpec:
         tools = resolve_tool_spec(f"{file_path}:greet")
         assert len(tools) == 1
 
-    def test_resolve_file_colon_plain_function_autowraps(self, plain_tools_file, caplog, monkeypatch):
+    def test_resolve_file_colon_plain_function_autowraps(
+        self, plain_tools_file, caplog, monkeypatch
+    ):
         """Plain function named explicitly via file colon spec is auto-wrapped.
 
         The function must become an AgentTool and a warning must be logged

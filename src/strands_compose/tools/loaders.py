@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from strands.tools.decorator import tool
+from strands.tools.loader import load_tools_from_module as _strands_load_tools_from_module
 from strands.types.tools import AgentTool
 
 from ..utils import load_module_from_file
@@ -98,7 +99,12 @@ def load_tools_from_file(path: str | Path) -> list[AgentTool]:
 
 
 def load_tools_from_module(module_path: str) -> list[AgentTool]:
-    """Load all @tool decorated functions from a Python module.
+    """Load tools from a Python module.
+
+    First scans for ``@tool``-decorated functions.  If none are found,
+    falls back to the strands module-based tool pattern (``TOOL_SPEC`` dict
+    + a function named after the module).  This ensures compatibility with
+    tools like ``strands_tools.http_request`` that use the legacy pattern.
 
     Args:
         module_path: Dotted import path (e.g., "my_package.tools").
@@ -108,9 +114,19 @@ def load_tools_from_module(module_path: str) -> list[AgentTool]:
 
     Raises:
         ImportError: If the module cannot be imported.
+        AttributeError: If the module contains neither ``@tool``-decorated
+            functions nor a valid ``TOOL_SPEC`` + module-named function.
     """
     module = importlib.import_module(module_path)
-    return _collect_tools(module)
+    tools = _collect_tools(module)
+    if tools:
+        return tools
+
+    # Fallback: delegate to strands for TOOL_SPEC-based (module) tools.
+    # Strands raises AttributeError if the module has neither @tool functions
+    # nor a valid TOOL_SPEC + module-named function.
+    module_name = module_path.split(".")[-1]
+    return _strands_load_tools_from_module(module, module_name)
 
 
 def load_tool_function(spec: str) -> AgentTool:

@@ -36,7 +36,7 @@ agents:
   researcher:
     model: default
     system_prompt: "You research topics."
-    tools: [strands_tools:http_request]
+    tools: [strands_tools.http_request]
 
   writer:
     model: default
