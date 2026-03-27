@@ -194,14 +194,19 @@ def resolve_tool_spec(spec: str) -> list[AgentTool]:
     Returns:
         List of tool objects.
     """
-    # Determine the path part (before colon, if present)
-    path_part = spec.rsplit(":", 1)[0] if ":" in spec else spec
+    # Determine the path part (before colon, if present).
+    # On Windows, absolute paths contain a drive letter colon (e.g. "C:\...").
+    # Strip a leading drive prefix so the colon check doesn't misfire.
+    _drive = Path(spec).drive  # e.g. "C:" on Windows, "" on POSIX
+    _after_drive = spec[len(_drive) :]
+    path_part = _after_drive.rsplit(":", 1)[0] if ":" in _after_drive else _after_drive
     is_fs_path = "/" in path_part or "\\" in path_part or path_part.endswith(".py")
 
     if is_fs_path:
-        if ":" in spec:
+        if ":" in _after_drive:
             # ./path/to/file.py:function_name — single function from a file
-            file_str, func_name = spec.rsplit(":", 1)
+            file_str, func_name = _after_drive.rsplit(":", 1)
+            file_str = _drive + file_str
             module = load_module_from_file(file_str)
             if not hasattr(module, func_name):
                 raise AttributeError(
