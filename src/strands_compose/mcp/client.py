@@ -37,7 +37,7 @@ def create_mcp_client(
     Exactly one of server, url, or command must be provided.
 
     Args:
-        server: A managed MCPServer instance (connects via its URL or stdio).
+        server: A managed MCPServer instance (connects via its URL).
         url: External MCP server URL (for SSE or streamable-http).
         command: Command to start an MCP server subprocess (stdio transport).
         transport: Override transport type ("stdio", "sse", "streamable-http").
@@ -75,12 +75,12 @@ def create_mcp_client(
     opts = transport_options or {}
 
     if server is not None:
-        transport_callable = _transport_for_server(server, transport, opts)
+        transport_callable = _transport_for_http(server.url, transport, opts, allow_stdio=False)
     elif url is not None:
-        transport_callable = _transport_for_url(url, transport, opts)
+        transport_callable = _transport_for_http(url, transport, opts, allow_stdio=True)
     else:
         # command is guaranteed non-None by the modes == 1 check above.
-        transport_callable = stdio_transport(command, **opts)  # type: ignore[arg-type]
+        transport_callable = stdio_transport(command, **opts)  # ty: ignore
 
     return _make_strands_client(transport_callable=transport_callable, **kwargs)
 
@@ -99,48 +99,28 @@ def _make_strands_client(**kwargs: Any) -> MCPClient:
     return _MCPClient(**kwargs)
 
 
-def _transport_for_server(
-    server: MCPServer, transport: str | None, opts: dict[str, Any] | None = None
+def _transport_for_http(
+    url: str,
+    transport: str | None,
+    opts: dict[str, Any] | None = None,
+    *,
+    allow_stdio: bool = True,
 ) -> Any:
-    """Build transport callable for a managed MCPServer.
+    """Build a transport callable for an HTTP-based MCP connection.
 
     Args:
-        server: The managed MCPServer instance.
-        transport: Optional transport override.
+        url: The MCP server URL.
+        transport: Optional transport override. Auto-detected from URL when omitted.
         opts: Transport-specific options forwarded to the transport factory.
+        allow_stdio: When False, raises ValueError if stdio is requested.
+            Set to False for managed servers where stdio makes no sense.
 
     Returns:
         A transport callable for strands MCPClient.
 
     Raises:
-        ValueError: If the transport type is unsupported for managed servers.
-    """
-    opts = opts or {}
-    effective = transport or "streamable-http"
-    if effective == "streamable-http":
-        return streamable_http_transport(server.url, **opts)
-    if effective == "sse":
-        return sse_transport(server.url, **opts)
-    if effective == "stdio":
-        raise ValueError(
-            "stdio transport not supported for managed servers. Use url or command instead."
-        )
-    raise ValueError(f"Unknown transport: {effective}")
-
-
-def _transport_for_url(url: str, transport: str | None, opts: dict[str, Any] | None = None) -> Any:
-    """Build transport callable for an external URL.
-
-    Args:
-        url: The external MCP server URL.
-        transport: Optional transport override.
-        opts: Transport-specific options forwarded to the transport factory.
-
-    Returns:
-        A transport callable for strands MCPClient.
-
-    Raises:
-        ValueError: If the transport type is unsupported for URL connections.
+        ValueError: If the transport type is unsupported or stdio is requested
+            when allow_stdio is False.
     """
     opts = opts or {}
     effective = transport or _detect_transport(url)
@@ -148,8 +128,12 @@ def _transport_for_url(url: str, transport: str | None, opts: dict[str, Any] | N
         return streamable_http_transport(url, **opts)
     if effective == "sse":
         return sse_transport(url, **opts)
+    if effective == "stdio" and not allow_stdio:
+        raise ValueError(
+            "stdio transport not supported for managed servers. Use url or command instead."
+        )
     raise ValueError(
-        f"URL-based connection requires 'sse' or 'streamable-http' transport, got: {effective}."
+        f"HTTP-based connection requires 'sse' or 'streamable-http' transport, got: {effective}."
     )
 
 

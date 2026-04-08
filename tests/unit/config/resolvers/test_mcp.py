@@ -73,7 +73,7 @@ class TestResolveMcpClient:
         servers = {"alpha": MagicMock(), "beta": MagicMock()}
         client_def = MCPClientDef(server="missing")
         with pytest.raises(ValueError, match="alpha, beta"):
-            resolve_mcp_client(client_def, servers, name="test")  # type: ignore[arg-type]
+            resolve_mcp_client(client_def, servers, name="test")  # ty: ignore
 
     @patch("strands_compose.config.resolvers.mcp.create_mcp_client")
     def test_tool_filters_passthrough(self, mock_create):

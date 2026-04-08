@@ -26,15 +26,15 @@ class TestResolveAgents:
         models = {"my-model": MagicMock()}
         result = resolve_agents(
             {"main": agent_def},
-            models=models,  # type: ignore[arg-type]
+            models=models,  # ty: ignore
             mcp_clients={},
             session_manager=None,
         )
         assert "main" in result
         agent = result["main"]
         assert isinstance(agent, _RealAgent)
-        assert agent._init_kwargs["model"] is models["my-model"]  # type: ignore[unresolved-attribute]
-        assert agent._init_kwargs["system_prompt"] == "You are helpful"  # type: ignore[unresolved-attribute]
+        assert agent._init_kwargs["model"] is models["my-model"]  # ty: ignore
+        assert agent._init_kwargs["system_prompt"] == "You are helpful"  # ty: ignore
 
     @patch("strands_compose.config.resolvers.agents.resolve_model")
     def test_agent_with_inline_model(self, mock_resolve_model, patch_agent_init):
@@ -52,7 +52,7 @@ class TestResolveAgents:
             {"main": agent_def}, models={}, mcp_clients={}, session_manager=None
         )
         assert "main" in result
-        assert result["main"]._init_kwargs["model"] is None  # type: ignore[unresolved-attribute]
+        assert result["main"]._init_kwargs["model"] is None  # ty: ignore
 
     @patch("strands_compose.config.resolvers.agents.resolve_tools")
     def test_agent_with_tools(self, mock_resolve_tools, patch_agent_init):
@@ -87,7 +87,7 @@ class TestResolveAgents:
             session_manager=None,
         )
         assert "main" in result
-        assert mock_client in result["main"]._init_kwargs["tools"]  # type: ignore[unresolved-attribute]
+        assert mock_client in result["main"]._init_kwargs["tools"]  # ty: ignore
 
     @patch("strands_compose.config.resolvers.agents.load_object")
     def test_agent_with_custom_type(self, mock_import):
@@ -115,7 +115,7 @@ class TestResolveAgents:
         result = resolve_agents(
             {"main": agent_def}, models={}, mcp_clients={}, session_manager=None
         )
-        assert result["main"]._init_kwargs["conversation_manager"] is None  # type: ignore[unresolved-attribute]
+        assert result["main"]._init_kwargs["conversation_manager"] is None  # ty: ignore
 
     @patch("strands_compose.config.resolvers.agents.resolve_conversation_manager")
     def test_agent_with_conversation_manager_resolves_and_passes(
@@ -133,7 +133,7 @@ class TestResolveAgents:
             {"main": agent_def}, models={}, mcp_clients={}, session_manager=None
         )
         mock_resolve_cm.assert_called_once_with(cm_def)
-        assert result["main"]._init_kwargs["conversation_manager"] is mock_cm  # type: ignore[unresolved-attribute]
+        assert result["main"]._init_kwargs["conversation_manager"] is mock_cm  # ty: ignore
 
     @patch("strands_compose.config.resolvers.agents.resolve_conversation_manager")
     @patch("strands_compose.config.resolvers.agents.load_object")
@@ -200,7 +200,7 @@ class TestSwarmSessionGuard:
             swarm_agent_names={"node"},
         )
         assert "node" in result
-        assert result["node"]._init_kwargs["session_manager"] is None  # type: ignore[unresolved-attribute]
+        assert result["node"]._init_kwargs["session_manager"] is None  # ty: ignore
 
     def test_non_swarm_agent_inherits_global_sm(self, patch_agent_init):
         """Non-swarm agent with no per-agent SM inherits the global session manager."""
@@ -212,7 +212,7 @@ class TestSwarmSessionGuard:
             mcp_clients={},
             session_manager=global_sm,
         )
-        assert result["main"]._init_kwargs["session_manager"] is global_sm  # type: ignore[unresolved-attribute]
+        assert result["main"]._init_kwargs["session_manager"] is global_sm  # ty: ignore
 
     @patch("strands_compose.config.resolvers.agents.resolve_session_manager")
     def test_non_swarm_agent_with_explicit_sm_uses_per_agent_sm(
@@ -230,7 +230,7 @@ class TestSwarmSessionGuard:
             mcp_clients={},
             session_manager=global_sm,
         )
-        assert result["main"]._init_kwargs["session_manager"] is per_agent_sm  # type: ignore[unresolved-attribute]
+        assert result["main"]._init_kwargs["session_manager"] is per_agent_sm  # ty: ignore
 
     def test_non_swarm_agent_with_explicit_null_sm_opts_out(self, patch_agent_init):
         """Non-swarm agent with session_manager: ~ opts out of the global SM."""
@@ -242,7 +242,7 @@ class TestSwarmSessionGuard:
             mcp_clients={},
             session_manager=global_sm,
         )
-        assert result["main"]._init_kwargs["session_manager"] is None  # type: ignore[unresolved-attribute]
+        assert result["main"]._init_kwargs["session_manager"] is None  # ty: ignore
 
 
 class TestResolveOrchestration:
@@ -264,7 +264,7 @@ class TestResolveOrchestration:
         mock_builder = MagicMock()
         mock_builder.build_all.return_value = {"my_swarm": mock_swarm}
         mock_builder_cls.return_value = mock_builder
-        orchestrators = resolve_orchestrations(config, agents, {}, {}, {})  # type: ignore[arg-type]
+        orchestrators = resolve_orchestrations(config, agents, {}, {}, {})  # ty: ignore
         assert orchestrators == {"my_swarm": mock_swarm}
         mock_builder_cls.assert_called_once()
         mock_builder.build_all.assert_called_once()

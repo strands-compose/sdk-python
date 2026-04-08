@@ -99,7 +99,7 @@ class TestResolveConversationManager:
         cm_def = ConversationManagerDef(type=f"{cm_file}:MyCM", params={"x": 42})
         result = resolve_conversation_manager(cm_def)
         assert isinstance(result, ConversationManager)
-        assert result.x == 42  # type: ignore[unresolved-attribute]
+        assert result.x == 42  # ty: ignore
 
     @patch("strands_compose.config.resolvers.conversation_manager.load_object")
     def test_params_forwarded_to_constructor(self, mock_load: MagicMock) -> None:

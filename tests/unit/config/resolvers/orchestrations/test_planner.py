@@ -42,8 +42,8 @@ class TestCollectNodeRefs:
         config = GraphOrchestrationDef(
             entry_name="a",
             edges=[
-                GraphEdgeDef(from_agent="a", to_agent="b"),  # type: ignore[call-arg]
-                GraphEdgeDef(from_agent="b", to_agent="c"),  # type: ignore[call-arg]
+                GraphEdgeDef(from_agent="a", to_agent="b"),  # ty: ignore
+                GraphEdgeDef(from_agent="b", to_agent="c"),  # ty: ignore
             ],
         )
         assert collect_node_refs(config) == {"a", "b", "c"}
@@ -66,7 +66,7 @@ class TestTopologicalSort:
             "orch_a": SwarmOrchestrationDef(entry_name="a1", agents=["a1", "a2"]),
             "orch_b": SwarmOrchestrationDef(entry_name="b1", agents=["b1", "b2"]),
         }
-        order = topological_sort(configs)  # type: ignore[arg-type]
+        order = topological_sort(configs)  # ty: ignore
         assert set(order) == {"orch_a", "orch_b"}
 
     def test_dependency_appears_before_dependent(self) -> None:
@@ -76,11 +76,11 @@ class TestTopologicalSort:
             "orch_b": GraphOrchestrationDef(
                 entry_name="orch_a",
                 edges=[
-                    GraphEdgeDef(from_agent="orch_a", to_agent="reviewer"),  # type: ignore[call-arg]
+                    GraphEdgeDef(from_agent="orch_a", to_agent="reviewer"),  # ty: ignore
                 ],
             ),
         }
-        order = topological_sort(configs)  # type: ignore[arg-type]
+        order = topological_sort(configs)  # ty: ignore
         assert order.index("orch_a") < order.index("orch_b")
 
     def test_circular_dependency_raises_configuration_error(self) -> None:
@@ -88,28 +88,28 @@ class TestTopologicalSort:
         configs = {
             "orch_a": GraphOrchestrationDef(
                 entry_name="orch_b",
-                edges=[GraphEdgeDef(from_agent="orch_b", to_agent="x")],  # type: ignore[call-arg]
+                edges=[GraphEdgeDef(from_agent="orch_b", to_agent="x")],  # ty: ignore
             ),
             "orch_b": GraphOrchestrationDef(
                 entry_name="orch_a",
-                edges=[GraphEdgeDef(from_agent="orch_a", to_agent="y")],  # type: ignore[call-arg]
+                edges=[GraphEdgeDef(from_agent="orch_a", to_agent="y")],  # ty: ignore
             ),
         }
         with pytest.raises(ConfigurationError, match="Circular dependency"):
-            topological_sort(configs)  # type: ignore[arg-type]
+            topological_sort(configs)  # ty: ignore
 
     def test_three_level_chain_correct_order(self) -> None:
         """A -> B -> C chain: C built first, then B, then A."""
         configs = {
             "A": GraphOrchestrationDef(
                 entry_name="B",
-                edges=[GraphEdgeDef(from_agent="B", to_agent="agent1")],  # type: ignore[call-arg]
+                edges=[GraphEdgeDef(from_agent="B", to_agent="agent1")],  # ty: ignore
             ),
             "B": GraphOrchestrationDef(
                 entry_name="C",
-                edges=[GraphEdgeDef(from_agent="C", to_agent="agent2")],  # type: ignore[call-arg]
+                edges=[GraphEdgeDef(from_agent="C", to_agent="agent2")],  # ty: ignore
             ),
             "C": SwarmOrchestrationDef(entry_name="agent3", agents=["agent3", "agent4"]),
         }
-        order = topological_sort(configs)  # type: ignore[arg-type]
+        order = topological_sort(configs)  # ty: ignore
         assert order.index("C") < order.index("B") < order.index("A")

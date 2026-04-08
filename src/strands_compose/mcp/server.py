@@ -191,7 +191,7 @@ class MCPServer(ABC):
 
         def _target() -> None:
             try:
-                asyncio.run(self._uvicorn_server.serve())  # type: ignore[union-attr]
+                asyncio.run(self._uvicorn_server.serve())  # ty: ignore
             except BaseException as exc:
                 self._error = exc
                 self._ready.set()
