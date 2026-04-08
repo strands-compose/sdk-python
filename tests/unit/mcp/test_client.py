@@ -8,8 +8,7 @@ import pytest
 
 from strands_compose.mcp.client import (
     _detect_transport,
-    _transport_for_server,
-    _transport_for_url,
+    _transport_for_http,
     create_mcp_client,
 )
 
@@ -24,23 +23,25 @@ class TestCreateMcpClient:
             create_mcp_client(url="http://x", command=["python"])
 
     @patch("strands_compose.mcp.client._make_strands_client")
-    @patch("strands_compose.mcp.client._transport_for_server")
+    @patch("strands_compose.mcp.client._transport_for_http")
     def test_create_with_server(self, mock_transport, mock_make):
         server = MagicMock()
         mock_transport.return_value = "transport-callable"
         mock_make.return_value = "client"
         result = create_mcp_client(server=server)
-        mock_transport.assert_called_once_with(server, "streamable-http", {})
+        mock_transport.assert_called_once_with(server.url, "streamable-http", {}, allow_stdio=False)
         mock_make.assert_called_once_with(transport_callable="transport-callable")
         assert result == "client"
 
     @patch("strands_compose.mcp.client._make_strands_client")
-    @patch("strands_compose.mcp.client._transport_for_url")
+    @patch("strands_compose.mcp.client._transport_for_http")
     def test_create_with_url(self, mock_transport, mock_make):
         mock_transport.return_value = "transport-callable"
         mock_make.return_value = "client"
         result = create_mcp_client(url="http://localhost:8000/mcp")
-        mock_transport.assert_called_once_with("http://localhost:8000/mcp", "streamable-http", {})
+        mock_transport.assert_called_once_with(
+            "http://localhost:8000/mcp", "streamable-http", {}, allow_stdio=True
+        )
         mock_make.assert_called_once_with(transport_callable="transport-callable")
         assert result == "client"
 
@@ -55,7 +56,7 @@ class TestCreateMcpClient:
         assert result == "client"
 
     @patch("strands_compose.mcp.client._make_strands_client")
-    @patch("strands_compose.mcp.client._transport_for_url")
+    @patch("strands_compose.mcp.client._transport_for_http")
     def test_create_forwards_extra_kwargs(self, mock_transport, mock_make):
         mock_transport.return_value = "t"
         mock_make.return_value = "client"
@@ -63,14 +64,16 @@ class TestCreateMcpClient:
         mock_make.assert_called_once_with(transport_callable="t", startup_timeout=30)
 
     @patch("strands_compose.mcp.client._make_strands_client")
-    @patch("strands_compose.mcp.client._transport_for_server")
+    @patch("strands_compose.mcp.client._transport_for_http")
     def test_create_with_transport_options(self, mock_transport, mock_make):
         server = MagicMock()
         mock_transport.return_value = "t"
         mock_make.return_value = "client"
         opts = {"headers": {"Authorization": "Bearer tok"}, "terminate_on_close": False}
         create_mcp_client(server=server, transport_options=opts)
-        mock_transport.assert_called_once_with(server, "streamable-http", opts)
+        mock_transport.assert_called_once_with(
+            server.url, "streamable-http", opts, allow_stdio=False
+        )
 
     @patch("strands_compose.mcp.client._make_strands_client")
     @patch("strands_compose.mcp.client.stdio_transport")
@@ -100,94 +103,70 @@ class TestDetectTransport:
         assert _detect_transport("http://localhost/mcp") == "streamable-http"
 
 
-class TestTransportForServer:
+class TestTransportForHttp:
     @patch("strands_compose.mcp.client.streamable_http_transport")
     def test_streamable_http_default(self, mock_transport):
-        server = MagicMock()
-        server.url = "http://localhost:8000/mcp"
         mock_transport.return_value = "transport"
-        result = _transport_for_server(server, None)
+        result = _transport_for_http("http://localhost:8000/mcp", None)
         mock_transport.assert_called_once_with("http://localhost:8000/mcp")
         assert result == "transport"
 
     @patch("strands_compose.mcp.client.streamable_http_transport")
     def test_streamable_http_explicit(self, mock_transport):
-        server = MagicMock()
-        server.url = "http://localhost:8000/mcp"
         mock_transport.return_value = "transport"
-        result = _transport_for_server(server, "streamable-http")
-        mock_transport.assert_called_once_with("http://localhost:8000/mcp")
-        assert result == "transport"
-
-    @patch("strands_compose.mcp.client.sse_transport")
-    def test_sse_transport(self, mock_transport):
-        server = MagicMock()
-        server.url = "http://localhost:8000/sse"
-        mock_transport.return_value = "transport"
-        result = _transport_for_server(server, "sse")
-        mock_transport.assert_called_once_with("http://localhost:8000/sse")
-        assert result == "transport"
-
-    @patch("strands_compose.mcp.client.streamable_http_transport")
-    def test_forwards_transport_options(self, mock_transport):
-        server = MagicMock()
-        server.url = "http://localhost:8000/mcp"
-        mock_transport.return_value = "transport"
-        opts = {"terminate_on_close": False}
-        result = _transport_for_server(server, "streamable-http", opts)
-        mock_transport.assert_called_once_with(
-            "http://localhost:8000/mcp", terminate_on_close=False
-        )
-        assert result == "transport"
-
-    def test_stdio_raises(self):
-        with pytest.raises(ValueError, match="not supported"):
-            _transport_for_server(MagicMock(), "stdio")
-
-    def test_unknown_raises(self):
-        with pytest.raises(ValueError, match="Unknown transport"):
-            _transport_for_server(MagicMock(), "grpc")
-
-
-class TestTransportForUrl:
-    @patch("strands_compose.mcp.client.streamable_http_transport")
-    def test_streamable_http_explicit(self, mock_transport):
-        mock_transport.return_value = "transport"
-        result = _transport_for_url("http://localhost:8000/mcp", "streamable-http")
+        result = _transport_for_http("http://localhost:8000/mcp", "streamable-http")
         mock_transport.assert_called_once_with("http://localhost:8000/mcp")
         assert result == "transport"
 
     @patch("strands_compose.mcp.client.sse_transport")
     def test_sse_explicit(self, mock_transport):
         mock_transport.return_value = "transport"
-        result = _transport_for_url("http://localhost:8000/sse", "sse")
+        result = _transport_for_http("http://localhost:8000/sse", "sse")
         mock_transport.assert_called_once_with("http://localhost:8000/sse")
         assert result == "transport"
 
     @patch("strands_compose.mcp.client.streamable_http_transport")
     def test_auto_detect_streamable_http(self, mock_transport):
         mock_transport.return_value = "transport"
-        result = _transport_for_url("http://localhost:8000/mcp", None)
+        result = _transport_for_http("http://localhost:8000/mcp", None)
         mock_transport.assert_called_once_with("http://localhost:8000/mcp")
         assert result == "transport"
 
     @patch("strands_compose.mcp.client.sse_transport")
     def test_auto_detect_sse(self, mock_transport):
         mock_transport.return_value = "transport"
-        result = _transport_for_url("http://localhost:8000/sse", None)
+        result = _transport_for_http("http://localhost:8000/sse", None)
         mock_transport.assert_called_once_with("http://localhost:8000/sse")
         assert result == "transport"
 
-    @patch("strands_compose.mcp.client.sse_transport")
+    @patch("strands_compose.mcp.client.streamable_http_transport")
     def test_forwards_transport_options(self, mock_transport):
         mock_transport.return_value = "transport"
+        opts = {"terminate_on_close": False}
+        result = _transport_for_http("http://localhost:8000/mcp", "streamable-http", opts)
+        mock_transport.assert_called_once_with(
+            "http://localhost:8000/mcp", terminate_on_close=False
+        )
+        assert result == "transport"
+
+    @patch("strands_compose.mcp.client.sse_transport")
+    def test_forwards_sse_transport_options(self, mock_transport):
+        mock_transport.return_value = "transport"
         opts = {"timeout": 30, "sse_read_timeout": 600}
-        result = _transport_for_url("http://localhost:8000/sse", "sse", opts)
+        result = _transport_for_http("http://localhost:8000/sse", "sse", opts)
         mock_transport.assert_called_once_with(
             "http://localhost:8000/sse", timeout=30, sse_read_timeout=600
         )
         assert result == "transport"
 
-    def test_unsupported_transport_raises(self):
-        with pytest.raises(ValueError, match=r"requires.*sse.*streamable-http"):
-            _transport_for_url("http://x", "stdio")
+    def test_stdio_raises_when_not_allowed(self):
+        with pytest.raises(ValueError, match="not supported"):
+            _transport_for_http("http://x", "stdio", allow_stdio=False)
+
+    def test_stdio_raises_as_unsupported_http_transport(self):
+        with pytest.raises(ValueError, match="requires.*sse.*streamable-http"):
+            _transport_for_http("http://x", "stdio", allow_stdio=True)
+
+    def test_unknown_raises(self):
+        with pytest.raises(ValueError, match="requires.*sse.*streamable-http"):
+            _transport_for_http("http://x", "grpc")

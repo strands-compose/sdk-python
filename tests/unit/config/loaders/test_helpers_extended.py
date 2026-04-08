@@ -140,7 +140,7 @@ class TestUpdateReferences:
         )
         orch: dict = raw["orchestrations"]["main"]
         assert orch["entry_name"] == "Parent_Agent"
-        conns: list = orch["connections"]  # type: ignore[assignment]
+        conns: list = orch["connections"]  # ty: ignore
         assert conns[0]["agent"] == "Child_Agent"
 
     def test_swarm_refs_updated(self):
@@ -174,8 +174,8 @@ class TestUpdateReferences:
         orch = raw["orchestrations"]["main"]
         assert orch["entry_name"] == "Node_A"
         edges = orch["edges"]
-        assert edges[0]["from"] == "Node_A"  # type: ignore[index]
-        assert edges[0]["to"] == "Node_B"  # type: ignore[index]
+        assert edges[0]["from"] == "Node_A"  # ty: ignore
+        assert edges[0]["to"] == "Node_B"  # ty: ignore
 
     def test_non_dict_agent_def_skipped(self):
         raw: dict = {"agents": {"a": "not-a-dict"}}

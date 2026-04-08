@@ -179,7 +179,7 @@ class TestBuildGraph:
         nodes: dict = {"a1": a1, "a2": a2}
         config = GraphOrchestrationDef(
             entry_name="a1",
-            edges=[GraphEdgeDef(from_agent="a1", to_agent="a2")],  # type: ignore[call-arg]
+            edges=[GraphEdgeDef(from_agent="a1", to_agent="a2")],  # ty: ignore
         )
 
         build_graph("test_graph", config, nodes, "a1")
@@ -200,7 +200,7 @@ class TestBuildGraph:
         config = GraphOrchestrationDef(
             entry_name="agent1",
             edges=[
-                GraphEdgeDef(from_agent="agent1", to_agent="nested_swarm"),  # type: ignore[call-arg]
+                GraphEdgeDef(from_agent="agent1", to_agent="nested_swarm"),  # ty: ignore
             ],
         )
 
@@ -226,7 +226,7 @@ class TestOrchestrationBuilderDispatch:
         configs = {"bad": unknown_cfg}
 
         with pytest.raises(ConfigurationError, match="Unknown orchestration config type"):
-            OrchestrationBuilder(configs, {"a1": a1}, {}, {}, {}).build_all()  # type: ignore[arg-type]
+            OrchestrationBuilder(configs, {"a1": a1}, {}, {}, {}).build_all()  # ty: ignore
 
 
 class TestOrchestrationBuilder:
@@ -249,7 +249,7 @@ class TestOrchestrationBuilder:
             ),
         }
 
-        built = OrchestrationBuilder(configs, agents, agent_defs, {}, {}).build_all()  # type: ignore[arg-type]
+        built = OrchestrationBuilder(configs, agents, agent_defs, {}, {}).build_all()  # ty: ignore
 
         assert built["orch"] is new_agent
         assert built["orch"] is not original
@@ -265,7 +265,7 @@ class TestOrchestrationBuilder:
             "my_swarm": SwarmOrchestrationDef(entry_name="a1", agents=["a1", "a2"]),
         }
 
-        built = OrchestrationBuilder(configs, agents, {}, {}, {}).build_all()  # type: ignore[arg-type]
+        built = OrchestrationBuilder(configs, agents, {}, {}, {}).build_all()  # ty: ignore
 
         assert "my_swarm" in built
         mock_swarm_cls.assert_called_once()
@@ -289,12 +289,12 @@ class TestOrchestrationBuilder:
             "pipeline": GraphOrchestrationDef(
                 entry_name="research_swarm",
                 edges=[
-                    GraphEdgeDef(from_agent="research_swarm", to_agent="reviewer"),  # type: ignore[call-arg]
+                    GraphEdgeDef(from_agent="research_swarm", to_agent="reviewer"),  # ty: ignore
                 ],
             ),
         }
 
-        built = OrchestrationBuilder(configs, agents, {}, {}, {}).build_all()  # type: ignore[arg-type]
+        built = OrchestrationBuilder(configs, agents, {}, {}, {}).build_all()  # ty: ignore
 
         assert "research_swarm" in built
         assert "pipeline" in built
@@ -312,7 +312,7 @@ class TestOrchestrationBuilder:
             "my_swarm": SwarmOrchestrationDef(entry_name="a1", agents=["a1", "a2"]),
         }
 
-        OrchestrationBuilder(configs, agents, {}, {}, {}, sm).build_all()  # type: ignore[arg-type]
+        OrchestrationBuilder(configs, agents, {}, {}, {}, sm).build_all()  # ty: ignore
 
         assert mock_swarm_cls.call_args.kwargs["session_manager"] is sm
 
@@ -325,4 +325,4 @@ class TestOrchestrationBuilder:
         }
 
         with pytest.raises(ConfigurationError, match="entry_name 'nonexistent' is not defined"):
-            OrchestrationBuilder(configs, agents, {}, {}, {}).build_all()  # type: ignore[arg-type]
+            OrchestrationBuilder(configs, agents, {}, {}, {}).build_all()  # ty: ignore

@@ -53,15 +53,15 @@ class TestPlannerRaisesCircularDependencyError:
         configs = {
             "a": GraphOrchestrationDef(
                 entry_name="b",
-                edges=[GraphEdgeDef(from_agent="b", to_agent="x")],  # type: ignore[call-arg]
+                edges=[GraphEdgeDef(from_agent="b", to_agent="x")],  # ty: ignore
             ),
             "b": GraphOrchestrationDef(
                 entry_name="a",
-                edges=[GraphEdgeDef(from_agent="a", to_agent="y")],  # type: ignore[call-arg]
+                edges=[GraphEdgeDef(from_agent="a", to_agent="y")],  # ty: ignore
             ),
         }
         with pytest.raises(CircularDependencyError, match="Circular dependency"):
-            topological_sort(configs)  # type: ignore[arg-type]
+            topological_sort(configs)  # ty: ignore
 
     def test_self_referencing_orchestration_raises_circular_error(self):
         configs = {
@@ -71,4 +71,4 @@ class TestPlannerRaisesCircularDependencyError:
             ),
         }
         with pytest.raises(CircularDependencyError, match="Circular dependency"):
-            topological_sort(configs)  # type: ignore[arg-type]
+            topological_sort(configs)  # ty: ignore

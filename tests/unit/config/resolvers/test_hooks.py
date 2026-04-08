@@ -20,7 +20,7 @@ class TestResolveHook:
             params={"max_calls": 10},
         )
         hook = resolve_hook(hook_def)
-        assert hook.max_calls == 10  # type: ignore[unresolved-attribute]
+        assert hook.max_calls == 10  # ty: ignore
 
     def test_no_colon_raises(self):
         hook_def = HookDef(type="not_a_valid_spec")
@@ -40,7 +40,7 @@ class TestResolveHook:
         )
         hook_def = HookDef(type=f"{hook_file}:MyHook", params={"x": 42})
         hook = resolve_hook(hook_def)
-        assert hook.x == 42  # type: ignore[unresolved-attribute]
+        assert hook.x == 42  # ty: ignore
 
     def test_non_hook_provider_raises(self, tmp_path):
         hook_file = tmp_path / "bad_hook.py"
@@ -71,7 +71,7 @@ class TestResolveHookEntry:
         hook = resolve_hook_entry(
             "strands_compose.hooks.max_calls_guard:MaxToolCallsGuard",
         )
-        assert hook.max_calls == 25  # default  # type: ignore[unresolved-attribute]
+        assert hook.max_calls == 25  # default  # ty: ignore
 
     def test_hook_def_entry(self):
         entry = HookDef(
@@ -79,4 +79,4 @@ class TestResolveHookEntry:
             params={"max_calls": 5},
         )
         hook = resolve_hook_entry(entry)
-        assert hook.max_calls == 5  # type: ignore[unresolved-attribute]
+        assert hook.max_calls == 5  # ty: ignore
