@@ -15,8 +15,8 @@
 load(["base.yaml", "agents.yaml"])
           ↓               ↓
     vars + models    agents + entry
-          └─────────┬─────────┘
-               merged config
+        └─────────┬─────────┘
+             merged config
 ```
 
 **Merging rules:**
@@ -50,23 +50,18 @@ from `agents.yaml`. For shared blocks across files, use variables instead.
 
 ## Run
 
-### Linux / macOS
-
 ```bash
+# Linux / macOS
 uv run python examples/11_multi_file_config/main.py
 
 # Override the model
 MODEL=us.anthropic.claude-sonnet-4-6-v1:0 uv run python examples/11_multi_file_config/main.py
-```
 
-### Windows
+# Windows PowerShell
+uv run python examples/11_multi_file_config/main.py
 
-```cmd
-uv run python examples\11_multi_file_config\main.py
-
-REM Override the model
-set MODEL=us.anthropic.claude-sonnet-4-6-v1:0
-uv run python examples\11_multi_file_config\main.py
+# Override the model
+$env:MODEL="us.anthropic.claude-sonnet-4-6-v1:0"; uv run python examples/11_multi_file_config/main.py
 ```
 
 ## Try these prompts

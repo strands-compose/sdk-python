@@ -42,17 +42,12 @@ uv run python examples/NN_name/main.py
 
 If there are environment variable overrides or platform differences, show them:
 
-### Linux / macOS
-
 ```bash
+# Linux / macOS
 VAR=value uv run python examples/NN_name/main.py
-```
 
-### Windows
-
-```cmd
-set VAR=value
-uv run python examples\NN_name\main.py
+# Windows PowerShell
+$env:VAR="value"; uv run python examples/NN_name/main.py
 ```
 
 ## Try these prompts

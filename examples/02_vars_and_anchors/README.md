@@ -63,26 +63,22 @@ strands-compose validation, so they're a safe place to park anchor definitions.
 
 ## Run
 
-### Linux / macOS
-
 ```bash
+# Linux / macOS
 # Use built-in defaults
 uv run python examples/02_vars_and_anchors/main.py
 
 # Override tone or model at runtime
 TONE=formal uv run python examples/02_vars_and_anchors/main.py
 MODEL=us.anthropic.claude-sonnet-4-6-v1:0 uv run python examples/02_vars_and_anchors/main.py
-```
 
-### Windows
+# Windows PowerShell
+# Use built-in defaults
+uv run python examples/02_vars_and_anchors/main.py
 
-```cmd
-REM Use built-in defaults
-uv run python examples\02_vars_and_anchors\main.py
-
-REM Override tone or model at runtime
-set TONE=formal
-uv run python examples\02_vars_and_anchors\main.py
+# Override tone or model at runtime
+$env:TONE="formal"; uv run python examples/02_vars_and_anchors/main.py
+$env:MODEL="us.anthropic.claude-sonnet-4-6-v1:0"; uv run python examples/02_vars_and_anchors/main.py
 ```
 
 ## Try these prompts
