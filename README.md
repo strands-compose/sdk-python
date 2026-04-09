@@ -8,7 +8,7 @@
   <p>
     <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.11+-blue.svg" alt="Python 3.11+"></a>
     <a href="https://pypi.org/project/strands-compose/"><img src="https://img.shields.io/pypi/v/strands-compose.svg" alt="PyPI version"></a>
-    <a href="https://github.com/strands-agents/sdk-python"><img src="https://img.shields.io/badge/strands--agents-1.32.0-green.svg" alt="Strands Agents"></a>
+    <a href="https://github.com/strands-agents/sdk-python"><img src="https://img.shields.io/badge/strands--agents-1.35.0-green.svg" alt="Strands Agents"></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" alt="License"></a>
   </p>
 </div>

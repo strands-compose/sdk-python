@@ -39,7 +39,7 @@ repos:
     hooks:
       - id: detect-secrets
         args: ['--baseline', '.secrets.baseline']
-        files: \.py$
+        files: \.(py|yaml|yml|md|toml|json|env)$
 
   - repo: https://github.com/commitizen-tools/commitizen
     rev: 'v4.4.1'
