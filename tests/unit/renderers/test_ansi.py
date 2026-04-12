@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import time
 
 from strands_compose.renderers import AnsiRenderer
 from strands_compose.types import EventType
@@ -182,3 +183,70 @@ class TestAnsiRenderer:
         idx_partial = output.index("partial")
         idx_newline = output.index("\n", idx_partial)
         assert idx_newline == idx_partial + len("partial")
+
+
+class TestAnsiRendererTypewriterDelay:
+    """AnsiRenderer typewriter_delay parameter writes text character-by-character."""
+
+    def _renderer_with_delay(self, delay: float) -> tuple[AnsiRenderer, io.StringIO]:
+        buf = io.StringIO()
+        return AnsiRenderer(file=buf, typewriter_delay=delay), buf
+
+    def test_token_output_unchanged_with_delay(self) -> None:
+        r, buf = self._renderer_with_delay(0.0001)
+        r.render(_event(EventType.TOKEN, text="hello"))
+        output = buf.getvalue()
+        assert "hello" in output
+        assert output.endswith("hello")
+
+    def test_reasoning_output_unchanged_with_delay(self) -> None:
+        r, buf = self._renderer_with_delay(0.0001)
+        r.render(_event(EventType.REASONING, text="thinking"))
+        output = buf.getvalue()
+        assert "thinking" in output
+
+    def test_zero_delay_is_default(self) -> None:
+        buf = io.StringIO()
+        r = AnsiRenderer(file=buf)
+        assert r._typewriter_delay == 0.0
+
+    def test_typewriter_delay_stored(self) -> None:
+        buf = io.StringIO()
+        r = AnsiRenderer(file=buf, typewriter_delay=0.008)
+        assert r._typewriter_delay == 0.008
+
+    def test_token_with_delay_calls_flush_per_char(self) -> None:
+        """Each character must be independently flushed during typewriter output."""
+        flush_calls: list[str] = []
+
+        class TrackingStream(io.StringIO):
+            def flush(self) -> None:
+                super().flush()
+                flush_calls.append(self.getvalue())
+
+        buf = TrackingStream()
+        r = AnsiRenderer(file=buf, typewriter_delay=0.0001)
+        r.render(_event(EventType.TOKEN, text="abc"))
+        # The separator is flushed first; then one flush per character.
+        # The last three flushes must contain progressively growing content.
+        text_flushes = [s for s in flush_calls if s.endswith(("a", "ab", "abc"))]
+        assert "a" in text_flushes[-3]
+        assert "ab" in text_flushes[-2]
+        assert "abc" in text_flushes[-1]
+
+    def test_reasoning_with_delay_text_surrounded_by_ansi_codes_in_non_tty(self) -> None:
+        """For non-TTY output the ANSI codes are empty strings, text is written normally."""
+        r, buf = self._renderer_with_delay(0.0001)
+        r.render(_event(EventType.REASONING, text="think"))
+        # Non-TTY: no ANSI codes, plain text
+        assert "think" in buf.getvalue()
+
+    def test_typewriter_delay_applies_elapsed_time(self) -> None:
+        """Rendering with a delay must take at least delay * len(printable) seconds."""
+        delay = 0.01
+        text = "abc"  # 3 printable non-whitespace chars
+        r, buf = self._renderer_with_delay(delay)
+        start = time.monotonic()
+        r.render(_event(EventType.TOKEN, text=text))
+        elapsed = time.monotonic() - start
+        assert elapsed >= delay * len(text)
