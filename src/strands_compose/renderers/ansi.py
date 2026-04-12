@@ -67,6 +67,7 @@ class AnsiRenderer(EventRenderer):
         self._green = "\033[32m" if is_tty else ""
         self._red = "\033[31m" if is_tty else ""
         self._yellow = "\033[33m" if is_tty else ""
+        self._magenta = "\033[95m" if is_tty else ""
         self._reset = "\033[0m" if is_tty else ""
 
         if separator_width is not None:
@@ -120,16 +121,19 @@ class AnsiRenderer(EventRenderer):
         self._break()
         self._mode = None
         self._active_agent = None
-        self._out.write(f"\n{self._cyan}{self._bold}[{event.agent_name}]{self._reset} starting…\n")
+        self._out.write(self._separator(event.agent_name, "AGENT START", color=self._magenta))
+        self._out.write(f"{self._cyan}{self._bold}[{event.agent_name}]{self._reset} starting…\n")
         self._out.flush()
 
     def _handle_tool_start(self, event: StreamEvent) -> None:
         self._break()
         self._mode = None
+        self._active_agent = None
         data = event.data
         label = data.get("tool_label") or data.get("tool_name", "unknown")
         tool_input = data.get("tool_input", {})
         preview = str(tool_input)[:80] + ("…" if len(str(tool_input)) > 80 else "")
+        self._out.write(self._separator(event.agent_name, "TOOL USE", color=self._magenta))
         self._out.write(
             f"  {self._yellow}⚙{self._reset}  [{event.agent_name}] -> {label!r}"
             f"  {self._dim}{preview}{self._reset}\n"
@@ -164,6 +168,7 @@ class AnsiRenderer(EventRenderer):
     def _handle_error(self, event: StreamEvent) -> None:
         self._break()
         self._mode = None
+        self._out.write(self._separator(event.agent_name, "ERROR", color=self._red))
         msg = event.data.get("message", "unknown error")
         exc_type = event.data.get("exception_type")
         if exc_type and msg.startswith(f"{exc_type}: "):

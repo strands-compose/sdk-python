@@ -66,8 +66,10 @@ class TestAnsiRenderer:
     def test_agent_start(self) -> None:
         r, buf = self._renderer()
         r.render(_event(EventType.AGENT_START))
-        assert AGENT in buf.getvalue()
-        assert "starting" in buf.getvalue()
+        output = buf.getvalue()
+        assert AGENT in output
+        assert "starting" in output
+        assert "AGENT START" in output
 
     def test_tool_start(self) -> None:
         r, buf = self._renderer()
@@ -75,6 +77,7 @@ class TestAnsiRenderer:
         output = buf.getvalue()
         assert "search" in output
         assert "⚙" in output
+        assert "TOOL USE" in output
 
     def test_tool_end_success(self) -> None:
         r, buf = self._renderer()
@@ -102,6 +105,14 @@ class TestAnsiRenderer:
         output = buf.getvalue()
         assert "ERROR" in output
         assert "something broke" in output
+
+    def test_error_separator_appears_before_detail(self) -> None:
+        r, buf = self._renderer()
+        r.render(_event(EventType.ERROR, message="something broke"))
+        output = buf.getvalue()
+        separator_idx = output.index("ERROR")
+        detail_idx = output.index("something broke")
+        assert separator_idx < detail_idx
 
     def test_node_start(self) -> None:
         r, buf = self._renderer()
