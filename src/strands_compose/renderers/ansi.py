@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import shutil
 import sys
+import time
 from collections.abc import Callable
 from typing import Any
 
@@ -38,6 +39,7 @@ class AnsiRenderer(EventRenderer):
         *,
         file: Any | None = None,
         separator_width: int | None = None,
+        typewriter_delay: float = 0.0,
     ) -> None:
         """Initialize the AnsiRenderer.
 
@@ -53,11 +55,15 @@ class AnsiRenderer(EventRenderer):
             file: Output stream (defaults to ``sys.stdout``).
             separator_width: Width of separator lines. Defaults to 70 or the
                 current terminal width, whichever is available.
+            typewriter_delay: Seconds to sleep after each printable character
+                in TOKEN and REASONING events.  ``0.0`` (default) disables
+                the effect entirely with no overhead.
         """
         self._out = file or sys.stdout
         self._in_stream = False
         self._mode: str | None = None  # "reasoning" | "responding" | None
         self._active_agent: str | None = None
+        self._typewriter_delay = typewriter_delay
 
         # Cache TTY state and pre-compute ANSI escape strings.
         is_tty = hasattr(self._out, "isatty") and self._out.isatty()
@@ -107,13 +113,16 @@ class AnsiRenderer(EventRenderer):
 
     def _handle_token(self, event: StreamEvent) -> None:
         self._ensure_mode(event.agent_name, "responding")
-        self._out.write(event.data.get("text", ""))
-        self._out.flush()
+        text = event.data.get("text", "")
+        self._write_with_delay(text)
         self._in_stream = True
 
     def _handle_reasoning(self, event: StreamEvent) -> None:
         self._ensure_mode(event.agent_name, "reasoning")
-        self._out.write(f"{self._yellow}{event.data.get('text', '')}{self._reset}")
+        text = event.data.get("text", "")
+        self._out.write(self._yellow)
+        self._write_with_delay(text)
+        self._out.write(self._reset)
         self._out.flush()
         self._in_stream = True
 
@@ -212,6 +221,26 @@ class AnsiRenderer(EventRenderer):
         self._out.flush()
 
     # -- Internal helpers --------------------------------------------------
+
+    def _write_with_delay(self, text: str) -> None:
+        """Write *text* to the output stream, sleeping between printable characters.
+
+        When :attr:`_typewriter_delay` is ``0.0`` the text is written in a
+        single call with no per-character overhead.  Otherwise each printable
+        character is written individually, flushed, and followed by a
+        ``time.sleep`` call so that the typewriter effect is visible.
+        Whitespace and control characters are written without a delay to
+        avoid stutter on word boundaries.
+        """
+        if self._typewriter_delay <= 0.0:
+            self._out.write(text)
+            self._out.flush()
+            return
+        for char in text:
+            self._out.write(char)
+            self._out.flush()
+            if char.isprintable() and not char.isspace():
+                time.sleep(self._typewriter_delay)
 
     def _break(self) -> None:
         """Insert a newline if we are mid-token/reasoning stream."""
