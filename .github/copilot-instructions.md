@@ -174,3 +174,34 @@ logger.info("Config loaded.")                                  # no punctuation
 - Comments should explain **what** and **why**, never **when** or **how it changed**
 - If you find something broken while working, fix it — don't leave it commented out
 - Never add or change files outside the scope of the task
+
+## Custom Agents
+
+Specialized agents are defined in `.github/agents/`. Select the right one for your task:
+
+| Agent | Purpose | Tool Access |
+|-------|---------|-------------|
+| `developer` | Implement features and fix bugs | read, edit, search, execute, agent |
+| `reviewer` | Review PRs for correctness and compliance | read, search, execute (read-only) |
+| `tester` | Write and improve tests | read, edit, search, execute, agent |
+| `docs-writer` | Write and update documentation | read, edit, search, execute |
+
+## Skills
+
+Skills in `.github/skills/` are **automatically activated** when relevant:
+
+| Skill | Triggered When |
+|-------|---------------|
+| `check-and-test` | Validating, linting, testing, or checking code quality |
+| `strands-api-lookup` | Working with strands APIs, checking upstream functionality |
+
+## Path-Specific Instructions
+
+Targeted rules in `.github/instructions/` are applied automatically based on file paths:
+
+| File | Applies To |
+|------|-----------|
+| `source.instructions.md` | `src/**/*.py` |
+| `tests.instructions.md` | `tests/**/*.py` |
+| `examples.instructions.md` | `examples/**/*.py`, `examples/**/*.yaml` |
+| `docs.instructions.md` | `docs/**/*.md` |
