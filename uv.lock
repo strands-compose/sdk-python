@@ -1815,10 +1815,10 @@ requires-dist = [
     { name = "mcp", specifier = ">=1.24.0" },
     { name = "pydantic", specifier = ">=2.12.5" },
     { name = "pyyaml", specifier = ">=6.0.0" },
-    { name = "strands-agents", specifier = ">=1.32,<1.39" },
-    { name = "strands-agents", extras = ["gemini"], marker = "extra == 'gemini'", specifier = ">=1.32,<1.39" },
-    { name = "strands-agents", extras = ["ollama"], marker = "extra == 'ollama'", specifier = ">=1.32,<1.39" },
-    { name = "strands-agents", extras = ["openai"], marker = "extra == 'openai'", specifier = ">=1.32,<1.39" },
+    { name = "strands-agents", specifier = ">=1.35.0,<2.0.0" },
+    { name = "strands-agents", extras = ["gemini"], marker = "extra == 'gemini'", specifier = ">=1.35.0,<2.0.0" },
+    { name = "strands-agents", extras = ["ollama"], marker = "extra == 'ollama'", specifier = ">=1.35.0,<2.0.0" },
+    { name = "strands-agents", extras = ["openai"], marker = "extra == 'openai'", specifier = ">=1.35.0,<2.0.0" },
 ]
 provides-extras = ["agentcore-memory", "ollama", "openai", "gemini"]
 
