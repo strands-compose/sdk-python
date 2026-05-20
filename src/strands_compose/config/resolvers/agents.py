@@ -36,7 +36,7 @@ def build_agent_from_def(
     extra_tools: list[Any] | None = None,
     extra_hooks: list[Any] | None = None,
     session_manager_override: SessionManager | None = None,
-    swarm_agent_names: set[str] | None = None,
+    orchestration_agent_names: set[str] | None = None,
 ) -> Agent:
     """Build a single Agent from an AgentDef blueprint.
 
@@ -54,13 +54,13 @@ def build_agent_from_def(
         extra_tools: Additional tools to append (e.g. delegate tools).
         extra_hooks: Additional hooks to append (e.g. orchestration-level hooks).
         session_manager_override: If set, overrides session manager resolution entirely.
-        swarm_agent_names: Agent names in swarm orchestrations (fail-fast on SM).
+        orchestration_agent_names: Agent names in swarm/graph orchestrations (fail-fast on SM).
 
     Returns:
         A freshly constructed strands Agent.
 
     Raises:
-        ConfigurationError: If a swarm agent has a session manager.
+        ConfigurationError: If a swarm or graph agent has a session manager.
         TypeError: If a custom factory doesn't return an Agent.
     """
     # 1. Resolve model — inline ModelDef or global name ref
@@ -94,17 +94,21 @@ def build_agent_from_def(
         else:
             agent_session = session_manager
 
-    # Fail fast: swarm node agents cannot carry a session manager.
-    if swarm_agent_names and name in swarm_agent_names and agent_session is not None:
+    # Fail fast: swarm/graph node agents cannot carry a session manager.
+    if (
+        orchestration_agent_names
+        and name in orchestration_agent_names
+        and agent_session is not None
+    ):
         source = (
             "per-agent 'session_manager:' field"
             if agent_def.session_manager is not None
             else "global 'session_manager:' in config"
         )
         raise ConfigurationError(
-            f"Agent '{name}' is in swarm orchestration and cannot have a session manager "
+            f"Agent '{name}' is in a swarm or graph orchestration and cannot have a session manager "
             f"(source: {source}).\n"
-            "Strands does not yet support session persistence for Swarm node agents.\n"
+            "Strands does not yet support session persistence for Swarm or Graph node agents.\n"
             f"Fix: Add 'session_manager: ~' to agent '{name}' to opt out of the global default."
         )
 
@@ -159,7 +163,7 @@ def resolve_agents(
     models: dict[str, Model],
     mcp_clients: dict[str, StrandsMCPClient],
     session_manager: SessionManager | None,
-    swarm_agent_names: set[str] | None = None,
+    orchestration_agent_names: set[str] | None = None,
 ) -> dict[str, Agent]:
     """Resolve all agents -- flat, no dependencies between them.
 
@@ -176,14 +180,14 @@ def resolve_agents(
         models: Resolved model instances keyed by name.
         mcp_clients: Resolved MCP clients keyed by name.
         session_manager: Optional shared session manager for all agents.
-        swarm_agent_names: Names of agents that participate in swarm orchestrations
+        orchestration_agent_names: Names of agents in swarm or graph orchestrations
             (these agents must not have a session manager).
 
     Returns:
         Resolved agents dict keyed by name.
 
     Raises:
-        ConfigurationError if an agent used in a Swarm orchestration has a session manager assigned.
+        ConfigurationError if an agent used in a Swarm or Graph orchestration has a session manager assigned.
         TypeError if agent factory does not return a strands Agent instance.
     """
     resolved: dict[str, Agent] = {}
@@ -195,7 +199,7 @@ def resolve_agents(
             models=models,
             mcp_clients=mcp_clients,
             session_manager=session_manager,
-            swarm_agent_names=swarm_agent_names,
+            orchestration_agent_names=orchestration_agent_names,
         )
         resolved[name] = agent
         logger.info("agent=<%s>, type=<%s> | resolved agent", name, agent_def.type or "Agent")

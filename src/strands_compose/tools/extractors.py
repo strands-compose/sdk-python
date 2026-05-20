@@ -1,7 +1,8 @@
-"""Text extraction utilities for agent and multi-agent results.
+"""Message extraction utilities for agent and multi-agent results.
 
 Key Features:
-    - Extract the last text block from strands Agent and MultiAgent results
+    - Extract the last message from strands Agent and MultiAgent results
+    - Extract text from messages when a string-only fallback is needed
     - Support for SwarmResult and GraphResult node resolution
     - Recursive extraction through nested orchestration results
 """
@@ -18,14 +19,38 @@ from strands.types.content import Message
 logger = logging.getLogger(__name__)
 
 
+def _message_from_text(text: str) -> Message:
+    """Build an assistant message from text."""
+    return {"role": "assistant", "content": [{"text": text}]}
+
+
+def _extract_last_message_from_multi_agent_result(result: MultiAgentResult) -> Message:
+    """Extract the final message from a ``MultiAgentResult``."""
+    last_node_id = resolve_last_node_id(result)
+
+    if last_node_id and last_node_id in result.results:
+        message = extract_last_message(result.results[last_node_id])
+        if message is not None:
+            return message
+
+    for node_result in reversed(list(result.results.values())):
+        message = extract_last_message(node_result)
+        if message is not None:
+            return message
+
+    logger.warning("status=<%s> | no message extracted from MultiAgentResult", result.status)
+    return _message_from_text(
+        f"[orchestration completed with status {result.status.value} but produced no message output]"
+    )
+
+
 def extract_text_from_message(message: Message | None) -> str | None:
-    """Extract the last text block from a message dict.
+    """Extract the last text block from a message.
 
     Strands ``ContentBlock`` uses ``{"text": "..."}`` for text blocks (no
-    ``"type"`` wrapper).  This helper collects all content blocks that
-    contain a ``"text"`` key and returns the last one — the model's final
-    turn can interleave text and tool-use blocks, and only the last text
-    block carries the actual answer we want to bubble up.
+    ``"type"`` wrapper). This helper scans content blocks in reverse and
+    returns the last text block. Use it only when a caller explicitly needs
+    plain text; ``extract_last_message`` preserves the complete message.
 
     Args:
         message: A strands ``Message`` dict (e.g. ``AgentResult.message``).
@@ -36,65 +61,48 @@ def extract_text_from_message(message: Message | None) -> str | None:
     if not message:
         return None
     content = message.get("content", [])
-    text_blocks = [
-        block["text"] for block in content if isinstance(block, dict) and "text" in block
-    ]
-    if text_blocks:
-        return text_blocks[-1]
+    for block in reversed(content):
+        if isinstance(block, dict) and "text" in block:
+            return block["text"]
     return None
 
 
-def extract_text_from_agent_result(result: AgentResult) -> str:
-    """Extract the final text answer from an ``AgentResult``.
+def extract_last_message(result: Any) -> Message:
+    """Extract the final message from an agent, orchestration, or node result.
 
-    Tries the last text block in ``result.message``.  Falls back to
-    ``str(result)`` which handles structured output and interrupts.
-
-    Args:
-        result: An ``AgentResult`` from a single agent invocation.
-
-    Returns:
-        The extracted answer text.
-    """
-    text = extract_text_from_message(result.message)
-    if text is not None:
-        return text
-    return str(result)
-
-
-def extract_text_from_multi_agent_result(result: MultiAgentResult) -> str:
-    """Extract the final answer text from a ``MultiAgentResult``.
-
-    ``MultiAgentResult`` (and subclasses ``SwarmResult``, ``GraphResult``)
-    store per-node results in ``result.results``.  This helper locates the
-    *last* agent that ran — using ``node_history`` for swarms and
-    ``execution_order`` for graphs — and extracts its text.  Falls back to
-    iterating all node results in reverse order.
+    Dispatches to the appropriate extractor based on the result type:
+    - ``AgentResult`` returns ``result.message`` directly.
+    - ``MultiAgentResult`` drills into the last executing node's message.
+    - ``NodeResult`` unwraps the inner payload and dispatches recursively.
+    - Unknown types fall back to an assistant text message containing
+      ``str(result)``.
 
     Args:
-        result: A ``MultiAgentResult`` (or ``SwarmResult`` / ``GraphResult``).
+        result: An ``AgentResult``, ``MultiAgentResult``, ``NodeResult``,
+            or any object.
 
     Returns:
-        The extracted answer text, or a descriptive fallback string.
+        The extracted ``Message``. This can be wrapped in a one-item list and
+        passed to ``Agent.invoke_async`` as ``Messages`` when richer content
+        such as images or documents must be preserved.
     """
-    # Determine the last agent that executed
-    last_node_id = resolve_last_node_id(result)
+    if isinstance(result, AgentResult):
+        return result.message
 
-    if last_node_id and last_node_id in result.results:
-        text = extract_text_from_node_result(result.results[last_node_id])
-        if text is not None:
-            return text
+    if isinstance(result, MultiAgentResult):
+        return _extract_last_message_from_multi_agent_result(result)
 
-    # Fallback: scan all node results in reverse
-    for node_result in reversed(list(result.results.values())):
-        text = extract_text_from_node_result(node_result)
-        if text is not None:
-            return text
+    if isinstance(result, NodeResult):
+        inner = result.result
+        if isinstance(inner, (AgentResult, MultiAgentResult)):
+            return extract_last_message(inner)
+        logger.warning("error=<%s> | nested node produced an exception", inner)
+        return _message_from_text(f"[nested agent error: {inner}]")
 
-    logger.warning("status=<%s> | no text extracted from MultiAgentResult", result.status)
-    return (
-        f"[orchestration completed with status {result.status.value} but produced no text output]"
+    logger.warning(
+        "type=<%s> | unexpected result type in extract_last_message", type(result).__name__
     )
+    return _message_from_text(str(result))
 
 
 def resolve_last_node_id(result: MultiAgentResult) -> str | None:
@@ -117,66 +125,3 @@ def resolve_last_node_id(result: MultiAgentResult) -> str | None:
         return str(execution_order[-1].node_id)
 
     return None
-
-
-def extract_text_from_node_result(node_result: NodeResult) -> str | None:
-    """Extract text from a single ``NodeResult``.
-
-    Handles all three payload shapes:
-    - ``AgentResult`` — extracts text from ``.message``.
-    - Nested ``MultiAgentResult`` — recurses into it.
-    - ``Exception`` — returns the error message.
-
-    Args:
-        node_result: A ``NodeResult`` from a multi-agent execution.
-
-    Returns:
-        Extracted text, or ``None`` if no usable text is found.
-    """
-    inner = node_result.result
-
-    if isinstance(inner, AgentResult):
-        text = extract_text_from_message(inner.message)
-        if text is not None:
-            return text
-        fallback = str(inner)
-        if fallback.strip():
-            return fallback
-        return None
-
-    if isinstance(inner, MultiAgentResult):
-        return extract_text_from_multi_agent_result(inner)
-
-    if isinstance(inner, Exception):
-        logger.warning("error=<%s> | nested node produced an exception", inner)
-        return f"[nested agent error: {inner}]"
-
-    return None
-
-
-def extract_last_text_block(result: Any) -> str:
-    """Extract the final text answer from an agent or orchestration result.
-
-    Dispatches to the appropriate extractor based on the result type:
-    - ``AgentResult`` — extracts the last text block from the message.
-    - ``MultiAgentResult`` (``SwarmResult``, ``GraphResult``) — drills into
-      the last executing node's ``AgentResult``.
-    - Unknown types — falls back to ``str(result)``.
-
-    Args:
-        result: An ``AgentResult``, ``MultiAgentResult``, or any object.
-
-    Returns:
-        The extracted answer text.
-    """
-    if isinstance(result, AgentResult):
-        return extract_text_from_agent_result(result)
-
-    if isinstance(result, MultiAgentResult):
-        return extract_text_from_multi_agent_result(result)
-
-    # Unknown result type — best-effort fallback.
-    logger.warning(
-        "type=<%s> | unexpected result type in extract_last_text_block", type(result).__name__
-    )
-    return str(result)
