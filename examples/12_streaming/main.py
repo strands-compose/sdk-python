@@ -57,10 +57,9 @@ async def _main() -> None:
             msg = await asyncio.to_thread(lambda: input("You: ").strip())
             if not msg:
                 break
-            print("\nAgent is thinking...")
-            result = await _stream(msg, entry, queue)
-            print(f"\n\n{52 * '-'}")
-            print(f"Agent: {result}\n")
+            print()
+            await _stream(msg, entry, queue)
+            print("\n" + 52 * "-" + "\n")
     except KeyboardInterrupt:
         print("\nGoodbye!")
     finally:
