@@ -19,9 +19,8 @@ from strands_compose.tools import (
     node_as_tool,
 )
 from strands_compose.tools.extractors import (
-    extract_last_text_block,
+    extract_last_message,
     extract_text_from_message,
-    extract_text_from_node_result,
     resolve_last_node_id,
 )
 
@@ -57,11 +56,31 @@ def _tool_use_block() -> dict[str, Any]:
     return {"toolUse": {"toolUseId": "t1", "name": "calc", "input": {}}}
 
 
+def _image_block() -> dict[str, Any]:
+    """Build a ``ContentBlock`` dict containing image content."""
+    return {"image": {"format": "png", "source": {"bytes": b"image-bytes"}}}
+
+
+def _tool_result(content: list[dict[str, Any]]) -> dict[str, Any]:
+    """Build the tool result dict returned by delegation wrappers."""
+    return {"status": "success", "content": content}
+
+
 def _agent_result_with_text(text: str) -> AgentResult:
     """Build a minimal ``AgentResult`` whose message contains a single text block."""
     return AgentResult(
         stop_reason="end_turn",
         message=_msg([_text_block(text)]),
+        metrics=MagicMock(),
+        state={},
+    )
+
+
+def _agent_result_with_content(content: list[dict[str, Any]]) -> AgentResult:
+    """Build a minimal ``AgentResult`` whose message contains the given content."""
+    return AgentResult(
+        stop_reason="end_turn",
+        message=_msg(content),
         metrics=MagicMock(),
         state={},
     )
@@ -125,56 +144,62 @@ class TestExtractTextFromMessage:
 
 
 # ===========================================================================
-# extract_last_text_block — AgentResult path
+# extract_last_message - AgentResult path
 # ===========================================================================
 
 
-class TestExtractLastTextBlockAgentResult:
-    """extract_last_text_block with AgentResult inputs."""
+class TestExtractLastMessageAgentResult:
+    """extract_last_message with AgentResult inputs."""
 
-    def test_single_text_block(self) -> None:
-        """Single text block is extracted."""
+    def test_returns_agent_result_message(self) -> None:
+        """AgentResult returns its complete message."""
         result = _agent_result_with_text("hello")
-        assert extract_last_text_block(result) == "hello"
+        assert extract_last_message(result) == result.message
 
-    def test_multiple_text_blocks_returns_last(self) -> None:
-        """Only the last text block is returned."""
+    def test_preserves_multiple_text_blocks(self) -> None:
+        """Multiple text blocks remain in the returned message."""
         result = AgentResult(
             stop_reason="end_turn",
             message=_msg([_text_block("a"), _text_block("b")]),
             metrics=MagicMock(),
             state={},
         )
-        assert extract_last_text_block(result) == "b"
+        assert extract_last_message(result)["content"] == [_text_block("a"), _text_block("b")]
 
-    def test_no_text_blocks_falls_back_to_str(self) -> None:
-        """When no text blocks exist, falls back to str(AgentResult)."""
+    def test_preserves_non_text_blocks(self) -> None:
+        """Image blocks remain in the returned message."""
+        result = _agent_result_with_content([_image_block()])
+        assert extract_last_message(result) == result.message
+
+    def test_tool_use_only_message_is_returned(self) -> None:
+        """Messages without text are still returned intact."""
         result = _agent_result_no_text()
-        text = extract_last_text_block(result)
-        # str(AgentResult) produces empty string when only toolUse blocks exist
-        assert isinstance(text, str)
+        assert extract_last_message(result) == result.message
 
     def test_interleaved_tool_use_and_text(self) -> None:
-        """Text block after toolUse is correctly extracted."""
+        """Tool use and text blocks are both preserved."""
         result = AgentResult(
             stop_reason="end_turn",
             message=_msg([_tool_use_block(), _text_block("the answer")]),
             metrics=MagicMock(),
             state={},
         )
-        assert extract_last_text_block(result) == "the answer"
+        assert extract_last_message(result)["content"] == [
+            _tool_use_block(),
+            _text_block("the answer"),
+        ]
 
 
 # ===========================================================================
-# extract_last_text_block — MultiAgentResult path (Swarm)
+# extract_last_message - MultiAgentResult path (Swarm)
 # ===========================================================================
 
 
-class TestExtractLastTextBlockSwarmResult:
-    """extract_last_text_block with SwarmResult inputs."""
+class TestExtractLastMessageSwarmResult:
+    """extract_last_message with SwarmResult inputs."""
 
-    def test_extracts_from_last_swarm_node(self) -> None:
-        """SwarmResult uses node_history to find the last agent's text."""
+    def test_extracts_message_from_last_swarm_node(self) -> None:
+        """SwarmResult uses node_history to find the last agent's message."""
         reviewer_result = _agent_result_with_text("reviewed article")
         swarm_result = SwarmResult(
             status=Status.COMPLETED,
@@ -184,108 +209,124 @@ class TestExtractLastTextBlockSwarmResult:
             },
             node_history=_fake_swarm_nodes("researcher", "reviewer"),
         )
-        assert extract_last_text_block(swarm_result) == "reviewed article"
+        assert extract_last_message(swarm_result) == reviewer_result.message
 
-    def test_extracts_from_single_agent_swarm(self) -> None:
-        """SwarmResult with a single agent returns that agent's text."""
+    def test_extracts_message_from_single_agent_swarm(self) -> None:
+        """SwarmResult with a single agent returns that agent's message."""
+        agent_result = _agent_result_with_text("solo answer")
         swarm_result = SwarmResult(
             status=Status.COMPLETED,
-            results={"only_agent": _node_result(_agent_result_with_text("solo answer"))},
+            results={"only_agent": _node_result(agent_result)},
             node_history=_fake_swarm_nodes("only_agent"),
         )
-        assert extract_last_text_block(swarm_result) == "solo answer"
+        assert extract_last_message(swarm_result) == agent_result.message
+
+    def test_preserves_non_text_blocks_from_swarm(self) -> None:
+        """SwarmResult preserves non-text content from the last agent."""
+        final_result = _agent_result_with_content([_image_block()])
+        swarm_result = SwarmResult(
+            status=Status.COMPLETED,
+            results={"image_agent": _node_result(final_result)},
+            node_history=_fake_swarm_nodes("image_agent"),
+        )
+        assert extract_last_message(swarm_result) == final_result.message
 
     def test_empty_node_history_falls_back_to_reverse_scan(self) -> None:
         """Empty node_history falls back to scanning results in reverse."""
+        agent_result = _agent_result_with_text("fallback text")
         swarm_result = SwarmResult(
             status=Status.COMPLETED,
-            results={"agent_a": _node_result(_agent_result_with_text("fallback text"))},
+            results={"agent_a": _node_result(agent_result)},
             node_history=[],
         )
-        assert extract_last_text_block(swarm_result) == "fallback text"
+        assert extract_last_message(swarm_result) == agent_result.message
 
     def test_empty_results_returns_descriptive_fallback(self) -> None:
-        """SwarmResult with no node results returns a descriptive message."""
+        """SwarmResult with no node results returns a descriptive text message."""
         swarm_result = SwarmResult(status=Status.COMPLETED, results={}, node_history=[])
-        text = extract_last_text_block(swarm_result)
-        assert "no text output" in text
+        text = extract_text_from_message(extract_last_message(swarm_result))
+        assert text is not None and "no message output" in text
 
     def test_last_node_not_in_results_falls_back_to_reverse_scan(self) -> None:
         """node_history references a node not in results — falls back gracefully."""
+        agent_result = _agent_result_with_text("found via fallback")
         swarm_result = SwarmResult(
             status=Status.COMPLETED,
-            results={"agent_a": _node_result(_agent_result_with_text("found via fallback"))},
+            results={"agent_a": _node_result(agent_result)},
             node_history=_fake_swarm_nodes("missing_agent"),
         )
-        assert extract_last_text_block(swarm_result) == "found via fallback"
+        assert extract_last_message(swarm_result) == agent_result.message
 
 
 # ===========================================================================
-# extract_last_text_block — MultiAgentResult path (Graph)
+# extract_last_message - MultiAgentResult path (Graph)
 # ===========================================================================
 
 
-class TestExtractLastTextBlockGraphResult:
-    """extract_last_text_block with GraphResult inputs."""
+class TestExtractLastMessageGraphResult:
+    """extract_last_message with GraphResult inputs."""
 
-    def test_extracts_from_last_graph_node(self) -> None:
-        """GraphResult uses execution_order to find the last node's text."""
+    def test_extracts_message_from_last_graph_node(self) -> None:
+        """GraphResult uses execution_order to find the last node's message."""
+        final_result = _agent_result_with_text("final output")
         graph_result = GraphResult(
             status=Status.COMPLETED,
             results={
                 "step_a": _node_result(_agent_result_with_text("intermediate")),
-                "step_b": _node_result(_agent_result_with_text("final output")),
+                "step_b": _node_result(final_result),
             },
             execution_order=_fake_graph_nodes("step_a", "step_b"),
         )
-        assert extract_last_text_block(graph_result) == "final output"
+        assert extract_last_message(graph_result) == final_result.message
 
     def test_empty_execution_order_falls_back(self) -> None:
         """Empty execution_order falls back to reverse scan of results."""
+        agent_result = _agent_result_with_text("from reverse scan")
         graph_result = GraphResult(
             status=Status.COMPLETED,
-            results={"node_x": _node_result(_agent_result_with_text("from reverse scan"))},
+            results={"node_x": _node_result(agent_result)},
             execution_order=[],
         )
-        assert extract_last_text_block(graph_result) == "from reverse scan"
+        assert extract_last_message(graph_result) == agent_result.message
 
 
 # ===========================================================================
-# extract_text_from_node_result — edge cases
+# extract_message_from_node_result - edge cases
 # ===========================================================================
 
 
-class TestExtractTextFromNodeResult:
-    """Unit tests for extract_text_from_node_result."""
+class TestExtractMessageFromNodeResult:
+    """Unit tests for NodeResult handling in extract_last_message."""
 
     def test_agent_result_with_text(self) -> None:
-        """NodeResult wrapping an AgentResult extracts text."""
-        nr = _node_result(_agent_result_with_text("answer"))
-        assert extract_text_from_node_result(nr) == "answer"
+        """NodeResult wrapping an AgentResult extracts the message."""
+        agent_result = _agent_result_with_text("answer")
+        node_result = _node_result(agent_result)
+        assert extract_last_message(node_result) == agent_result.message
 
     def test_nested_multi_agent_result(self) -> None:
         """NodeResult wrapping a nested MultiAgentResult recurses into it."""
+        agent_result = _agent_result_with_text("nested answer")
         inner_multi = MultiAgentResult(
             status=Status.COMPLETED,
-            results={"inner_agent": _node_result(_agent_result_with_text("nested answer"))},
+            results={"inner_agent": _node_result(agent_result)},
         )
-        nr = _node_result(inner_multi)
-        assert extract_text_from_node_result(nr) == "nested answer"
+        node_result = _node_result(inner_multi)
+        assert extract_last_message(node_result) == agent_result.message
 
     def test_exception_result_returns_error_message(self) -> None:
         """NodeResult wrapping an Exception returns a descriptive error string."""
-        nr = _node_result(RuntimeError("something broke"))
-        text = extract_text_from_node_result(nr)
+        node_result = _node_result(RuntimeError("something broke"))
+        message = extract_last_message(node_result)
+        text = extract_text_from_message(message)
         assert text is not None
         assert "something broke" in text
 
-    def test_agent_result_without_text_falls_back_to_str(self) -> None:
-        """AgentResult without text blocks falls back to str(AgentResult)."""
-        ar = _agent_result_no_text()
-        nr = _node_result(ar)
-        text = extract_text_from_node_result(nr)
-        # str(AgentResult) may be empty string for toolUse-only messages
-        assert isinstance(text, str) or text is None
+    def test_agent_result_without_text_returns_message(self) -> None:
+        """AgentResult without text blocks still returns its message."""
+        agent_result = _agent_result_no_text()
+        node_result = _node_result(agent_result)
+        assert extract_last_message(node_result) == agent_result.message
 
 
 # ===========================================================================
@@ -343,7 +384,7 @@ class TestNodeAsToolWithAgent:
         tool = node_as_tool(self._agent(result, "my_agent"), description="Use agent")
 
         assert tool.tool_name == "my_agent"
-        assert tool("test") == "hello"
+        assert tool("test") == _tool_result([_text_block("hello")])
 
 
 # ===========================================================================
@@ -366,10 +407,10 @@ class TestNodeAsTool:
         tool = node_as_tool(self._agent(result, "my_agent"), description="Use agent")
 
         assert tool.tool_name == "my_agent"
-        assert tool("test query") == "agent response"
+        assert tool("test query") == _tool_result([_text_block("agent response")])
 
-    def test_wraps_swarm_extracts_last_agent_text(self) -> None:
-        """node_as_tool with a Swarm node extracts text from the last agent."""
+    def test_wraps_swarm_extracts_last_agent_message_content(self) -> None:
+        """node_as_tool with a Swarm node extracts content from the last agent."""
         swarm_result = SwarmResult(
             status=Status.COMPLETED,
             results={
@@ -385,10 +426,10 @@ class TestNodeAsTool:
         tool = node_as_tool(multi, name="content_team", description="Content production")
 
         assert tool.tool_name == "content_team"
-        assert tool("write an article") == "polished article"
+        assert tool("write an article") == _tool_result([_text_block("polished article")])
 
-    def test_wraps_graph_extracts_last_node_text(self) -> None:
-        """node_as_tool with a Graph node extracts text from the last executed node."""
+    def test_wraps_graph_extracts_last_node_message_content(self) -> None:
+        """node_as_tool with a Graph node extracts content from the last node."""
         graph_result = GraphResult(
             status=Status.COMPLETED,
             results={
@@ -403,7 +444,7 @@ class TestNodeAsTool:
 
         tool = node_as_tool(multi, name="my_graph", description="Pipeline")
 
-        assert tool("run") == "final graph output"
+        assert tool("run") == _tool_result([_text_block("final graph output")])
 
     def test_custom_name_overrides_agent_id(self) -> None:
         """Explicit name= overrides the agent's own agent_id."""
@@ -414,8 +455,8 @@ class TestNodeAsTool:
 
         assert tool.tool_name == "custom_name"
 
-    def test_multi_block_response_returns_last_text_block(self) -> None:
-        """toolUse block followed by text block -> returns the text content."""
+    def test_multi_block_response_returns_tool_result_content(self) -> None:
+        """toolUse block followed by text block returns supported content."""
         result = AgentResult(
             stop_reason="end_turn",
             message=_msg([_tool_use_block(), _text_block("answer")]),
@@ -424,10 +465,10 @@ class TestNodeAsTool:
         )
         tool = node_as_tool(self._agent(result), description="desc")
 
-        assert tool("q") == "answer"
+        assert tool("q") == _tool_result([_text_block("answer")])
 
-    def test_multiple_text_blocks_returns_last(self) -> None:
-        """Multiple text blocks -> only the last one is returned."""
+    def test_multiple_text_blocks_are_preserved(self) -> None:
+        """Multiple text blocks are returned as message content."""
         result = AgentResult(
             stop_reason="end_turn",
             message=_msg([_text_block("part1"), _text_block("part2")]),
@@ -436,25 +477,31 @@ class TestNodeAsTool:
         )
         tool = node_as_tool(self._agent(result), description="desc")
 
-        assert tool("q") == "part2"
+        assert tool("q") == _tool_result([_text_block("part1"), _text_block("part2")])
 
-    def test_no_text_blocks_falls_back_to_str_result(self) -> None:
-        """Only toolUse blocks -> str(result) fallback."""
+    def test_image_blocks_are_preserved(self) -> None:
+        """Image blocks are returned as tool result content."""
+        result = _agent_result_with_content([_image_block()])
+        tool = node_as_tool(self._agent(result), description="desc")
+
+        assert tool("q") == _tool_result([_image_block()])
+
+    def test_no_supported_blocks_returns_empty_text_content(self) -> None:
+        """Only toolUse blocks return an empty text tool result."""
         result = _agent_result_no_text()
         tool = node_as_tool(self._agent(result), description="desc")
 
-        text = tool("q")
-        assert isinstance(text, str)
+        assert tool("q") == _tool_result([_text_block("")])
 
     def test_single_text_block_returns_text(self) -> None:
-        """Single text block -> returns its text directly."""
+        """Single text block returns a text tool result."""
         result = _agent_result_with_text("only")
         tool = node_as_tool(self._agent(result), description="desc")
 
-        assert tool("q") == "only"
+        assert tool("q") == _tool_result([_text_block("only")])
 
-    def test_empty_content_falls_back_to_str_result(self) -> None:
-        """Empty content list -> str(result) fallback."""
+    def test_empty_content_returns_empty_text_content(self) -> None:
+        """Empty content list returns an empty text tool result."""
         result = AgentResult(
             stop_reason="end_turn",
             message=_msg([]),
@@ -463,8 +510,7 @@ class TestNodeAsTool:
         )
         tool = node_as_tool(self._agent(result), description="desc")
 
-        text = tool("q")
-        assert isinstance(text, str)
+        assert tool("q") == _tool_result([_text_block("")])
 
 
 # ===========================================================================
@@ -486,8 +532,8 @@ class TestNodeAsAsyncTool:
         return agent
 
     @pytest.mark.asyncio
-    async def test_multi_block_response_returns_text_block(self) -> None:
-        """toolUse block followed by text block -> returns the text content."""
+    async def test_multi_block_response_returns_tool_result_content(self) -> None:
+        """toolUse block followed by text block returns supported content."""
         result = AgentResult(
             stop_reason="end_turn",
             message=_msg([_tool_use_block(), _text_block("answer")]),
@@ -496,11 +542,11 @@ class TestNodeAsAsyncTool:
         )
         tool = node_as_async_tool(self._agent_with_async(result), description="desc")
 
-        assert await tool("q") == "answer"
+        assert await tool("q") == _tool_result([_text_block("answer")])
 
     @pytest.mark.asyncio
-    async def test_multiple_text_blocks_returns_last(self) -> None:
-        """Multiple text blocks -> only the last one is returned."""
+    async def test_multiple_text_blocks_are_preserved(self) -> None:
+        """Multiple text blocks are returned as message content."""
         result = AgentResult(
             stop_reason="end_turn",
             message=_msg([_text_block("part1"), _text_block("part2")]),
@@ -509,20 +555,27 @@ class TestNodeAsAsyncTool:
         )
         tool = node_as_async_tool(self._agent_with_async(result), description="desc")
 
-        assert await tool("q") == "part2"
+        assert await tool("q") == _tool_result([_text_block("part1"), _text_block("part2")])
 
     @pytest.mark.asyncio
-    async def test_no_text_blocks_falls_back_to_str_result(self) -> None:
-        """Only toolUse blocks -> str(result) fallback."""
+    async def test_image_blocks_are_preserved(self) -> None:
+        """Image blocks are returned as tool result content."""
+        result = _agent_result_with_content([_image_block()])
+        tool = node_as_async_tool(self._agent_with_async(result), description="desc")
+
+        assert await tool("q") == _tool_result([_image_block()])
+
+    @pytest.mark.asyncio
+    async def test_no_supported_blocks_returns_empty_text_content(self) -> None:
+        """Only toolUse blocks return an empty text tool result."""
         result = _agent_result_no_text()
         tool = node_as_async_tool(self._agent_with_async(result), description="desc")
 
-        text = await tool("q")
-        assert isinstance(text, str)
+        assert await tool("q") == _tool_result([_text_block("")])
 
     @pytest.mark.asyncio
-    async def test_empty_content_falls_back_to_str_result(self) -> None:
-        """Empty content list -> str(result) fallback."""
+    async def test_empty_content_returns_empty_text_content(self) -> None:
+        """Empty content list returns an empty text tool result."""
         result = AgentResult(
             stop_reason="end_turn",
             message=_msg([]),
@@ -531,12 +584,11 @@ class TestNodeAsAsyncTool:
         )
         tool = node_as_async_tool(self._agent_with_async(result), description="desc")
 
-        text = await tool("q")
-        assert isinstance(text, str)
+        assert await tool("q") == _tool_result([_text_block("")])
 
     @pytest.mark.asyncio
-    async def test_async_wraps_swarm_extracts_last_agent_text(self) -> None:
-        """node_as_async_tool with a Swarm node extracts the last agent's text."""
+    async def test_async_wraps_swarm_extracts_last_agent_message_content(self) -> None:
+        """node_as_async_tool with a Swarm node extracts last agent content."""
         swarm_result = SwarmResult(
             status=Status.COMPLETED,
             results={
@@ -555,11 +607,11 @@ class TestNodeAsAsyncTool:
 
         tool = node_as_async_tool(multi, name="swarm_orch", description="Swarm")
 
-        assert await tool("q") == "final async answer"
+        assert await tool("q") == _tool_result([_text_block("final async answer")])
 
     @pytest.mark.asyncio
-    async def test_async_wraps_graph_extracts_last_node_text(self) -> None:
-        """node_as_async_tool with a Graph node extracts the last node's text."""
+    async def test_async_wraps_graph_extracts_last_node_message_content(self) -> None:
+        """node_as_async_tool with a Graph node extracts last node content."""
         graph_result = GraphResult(
             status=Status.COMPLETED,
             results={
@@ -578,4 +630,4 @@ class TestNodeAsAsyncTool:
 
         tool = node_as_async_tool(multi, name="graph_orch", description="Graph")
 
-        assert await tool("q") == "graph async final"
+        assert await tool("q") == _tool_result([_text_block("graph async final")])

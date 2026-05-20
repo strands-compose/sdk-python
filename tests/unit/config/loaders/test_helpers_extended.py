@@ -140,7 +140,7 @@ class TestUpdateReferences:
         )
         orch: dict = raw["orchestrations"]["main"]
         assert orch["entry_name"] == "Parent_Agent"
-        conns: list = orch["connections"]  # ty: ignore
+        conns: list = orch["connections"]
         assert conns[0]["agent"] == "Child_Agent"
 
     def test_swarm_refs_updated(self):

@@ -154,8 +154,8 @@ class TestResolveAgents:
         assert call_kwargs["conversation_manager"] is mock_cm
 
 
-class TestSwarmSessionGuard:
-    """Tests for the fail-fast swarm + session manager conflict guard."""
+class TestOrchestrationSessionGuard:
+    """Tests for the fail-fast swarm/graph + session manager conflict guard."""
 
     def test_swarm_agent_inherits_global_sm_raises_configuration_error(self, patch_agent_init):
         """Swarm agent that would inherit the global SM raises ConfigurationError."""
@@ -167,7 +167,7 @@ class TestSwarmSessionGuard:
                 models={},
                 mcp_clients={},
                 session_manager=global_sm,
-                swarm_agent_names={"node"},
+                orchestration_agent_names={"node"},
             )
 
     @patch("strands_compose.config.resolvers.agents.resolve_session_manager")
@@ -184,7 +184,7 @@ class TestSwarmSessionGuard:
                 models={},
                 mcp_clients={},
                 session_manager=None,
-                swarm_agent_names={"node"},
+                orchestration_agent_names={"node"},
             )
 
     def test_swarm_agent_with_explicit_null_sm_opts_out_and_succeeds(self, patch_agent_init):
@@ -197,13 +197,58 @@ class TestSwarmSessionGuard:
             models={},
             mcp_clients={},
             session_manager=global_sm,
-            swarm_agent_names={"node"},
+            orchestration_agent_names={"node"},
         )
         assert "node" in result
         assert result["node"]._init_kwargs["session_manager"] is None  # ty: ignore
 
-    def test_non_swarm_agent_inherits_global_sm(self, patch_agent_init):
-        """Non-swarm agent with no per-agent SM inherits the global session manager."""
+    def test_graph_agent_inherits_global_sm_raises_configuration_error(self, patch_agent_init):
+        """Graph node agent that would inherit the global SM raises ConfigurationError."""
+        global_sm = MagicMock()
+        agent_def = AgentDef()
+        with pytest.raises(ConfigurationError, match="global 'session_manager:'"):
+            resolve_agents(
+                {"node": agent_def},
+                models={},
+                mcp_clients={},
+                session_manager=global_sm,
+                orchestration_agent_names={"node"},
+            )
+
+    @patch("strands_compose.config.resolvers.agents.resolve_session_manager")
+    def test_graph_agent_with_explicit_per_agent_sm_raises_configuration_error(
+        self, mock_resolve_sm, patch_agent_init
+    ):
+        """Graph node agent with an explicit per-agent session_manager raises ConfigurationError."""
+        mock_resolve_sm.return_value = MagicMock()
+        sm_def = SessionManagerDef(provider="file")
+        agent_def = AgentDef(session_manager=sm_def)
+        with pytest.raises(ConfigurationError, match="per-agent 'session_manager:'"):
+            resolve_agents(
+                {"node": agent_def},
+                models={},
+                mcp_clients={},
+                session_manager=None,
+                orchestration_agent_names={"node"},
+            )
+
+    def test_graph_agent_with_explicit_null_sm_opts_out_and_succeeds(self, patch_agent_init):
+        """Graph node agent with session_manager: ~ opts out and is built."""
+        global_sm = MagicMock()
+        agent_def = AgentDef(session_manager=None)
+        assert "session_manager" in agent_def.model_fields_set
+        result = resolve_agents(
+            {"node": agent_def},
+            models={},
+            mcp_clients={},
+            session_manager=global_sm,
+            orchestration_agent_names={"node"},
+        )
+        assert "node" in result
+        assert result["node"]._init_kwargs["session_manager"] is None  # ty: ignore
+
+    def test_non_orchestration_agent_inherits_global_sm(self, patch_agent_init):
+        """Non-orchestration agent with no per-agent SM inherits the global session manager."""
         global_sm = MagicMock()
         agent_def = AgentDef()
         result = resolve_agents(
@@ -215,10 +260,10 @@ class TestSwarmSessionGuard:
         assert result["main"]._init_kwargs["session_manager"] is global_sm  # ty: ignore
 
     @patch("strands_compose.config.resolvers.agents.resolve_session_manager")
-    def test_non_swarm_agent_with_explicit_sm_uses_per_agent_sm(
+    def test_non_orchestration_agent_with_explicit_sm_uses_per_agent_sm(
         self, mock_resolve_sm, patch_agent_init
     ):
-        """Non-swarm agent with an explicit per-agent SM uses that SM, not the global one."""
+        """Non-orchestration agent with an explicit per-agent SM uses that SM, not the global one."""
         per_agent_sm = MagicMock()
         mock_resolve_sm.return_value = per_agent_sm
         sm_def = SessionManagerDef(provider="file")
@@ -232,8 +277,8 @@ class TestSwarmSessionGuard:
         )
         assert result["main"]._init_kwargs["session_manager"] is per_agent_sm  # ty: ignore
 
-    def test_non_swarm_agent_with_explicit_null_sm_opts_out(self, patch_agent_init):
-        """Non-swarm agent with session_manager: ~ opts out of the global SM."""
+    def test_non_orchestration_agent_with_explicit_null_sm_opts_out(self, patch_agent_init):
+        """Non-orchestration agent with session_manager: ~ opts out of the global SM."""
         global_sm = MagicMock()
         agent_def = AgentDef(session_manager=None)  # explicit None -> opt-out
         result = resolve_agents(

@@ -29,10 +29,9 @@ def main() -> None:
             msg = input("You: ").strip()
             if not msg:
                 break
-            print("\nAgent is thinking...")
-            result = agent(msg)
-            print(f"\n\n{52 * '-'}")
-            print(f"Agent: {result}\n")
+            print()
+            agent(msg)
+            print("\n" + 52 * "-" + "\n")
     except KeyboardInterrupt:
         print("\nGoodbye!")
     finally:

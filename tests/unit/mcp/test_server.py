@@ -137,7 +137,7 @@ class TestMCPServer:
     def test_get_asgi_app_raises_for_unsupported_transport(self):
         """_get_asgi_app should raise ValueError for unsupported transports like stdio."""
         s = ConcreteMCPServer(name="test")
-        s.transport = "stdio"  # force invalid value
+        s.transport = "stdio"  # force invalid value # ty: ignore
         mock_mcp = MagicMock()
         with pytest.raises(ValueError, match="Unsupported server transport.*stdio"):
             s._get_asgi_app(mock_mcp)

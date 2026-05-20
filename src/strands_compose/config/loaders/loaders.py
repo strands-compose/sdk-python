@@ -39,7 +39,7 @@ from ..resolvers import (
     resolve_orchestrations,
     resolve_session_manager,
 )
-from ..schema import AppConfig, SwarmOrchestrationDef
+from ..schema import AppConfig, GraphOrchestrationDef, SwarmOrchestrationDef
 from .helpers import merge_raw_configs, parse_single_source, sanitize_collection_keys
 from .validators import validate_references
 
@@ -236,19 +236,24 @@ def load_session(
             session_id_override=session_id,
         )
 
-    # Agents used in Swarm orchestrations cannot have session_manager set.
-    # Temporary until strands-agents supports swarm agents with session persistence.
-    swarm_agent_names: set[str] = set()
+    # Agents used in Swarm or Graph orchestrations cannot have session_manager set.
+    # Temporary until strands-agents supports session persistence for orchestration node agents.
+    orchestration_agent_names: set[str] = set()
     for orch in config.orchestrations.values():
         if isinstance(orch, SwarmOrchestrationDef):
-            swarm_agent_names.update(orch.agents)
+            orchestration_agent_names.update(orch.agents)
+        elif isinstance(orch, GraphOrchestrationDef):
+            orchestration_agent_names.add(orch.entry_name)
+            for edge in orch.edges:
+                orchestration_agent_names.add(edge.from_agent)
+                orchestration_agent_names.add(edge.to_agent)
 
     agents = resolve_agents(
         agent_defs=config.agents,
         models=infra.models,
         mcp_clients=infra.clients,
         session_manager=session_manager,
-        swarm_agent_names=swarm_agent_names,
+        orchestration_agent_names=orchestration_agent_names,
     )
     orchestrators = resolve_orchestrations(
         config,
