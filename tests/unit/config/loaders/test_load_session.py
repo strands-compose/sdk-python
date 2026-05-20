@@ -6,7 +6,13 @@ from unittest.mock import MagicMock, patch
 
 from strands_compose.config.loaders.loaders import load_session
 from strands_compose.config.resolvers.config import ResolvedConfig, ResolvedInfra
-from strands_compose.config.schema import AgentDef, AppConfig, SwarmOrchestrationDef
+from strands_compose.config.schema import (
+    AgentDef,
+    AppConfig,
+    GraphEdgeDef,
+    GraphOrchestrationDef,
+    SwarmOrchestrationDef,
+)
 
 
 class TestLoadSession:
@@ -131,7 +137,58 @@ class TestLoadSession:
         load_session(config, infra)
 
         call_kwargs = mock_resolve_agents.call_args[1]
-        assert call_kwargs["swarm_agent_names"] == {"a", "b"}
+        assert call_kwargs["orchestration_agent_names"] == {"a", "b"}
+
+    @patch("strands_compose.config.loaders.loaders.resolve_orchestrations")
+    @patch("strands_compose.config.loaders.loaders.resolve_agents")
+    def test_graph_agents_excluded_from_session_manager(
+        self, mock_resolve_agents, mock_resolve_orch
+    ):
+        mock_resolve_agents.return_value = {"a": MagicMock(), "b": MagicMock()}
+        mock_resolve_orch.return_value = {}
+
+        config = AppConfig(
+            agents={"a": AgentDef(), "b": AgentDef()},
+            entry="a",
+            orchestrations={
+                "gr": GraphOrchestrationDef(
+                    mode="graph",
+                    entry_name="a",
+                    edges=[GraphEdgeDef(**{"from": "a", "to": "b"})],
+                )
+            },
+        )
+        infra = ResolvedInfra()
+        load_session(config, infra)
+
+        call_kwargs = mock_resolve_agents.call_args[1]
+        assert call_kwargs["orchestration_agent_names"] == {"a", "b"}
+
+    @patch("strands_compose.config.loaders.loaders.resolve_orchestrations")
+    @patch("strands_compose.config.loaders.loaders.resolve_agents")
+    def test_swarm_and_graph_agents_combined_in_orchestration_agent_names(
+        self, mock_resolve_agents, mock_resolve_orch
+    ):
+        mock_resolve_agents.return_value = {"a": MagicMock(), "b": MagicMock(), "c": MagicMock()}
+        mock_resolve_orch.return_value = {}
+
+        config = AppConfig(
+            agents={"a": AgentDef(), "b": AgentDef(), "c": AgentDef()},
+            entry="a",
+            orchestrations={
+                "sw": SwarmOrchestrationDef(mode="swarm", agents=["a", "b"], entry_name="a"),
+                "gr": GraphOrchestrationDef(
+                    mode="graph",
+                    entry_name="b",
+                    edges=[GraphEdgeDef(**{"from": "b", "to": "c"})],
+                ),
+            },
+        )
+        infra = ResolvedInfra()
+        load_session(config, infra)
+
+        call_kwargs = mock_resolve_agents.call_args[1]
+        assert call_kwargs["orchestration_agent_names"] == {"a", "b", "c"}
 
     @patch("strands_compose.config.loaders.loaders.resolve_orchestrations")
     @patch("strands_compose.config.loaders.loaders.resolve_agents")
