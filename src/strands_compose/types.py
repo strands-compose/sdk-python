@@ -33,6 +33,7 @@ class EventType(StrEnum):
     TOOL_START = "tool_start"
     TOOL_END = "tool_end"
     REASONING = "reasoning"
+    INTERRUPT = "interrupt"
     COMPLETE = "complete"
     ERROR = "error"
 
@@ -50,7 +51,7 @@ class StreamEvent:
 
     Produced by :class:`~strands_compose.hooks.EventPublisher` for
     all agent activity: ``TOKEN``, ``REASONING``, ``TOOL_START``, ``TOOL_END``,
-    ``COMPLETE``, ``ERROR``, ``NODE_START``, ``NODE_STOP``,
+    ``INTERRUPT``, ``COMPLETE``, ``ERROR``, ``NODE_START``, ``NODE_STOP``,
     ``HANDOFF``, ``MULTIAGENT_COMPLETE``.
 
     Attributes:

@@ -6,7 +6,7 @@
 :class:`EventQueue` is a thin async queue wrapper that hides the sentinel
 pattern from callers.  :func:`make_event_queue` attaches
 :class:`~strands_compose.hooks.EventPublisher` hooks to every agent
-so all events (TOKEN, REASONING, TOOL_START, TOOL_END, COMPLETE,
+so all events (TOKEN, REASONING, TOOL_START, TOOL_END, INTERRUPT, COMPLETE,
 and — for Swarm/Graph — NODE_START, NODE_STOP, HANDOFF, MULTIAGENT_COMPLETE)
 flow into the shared queue.
 

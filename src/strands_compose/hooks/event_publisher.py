@@ -230,6 +230,22 @@ class EventPublisher(HookProvider):
         if self._errored:
             return
 
+        result = event.result
+        if result is not None and result.stop_reason == "interrupt":
+            for interrupt in result.interrupts or []:
+                self._callback(
+                    StreamEvent(
+                        type=EventType.INTERRUPT,
+                        agent_name=self._agent_name,
+                        data={
+                            "interrupt_id": interrupt.id,
+                            "name": interrupt.name,
+                            "reason": interrupt.reason,
+                        },
+                    ),
+                )
+            return
+
         metrics = event.agent.event_loop_metrics
 
         # Usage from the latest invocation (current turn only).
