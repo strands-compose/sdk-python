@@ -43,5 +43,5 @@ class TestStreamConverterABC:
 
     def test_openai_converter_is_instance_of_stream_converter(self) -> None:
         """OpenAIStreamConverter must be a StreamConverter subclass."""
-        conv = OpenAIStreamConverter()
+        conv = OpenAIStreamConverter(entry_agent_name="test-agent")
         assert isinstance(conv, StreamConverter)

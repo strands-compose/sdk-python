@@ -1,6 +1,7 @@
 .env
 .claude
 .sessions
+.converter
 
 # Ignore Python cache and compiled files
 __pycache__/
