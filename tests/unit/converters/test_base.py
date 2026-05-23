@@ -29,7 +29,7 @@ class TestStreamConverterABC:
     def test_cannot_instantiate_abstract_class_directly(self) -> None:
         """StreamConverter cannot be instantiated without implementing abstract methods."""
         with pytest.raises(TypeError):
-            StreamConverter()
+            StreamConverter() # type: ignore
 
     def test_concrete_subclass_instantiates(self) -> None:
         """A fully concrete subclass can be instantiated."""
@@ -43,5 +43,5 @@ class TestStreamConverterABC:
 
     def test_openai_converter_is_instance_of_stream_converter(self) -> None:
         """OpenAIStreamConverter must be a StreamConverter subclass."""
-        conv = OpenAIStreamConverter()
+        conv = OpenAIStreamConverter(entry_agent_name="test-agent")
         assert isinstance(conv, StreamConverter)
