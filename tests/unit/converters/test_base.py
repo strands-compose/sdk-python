@@ -29,7 +29,7 @@ class TestStreamConverterABC:
     def test_cannot_instantiate_abstract_class_directly(self) -> None:
         """StreamConverter cannot be instantiated without implementing abstract methods."""
         with pytest.raises(TypeError):
-            StreamConverter() # type: ignore
+            StreamConverter()
 
     def test_concrete_subclass_instantiates(self) -> None:
         """A fully concrete subclass can be instantiated."""
