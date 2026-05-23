@@ -66,7 +66,7 @@ class TestTopologicalSort:
             "orch_a": SwarmOrchestrationDef(entry_name="a1", agents=["a1", "a2"]),
             "orch_b": SwarmOrchestrationDef(entry_name="b1", agents=["b1", "b2"]),
         }
-        order = topological_sort(configs)  # ty: ignore
+        order = topological_sort(configs)
         assert set(order) == {"orch_a", "orch_b"}
 
     def test_dependency_appears_before_dependent(self) -> None:
@@ -80,7 +80,7 @@ class TestTopologicalSort:
                 ],
             ),
         }
-        order = topological_sort(configs)  # ty: ignore
+        order = topological_sort(configs)
         assert order.index("orch_a") < order.index("orch_b")
 
     def test_circular_dependency_raises_configuration_error(self) -> None:
@@ -96,7 +96,7 @@ class TestTopologicalSort:
             ),
         }
         with pytest.raises(ConfigurationError, match="Circular dependency"):
-            topological_sort(configs)  # ty: ignore
+            topological_sort(configs)
 
     def test_three_level_chain_correct_order(self) -> None:
         """A -> B -> C chain: C built first, then B, then A."""
@@ -111,5 +111,5 @@ class TestTopologicalSort:
             ),
             "C": SwarmOrchestrationDef(entry_name="agent3", agents=["agent3", "agent4"]),
         }
-        order = topological_sort(configs)  # ty: ignore
+        order = topological_sort(configs)
         assert order.index("C") < order.index("B") < order.index("A")

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import heapq
 import logging
+from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
 from ....exceptions import CircularDependencyError
@@ -47,7 +48,7 @@ def collect_node_refs(config: OrchestrationDef) -> set[str]:
 
 
 def topological_sort(
-    configs: dict[str, OrchestrationDef],
+    configs: Mapping[str, OrchestrationDef],
 ) -> list[str]:
     """Sort named orchestrations in dependency order.
 

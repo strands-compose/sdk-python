@@ -134,7 +134,10 @@ The fix: add `session_manager: ~` to each swarm agent to opt out.
 > **Tips & Tricks**
 >
 > - For development, `file` provider with a fixed `session_id` is great — restart your script and the agent remembers your conversation.
-> - For server/API deployments, use `load_session()` with a per-request `session_id` to isolate conversations between users. See [the multi-tenant pattern](#the-multi-tenant-server-pattern) below.
+> - For server/API deployments, use `load_session()` with a per-request `session_id`. strands-compose
+>   computes a single `effective_session_id` from your value and threads it to every agent and
+>   orchestration, so all agents in one request share the same session folder. See
+>   [the multi-tenant pattern](#the-multi-tenant-server-pattern) below.
 > - Delete the `.sessions/` directory to "factory reset" your agent's memory.
 
 ## The Multi-Tenant Server Pattern

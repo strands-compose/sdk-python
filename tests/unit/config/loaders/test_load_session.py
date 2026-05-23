@@ -11,6 +11,7 @@ from strands_compose.config.schema import (
     AppConfig,
     GraphEdgeDef,
     GraphOrchestrationDef,
+    SessionManagerDef,
     SwarmOrchestrationDef,
 )
 
@@ -54,65 +55,69 @@ class TestLoadSession:
 
     @patch("strands_compose.config.loaders.loaders.resolve_orchestrations")
     @patch("strands_compose.config.loaders.loaders.resolve_agents")
-    def test_uses_infra_session_manager_by_default(self, mock_resolve_agents, mock_resolve_orch):
-        mock_resolve_agents.return_value = {"main": MagicMock()}
-        mock_resolve_orch.return_value = {}
-
-        infra = ResolvedInfra()
-        infra.session_manager = MagicMock()
-
-        config = AppConfig(agents={"main": AgentDef()}, entry="main")
-        load_session(config, infra)
-
-        call_kwargs = mock_resolve_agents.call_args[1]
-        assert call_kwargs["session_manager"] is infra.session_manager
-
-    @patch("strands_compose.config.loaders.loaders.resolve_session_manager")
-    @patch("strands_compose.config.loaders.loaders.resolve_orchestrations")
-    @patch("strands_compose.config.loaders.loaders.resolve_agents")
-    def test_session_id_creates_fresh_session_manager(
-        self,
-        mock_resolve_agents,
-        mock_resolve_orch,
-        mock_resolve_sm,
-    ):
-        from strands_compose.config.schema import SessionManagerDef
-
-        mock_resolve_agents.return_value = {"main": MagicMock()}
-        mock_resolve_orch.return_value = {}
-        fresh_sm = MagicMock()
-        mock_resolve_sm.return_value = fresh_sm
-
-        config = AppConfig(
-            agents={"main": AgentDef()},
-            entry="main",
-            session_manager=SessionManagerDef(provider="file"),
-        )
-        infra = ResolvedInfra()
-        infra.session_manager = MagicMock()
-
-        load_session(config, infra, session_id="abc-123")
-
-        mock_resolve_sm.assert_called_once()
-        call_kwargs = mock_resolve_agents.call_args[1]
-        assert call_kwargs["session_manager"] is fresh_sm
+    def test_global_session_manager_def_forwarded(self, mock_agents, mock_orch):
+        mock_agents.return_value = {"main": MagicMock()}
+        mock_orch.return_value = {}
+        sm_def = SessionManagerDef(provider="file")
+        config = AppConfig(agents={"main": AgentDef()}, entry="main", session_manager=sm_def)
+        load_session(config, ResolvedInfra())
+        assert mock_agents.call_args.kwargs["global_session_manager_def"] is sm_def
+        assert mock_orch.call_args.kwargs["global_session_manager_def"] is sm_def
 
     @patch("strands_compose.config.loaders.loaders.resolve_orchestrations")
     @patch("strands_compose.config.loaders.loaders.resolve_agents")
-    def test_session_id_without_config_sm_uses_infra_sm(
-        self, mock_resolve_agents, mock_resolve_orch
-    ):
-        mock_resolve_agents.return_value = {"main": MagicMock()}
-        mock_resolve_orch.return_value = {}
-
-        infra = ResolvedInfra()
-        infra.session_manager = MagicMock()
-
+    def test_no_global_session_manager_def_is_none(self, mock_agents, mock_orch):
+        mock_agents.return_value = {"main": MagicMock()}
+        mock_orch.return_value = {}
         config = AppConfig(agents={"main": AgentDef()}, entry="main")
-        load_session(config, infra, session_id="abc-123")
+        load_session(config, ResolvedInfra())
+        assert mock_agents.call_args.kwargs["global_session_manager_def"] is None
+        assert mock_agents.call_args.kwargs["session_id"] is None
 
-        call_kwargs = mock_resolve_agents.call_args[1]
-        assert call_kwargs["session_manager"] is infra.session_manager
+    @patch("strands_compose.config.loaders.loaders.resolve_orchestrations")
+    @patch("strands_compose.config.loaders.loaders.resolve_agents")
+    def test_explicit_session_id_threaded(self, mock_agents, mock_orch):
+        mock_agents.return_value = {"main": MagicMock()}
+        mock_orch.return_value = {}
+        sm_def = SessionManagerDef(provider="file")
+        config = AppConfig(agents={"main": AgentDef()}, entry="main", session_manager=sm_def)
+        load_session(config, ResolvedInfra(), session_id="abc-123")
+        assert mock_agents.call_args.kwargs["session_id"] == "abc-123"
+        assert mock_orch.call_args.kwargs["session_id"] == "abc-123"
+
+    @patch("strands_compose.config.loaders.loaders.uuid")
+    @patch("strands_compose.config.loaders.loaders.resolve_orchestrations")
+    @patch("strands_compose.config.loaders.loaders.resolve_agents")
+    def test_cli_mode_synthesises_session_id_when_global_sm_set(
+        self, mock_agents, mock_orch, mock_uuid
+    ):
+        mock_agents.return_value = {"main": MagicMock()}
+        mock_orch.return_value = {}
+        mock_uuid.uuid4.return_value = "deadbeef"
+        sm_def = SessionManagerDef(provider="file")
+        config = AppConfig(agents={"main": AgentDef()}, entry="main", session_manager=sm_def)
+        load_session(config, ResolvedInfra())
+        assert mock_agents.call_args.kwargs["session_id"] == "deadbeef"
+        assert mock_orch.call_args.kwargs["session_id"] == "deadbeef"
+
+    @patch("strands_compose.config.loaders.loaders.resolve_orchestrations")
+    @patch("strands_compose.config.loaders.loaders.resolve_agents")
+    def test_cli_mode_uses_yaml_session_id_when_present(self, mock_agents, mock_orch):
+        mock_agents.return_value = {"main": MagicMock()}
+        mock_orch.return_value = {}
+        sm_def = SessionManagerDef(provider="file", params={"session_id": "from-yaml"})
+        config = AppConfig(agents={"main": AgentDef()}, entry="main", session_manager=sm_def)
+        load_session(config, ResolvedInfra())
+        assert mock_agents.call_args.kwargs["session_id"] == "from-yaml"
+
+    @patch("strands_compose.config.loaders.loaders.resolve_orchestrations")
+    @patch("strands_compose.config.loaders.loaders.resolve_agents")
+    def test_cli_mode_no_global_sm_keeps_session_id_none(self, mock_agents, mock_orch):
+        mock_agents.return_value = {"main": MagicMock()}
+        mock_orch.return_value = {}
+        config = AppConfig(agents={"main": AgentDef()}, entry="main")
+        load_session(config, ResolvedInfra())
+        assert mock_agents.call_args.kwargs["session_id"] is None
 
     @patch("strands_compose.config.loaders.loaders.resolve_orchestrations")
     @patch("strands_compose.config.loaders.loaders.resolve_agents")

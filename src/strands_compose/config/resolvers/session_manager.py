@@ -147,3 +147,37 @@ def resolve_session_manager(
     raise ValueError(
         f"Unknown session provider '{provider}'.\nSupported: 'file', 's3', 'agentcore'."
     )
+
+
+def resolve_leaf_session_manager(
+    *,
+    leaf_def: SessionManagerDef | None,
+    leaf_is_set: bool,
+    global_def: SessionManagerDef | None,
+    session_id: str | None,
+) -> SessionManager | None:
+    """Apply the uniform leaf chain to one Pydantic model's ``session_manager`` field.
+
+    Precedence (top wins):
+
+    1. ``leaf_def is not None`` → ``resolve_session_manager(leaf_def, session_id_override=session_id)``.
+    2. ``leaf_is_set and leaf_def is None`` → explicit opt-out → ``None``.
+    3. ``global_def is not None`` → ``resolve_session_manager(global_def, session_id_override=session_id)``.
+    4. otherwise → ``None``.
+
+    Args:
+        leaf_def: The leaf model's ``session_manager`` value.
+        leaf_is_set: ``"session_manager" in leaf_model.model_fields_set``.
+        global_def: The global ``AppConfig.session_manager`` def.
+        session_id: Effective session id from ``load_session``.
+
+    Returns:
+        A new ``SessionManager`` instance or ``None``.
+    """
+    if leaf_def is not None:
+        return resolve_session_manager(leaf_def, session_id_override=session_id)
+    if leaf_is_set:
+        return None
+    if global_def is not None:
+        return resolve_session_manager(global_def, session_id_override=session_id)
+    return None

@@ -28,7 +28,6 @@ class TestResolveAgents:
             {"main": agent_def},
             models=models,  # ty: ignore
             mcp_clients={},
-            session_manager=None,
         )
         assert "main" in result
         agent = result["main"]
@@ -40,17 +39,13 @@ class TestResolveAgents:
     def test_agent_with_inline_model(self, mock_resolve_model, patch_agent_init):
         inline_model = ModelDef(provider="bedrock", model_id="nova-v1:0")
         agent_def = AgentDef(model=inline_model)
-        result = resolve_agents(
-            {"main": agent_def}, models={}, mcp_clients={}, session_manager=None
-        )
+        result = resolve_agents({"main": agent_def}, models={}, mcp_clients={})
         assert "main" in result
         mock_resolve_model.assert_called_once_with(inline_model)
 
     def test_agent_with_no_model(self, patch_agent_init):
         agent_def = AgentDef()
-        result = resolve_agents(
-            {"main": agent_def}, models={}, mcp_clients={}, session_manager=None
-        )
+        result = resolve_agents({"main": agent_def}, models={}, mcp_clients={})
         assert "main" in result
         assert result["main"]._init_kwargs["model"] is None  # ty: ignore
 
@@ -59,9 +54,7 @@ class TestResolveAgents:
         tool_obj = MagicMock()
         mock_resolve_tools.return_value = [tool_obj]
         agent_def = AgentDef(tools=["my.module:my_tool"])
-        result = resolve_agents(
-            {"main": agent_def}, models={}, mcp_clients={}, session_manager=None
-        )
+        result = resolve_agents({"main": agent_def}, models={}, mcp_clients={})
         assert "main" in result
         mock_resolve_tools.assert_called_once_with(["my.module:my_tool"])
 
@@ -71,9 +64,7 @@ class TestResolveAgents:
         mock_resolve_hook.return_value = mock_hook
         hook_def = HookDef(type="strands_compose.hooks.max_calls_guard:MaxToolCallsGuard")
         agent_def = AgentDef(hooks=[hook_def])
-        result = resolve_agents(
-            {"main": agent_def}, models={}, mcp_clients={}, session_manager=None
-        )
+        result = resolve_agents({"main": agent_def}, models={}, mcp_clients={})
         assert "main" in result
         mock_resolve_hook.assert_called_once_with(hook_def)
 
@@ -84,7 +75,6 @@ class TestResolveAgents:
             {"main": agent_def},
             models={},
             mcp_clients={"pg-client": mock_client},
-            session_manager=None,
         )
         assert "main" in result
         assert mock_client in result["main"]._init_kwargs["tools"]  # ty: ignore
@@ -94,9 +84,7 @@ class TestResolveAgents:
         mock_factory = MagicMock(return_value=MagicMock(spec=_RealAgent))
         mock_import.return_value = mock_factory
         agent_def = AgentDef(type="my.module:CustomAgent", agent_kwargs={"extra": "val"})
-        result = resolve_agents(
-            {"main": agent_def}, models={}, mcp_clients={}, session_manager=None
-        )
+        result = resolve_agents({"main": agent_def}, models={}, mcp_clients={})
         assert "main" in result
         mock_factory.assert_called_once()
         call_kwargs = mock_factory.call_args[1]
@@ -107,14 +95,12 @@ class TestResolveAgents:
         mock_import.return_value = MagicMock(return_value="not_an_agent")
         agent_def = AgentDef(type="my.module:BadFactory")
         with pytest.raises(TypeError, match="expected strands.Agent"):
-            resolve_agents({"main": agent_def}, models={}, mcp_clients={}, session_manager=None)
+            resolve_agents({"main": agent_def}, models={}, mcp_clients={})
 
     def test_agent_without_conversation_manager_passes_none(self, patch_agent_init):
         """Agent without conversation_manager config passes None to Agent constructor."""
         agent_def = AgentDef()
-        result = resolve_agents(
-            {"main": agent_def}, models={}, mcp_clients={}, session_manager=None
-        )
+        result = resolve_agents({"main": agent_def}, models={}, mcp_clients={})
         assert result["main"]._init_kwargs["conversation_manager"] is None  # ty: ignore
 
     @patch("strands_compose.config.resolvers.agents.resolve_conversation_manager")
@@ -129,9 +115,7 @@ class TestResolveAgents:
             params={"should_truncate_results": False},
         )
         agent_def = AgentDef(conversation_manager=cm_def)
-        result = resolve_agents(
-            {"main": agent_def}, models={}, mcp_clients={}, session_manager=None
-        )
+        result = resolve_agents({"main": agent_def}, models={}, mcp_clients={})
         mock_resolve_cm.assert_called_once_with(cm_def)
         assert result["main"]._init_kwargs["conversation_manager"] is mock_cm  # ty: ignore
 
@@ -149,7 +133,7 @@ class TestResolveAgents:
             type="strands.agent:NullConversationManager",
         )
         agent_def = AgentDef(type="my.module:CustomAgent", conversation_manager=cm_def)
-        resolve_agents({"main": agent_def}, models={}, mcp_clients={}, session_manager=None)
+        resolve_agents({"main": agent_def}, models={}, mcp_clients={})
         call_kwargs = mock_factory.call_args[1]
         assert call_kwargs["conversation_manager"] is mock_cm
 
@@ -157,20 +141,23 @@ class TestResolveAgents:
 class TestOrchestrationSessionGuard:
     """Tests for the fail-fast swarm/graph + session manager conflict guard."""
 
-    def test_swarm_agent_inherits_global_sm_raises_configuration_error(self, patch_agent_init):
+    @patch("strands_compose.config.resolvers.session_manager.resolve_session_manager")
+    def test_swarm_agent_inherits_global_sm_raises_configuration_error(
+        self, mock_resolve_sm, patch_agent_init
+    ):
         """Swarm agent that would inherit the global SM raises ConfigurationError."""
-        global_sm = MagicMock()
+        mock_resolve_sm.return_value = MagicMock()
         agent_def = AgentDef()  # session_manager NOT in model_fields_set
         with pytest.raises(ConfigurationError, match="global 'session_manager:'"):
             resolve_agents(
                 {"node": agent_def},
                 models={},
                 mcp_clients={},
-                session_manager=global_sm,
+                global_session_manager_def=SessionManagerDef(provider="file"),
                 orchestration_agent_names={"node"},
             )
 
-    @patch("strands_compose.config.resolvers.agents.resolve_session_manager")
+    @patch("strands_compose.config.resolvers.session_manager.resolve_session_manager")
     def test_swarm_agent_with_explicit_per_agent_sm_raises_configuration_error(
         self, mock_resolve_sm, patch_agent_init
     ):
@@ -183,39 +170,40 @@ class TestOrchestrationSessionGuard:
                 {"node": agent_def},
                 models={},
                 mcp_clients={},
-                session_manager=None,
                 orchestration_agent_names={"node"},
             )
+        mock_resolve_sm.assert_called_once_with(sm_def, session_id_override=None)
 
     def test_swarm_agent_with_explicit_null_sm_opts_out_and_succeeds(self, patch_agent_init):
         """Swarm agent with session_manager: ~ (explicit None) opts out and is built."""
-        global_sm = MagicMock()
         agent_def = AgentDef(session_manager=None)  # explicit None -> opt-out
         assert "session_manager" in agent_def.model_fields_set
         result = resolve_agents(
             {"node": agent_def},
             models={},
             mcp_clients={},
-            session_manager=global_sm,
             orchestration_agent_names={"node"},
         )
         assert "node" in result
         assert result["node"]._init_kwargs["session_manager"] is None  # ty: ignore
 
-    def test_graph_agent_inherits_global_sm_raises_configuration_error(self, patch_agent_init):
+    @patch("strands_compose.config.resolvers.session_manager.resolve_session_manager")
+    def test_graph_agent_inherits_global_sm_raises_configuration_error(
+        self, mock_resolve_sm, patch_agent_init
+    ):
         """Graph node agent that would inherit the global SM raises ConfigurationError."""
-        global_sm = MagicMock()
+        mock_resolve_sm.return_value = MagicMock()
         agent_def = AgentDef()
         with pytest.raises(ConfigurationError, match="global 'session_manager:'"):
             resolve_agents(
                 {"node": agent_def},
                 models={},
                 mcp_clients={},
-                session_manager=global_sm,
+                global_session_manager_def=SessionManagerDef(provider="file"),
                 orchestration_agent_names={"node"},
             )
 
-    @patch("strands_compose.config.resolvers.agents.resolve_session_manager")
+    @patch("strands_compose.config.resolvers.session_manager.resolve_session_manager")
     def test_graph_agent_with_explicit_per_agent_sm_raises_configuration_error(
         self, mock_resolve_sm, patch_agent_init
     ):
@@ -228,38 +216,37 @@ class TestOrchestrationSessionGuard:
                 {"node": agent_def},
                 models={},
                 mcp_clients={},
-                session_manager=None,
                 orchestration_agent_names={"node"},
             )
 
     def test_graph_agent_with_explicit_null_sm_opts_out_and_succeeds(self, patch_agent_init):
         """Graph node agent with session_manager: ~ opts out and is built."""
-        global_sm = MagicMock()
         agent_def = AgentDef(session_manager=None)
         assert "session_manager" in agent_def.model_fields_set
         result = resolve_agents(
             {"node": agent_def},
             models={},
             mcp_clients={},
-            session_manager=global_sm,
             orchestration_agent_names={"node"},
         )
         assert "node" in result
         assert result["node"]._init_kwargs["session_manager"] is None  # ty: ignore
 
-    def test_non_orchestration_agent_inherits_global_sm(self, patch_agent_init):
+    @patch("strands_compose.config.resolvers.session_manager.resolve_session_manager")
+    def test_non_orchestration_agent_inherits_global_sm(self, mock_resolve_sm, patch_agent_init):
         """Non-orchestration agent with no per-agent SM inherits the global session manager."""
-        global_sm = MagicMock()
+        resolved_sm = MagicMock()
+        mock_resolve_sm.return_value = resolved_sm
         agent_def = AgentDef()
         result = resolve_agents(
             {"main": agent_def},
             models={},
             mcp_clients={},
-            session_manager=global_sm,
+            global_session_manager_def=SessionManagerDef(provider="file"),
         )
-        assert result["main"]._init_kwargs["session_manager"] is global_sm  # ty: ignore
+        assert result["main"]._init_kwargs["session_manager"] is resolved_sm  # ty: ignore
 
-    @patch("strands_compose.config.resolvers.agents.resolve_session_manager")
+    @patch("strands_compose.config.resolvers.session_manager.resolve_session_manager")
     def test_non_orchestration_agent_with_explicit_sm_uses_per_agent_sm(
         self, mock_resolve_sm, patch_agent_init
     ):
@@ -268,26 +255,63 @@ class TestOrchestrationSessionGuard:
         mock_resolve_sm.return_value = per_agent_sm
         sm_def = SessionManagerDef(provider="file")
         agent_def = AgentDef(session_manager=sm_def)
-        global_sm = MagicMock()
         result = resolve_agents(
             {"main": agent_def},
             models={},
             mcp_clients={},
-            session_manager=global_sm,
         )
         assert result["main"]._init_kwargs["session_manager"] is per_agent_sm  # ty: ignore
+        mock_resolve_sm.assert_called_once_with(sm_def, session_id_override=None)
 
     def test_non_orchestration_agent_with_explicit_null_sm_opts_out(self, patch_agent_init):
         """Non-orchestration agent with session_manager: ~ opts out of the global SM."""
-        global_sm = MagicMock()
         agent_def = AgentDef(session_manager=None)  # explicit None -> opt-out
         result = resolve_agents(
             {"main": agent_def},
             models={},
             mcp_clients={},
-            session_manager=global_sm,
         )
         assert result["main"]._init_kwargs["session_manager"] is None  # ty: ignore
+
+    @patch("strands_compose.config.resolvers.session_manager.resolve_session_manager")
+    def test_session_id_forwarded_to_per_agent_resolver(self, mock_resolve_sm, patch_agent_init):
+        mock_resolve_sm.return_value = MagicMock()
+        sm_def = SessionManagerDef(provider="file")
+        resolve_agents(
+            {"main": AgentDef(session_manager=sm_def)},
+            models={},
+            mcp_clients={},
+            session_id="sid-42",
+        )
+        mock_resolve_sm.assert_called_once_with(sm_def, session_id_override="sid-42")
+
+    @patch("strands_compose.config.resolvers.session_manager.resolve_session_manager")
+    def test_global_def_used_when_agent_has_no_session_manager(
+        self, mock_resolve_sm, patch_agent_init
+    ):
+        mock_resolve_sm.return_value = MagicMock()
+        global_def = SessionManagerDef(provider="file")
+        resolve_agents(
+            {"main": AgentDef()},
+            models={},
+            mcp_clients={},
+            global_session_manager_def=global_def,
+            session_id="sid-7",
+        )
+        mock_resolve_sm.assert_called_once_with(global_def, session_id_override="sid-7")
+
+    @patch("strands_compose.config.resolvers.session_manager.resolve_session_manager")
+    def test_explicit_opt_out_overrides_global_def(self, mock_resolve_sm, patch_agent_init):
+        mock_resolve_sm.return_value = MagicMock()
+        global_def = SessionManagerDef(provider="file")
+        resolve_agents(
+            {"main": AgentDef(session_manager=None)},
+            models={},
+            mcp_clients={},
+            global_session_manager_def=global_def,
+            session_id="sid-X",
+        )
+        mock_resolve_sm.assert_not_called()
 
 
 class TestResolveOrchestration:

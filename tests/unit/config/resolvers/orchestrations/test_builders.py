@@ -20,6 +20,7 @@ from strands_compose.config.schema import (
     DelegateOrchestrationDef,
     GraphEdgeDef,
     GraphOrchestrationDef,
+    SessionManagerDef,
     SwarmOrchestrationDef,
 )
 from strands_compose.exceptions import ConfigurationError
@@ -226,7 +227,7 @@ class TestOrchestrationBuilderDispatch:
         configs = {"bad": unknown_cfg}
 
         with pytest.raises(ConfigurationError, match="Unknown orchestration config type"):
-            OrchestrationBuilder(configs, {"a1": a1}, {}, {}, {}).build_all()  # ty: ignore
+            OrchestrationBuilder(configs, {"a1": a1}, {}, {}, {}).build_all()
 
 
 class TestOrchestrationBuilder:
@@ -249,7 +250,7 @@ class TestOrchestrationBuilder:
             ),
         }
 
-        built = OrchestrationBuilder(configs, agents, agent_defs, {}, {}).build_all()  # ty: ignore
+        built = OrchestrationBuilder(configs, agents, agent_defs, {}, {}).build_all()
 
         assert built["orch"] is new_agent
         assert built["orch"] is not original
@@ -265,7 +266,7 @@ class TestOrchestrationBuilder:
             "my_swarm": SwarmOrchestrationDef(entry_name="a1", agents=["a1", "a2"]),
         }
 
-        built = OrchestrationBuilder(configs, agents, {}, {}, {}).build_all()  # ty: ignore
+        built = OrchestrationBuilder(configs, agents, {}, {}, {}).build_all()
 
         assert "my_swarm" in built
         mock_swarm_cls.assert_called_once()
@@ -294,27 +295,173 @@ class TestOrchestrationBuilder:
             ),
         }
 
-        built = OrchestrationBuilder(configs, agents, {}, {}, {}).build_all()  # ty: ignore
+        built = OrchestrationBuilder(configs, agents, {}, {}, {}).build_all()
 
         assert "research_swarm" in built
         assert "pipeline" in built
         builder.add_node.assert_any_call(mock_swarm, node_id="research_swarm")
 
+    @patch("strands_compose.config.resolvers.session_manager.resolve_session_manager")
     @patch("strands_compose.config.resolvers.orchestrations.builders.Swarm")
-    def test_session_manager_forwarded_to_swarm(self, mock_swarm_cls: MagicMock) -> None:
-        """A session manager passed to OrchestrationBuilder is forwarded to Swarm."""
+    def test_session_manager_forwarded_to_swarm(
+        self, mock_swarm_cls: MagicMock, mock_resolve_sm: MagicMock
+    ) -> None:
+        """A session manager def passed to OrchestrationBuilder is resolved and forwarded to Swarm."""
         a1 = MagicMock(spec=_Agent)
         a2 = MagicMock(spec=_Agent)
-        agents = {"a1": a1, "a2": a2}
+        agents: dict = {"a1": a1, "a2": a2}
         sm = MagicMock()
+        mock_resolve_sm.return_value = sm
         mock_swarm_cls.return_value = MagicMock()
-        configs = {
+        sm_def = SessionManagerDef(provider="file")
+        configs: dict = {
             "my_swarm": SwarmOrchestrationDef(entry_name="a1", agents=["a1", "a2"]),
         }
 
-        OrchestrationBuilder(configs, agents, {}, {}, {}, sm).build_all()  # ty: ignore
+        OrchestrationBuilder(
+            configs,
+            agents,
+            {},
+            {},
+            {},
+            global_session_manager_def=sm_def,
+            session_id="sid-X",
+        ).build_all()
 
         assert mock_swarm_cls.call_args.kwargs["session_manager"] is sm
+        mock_resolve_sm.assert_called_once_with(sm_def, session_id_override="sid-X")
+
+    @patch("strands_compose.config.resolvers.session_manager.resolve_session_manager")
+    @patch("strands_compose.config.resolvers.orchestrations.builders.Swarm")
+    def test_orchestration_session_manager_resolved_with_session_id(
+        self, mock_swarm_cls: MagicMock, mock_resolve_sm: MagicMock
+    ) -> None:
+        """Orch-level session_manager def is resolved with the correct session_id."""
+        a1 = MagicMock(spec=_Agent)
+        agents: dict = {"a1": a1}
+        sm = MagicMock()
+        mock_resolve_sm.return_value = sm
+        mock_swarm_cls.return_value = MagicMock()
+        orch_sm_def = SessionManagerDef(provider="file")
+        configs: dict = {
+            "my_swarm": SwarmOrchestrationDef(
+                entry_name="a1", agents=["a1"], session_manager=orch_sm_def
+            ),
+        }
+
+        OrchestrationBuilder(configs, agents, {}, {}, {}, session_id="sid-99").build_all()
+
+        mock_resolve_sm.assert_called_once_with(orch_sm_def, session_id_override="sid-99")
+
+    @patch("strands_compose.config.resolvers.session_manager.resolve_session_manager")
+    @patch("strands_compose.config.resolvers.orchestrations.builders.Swarm")
+    def test_swarm_inherits_global_def_when_orch_has_none(
+        self, mock_swarm_cls: MagicMock, mock_resolve_sm: MagicMock
+    ) -> None:
+        """Swarm with no session_manager set falls back to global_session_manager_def."""
+        a1 = MagicMock(spec=_Agent)
+        agents: dict = {"a1": a1}
+        sm = MagicMock()
+        mock_resolve_sm.return_value = sm
+        mock_swarm_cls.return_value = MagicMock()
+        global_def = SessionManagerDef(provider="file")
+        configs: dict = {
+            "my_swarm": SwarmOrchestrationDef(entry_name="a1", agents=["a1"]),
+        }
+
+        OrchestrationBuilder(
+            configs,
+            agents,
+            {},
+            {},
+            {},
+            global_session_manager_def=global_def,
+        ).build_all()
+
+        mock_resolve_sm.assert_called_once_with(global_def, session_id_override=None)
+
+    @patch("strands_compose.config.resolvers.session_manager.resolve_session_manager")
+    @patch("strands_compose.config.resolvers.orchestrations.builders.build_agent_from_def")
+    def test_delegate_forwards_session_id_and_global_def(
+        self, mock_build: MagicMock, mock_resolve_sm: MagicMock
+    ) -> None:
+        """build_delegate passes global_session_manager_def and session_id to build_agent_from_def."""
+        new_agent = MagicMock(spec=_Agent)
+        mock_build.return_value = new_agent
+        child = MagicMock(spec=_Agent)
+        child.agent_id = "child"
+        agents: dict = {"parent": MagicMock(spec=_Agent), "child": child}
+        agent_defs: dict = {"parent": AgentDef(), "child": AgentDef()}
+        global_def = SessionManagerDef(provider="file")
+        configs: dict = {
+            "orch": DelegateOrchestrationDef(
+                entry_name="parent",
+                connections=[DelegateConnectionDef(agent="child", description="do work")],
+            ),
+        }
+
+        OrchestrationBuilder(
+            configs,
+            agents,
+            agent_defs,
+            {},
+            {},
+            global_session_manager_def=global_def,
+            session_id="sid-D",
+        ).build_all()
+
+        call_kwargs = mock_build.call_args.kwargs
+        assert call_kwargs["global_session_manager_def"] is global_def
+        assert call_kwargs["session_id"] == "sid-D"
+
+    @patch("strands_compose.config.resolvers.session_manager.resolve_session_manager")
+    @patch("strands_compose.config.resolvers.orchestrations.builders.build_agent_from_def")
+    def test_delegate_with_own_sm_merges_into_entry_def(
+        self, mock_build: MagicMock, mock_resolve_sm: MagicMock
+    ) -> None:
+        """Delegate-level session_manager is merged into the forked entry_def."""
+        new_agent = MagicMock(spec=_Agent)
+        mock_build.return_value = new_agent
+        child = MagicMock(spec=_Agent)
+        child.agent_id = "child"
+        agents: dict = {"parent": MagicMock(spec=_Agent), "child": child}
+        orch_sm_def = SessionManagerDef(provider="file")
+        agent_defs: dict = {"parent": AgentDef(), "child": AgentDef()}
+        configs: dict = {
+            "orch": DelegateOrchestrationDef(
+                entry_name="parent",
+                connections=[DelegateConnectionDef(agent="child", description="x")],
+                session_manager=orch_sm_def,
+            ),
+        }
+
+        OrchestrationBuilder(configs, agents, agent_defs, {}, {}).build_all()
+
+        passed_def = mock_build.call_args.kwargs["agent_def"]
+        assert passed_def.session_manager is orch_sm_def
+
+    @patch("strands_compose.config.resolvers.orchestrations.builders.build_agent_from_def")
+    def test_delegate_explicit_null_opts_entry_agent_out(self, mock_build: MagicMock) -> None:
+        """Delegate with session_manager: ~ (null) opts the forked entry agent out of any SM."""
+        new_agent = MagicMock(spec=_Agent)
+        mock_build.return_value = new_agent
+        child = MagicMock(spec=_Agent)
+        child.agent_id = "child"
+        agents: dict = {"parent": MagicMock(spec=_Agent), "child": child}
+        agent_defs: dict = {"parent": AgentDef(), "child": AgentDef()}
+        configs: dict = {
+            "orch": DelegateOrchestrationDef(
+                entry_name="parent",
+                connections=[DelegateConnectionDef(agent="child", description="x")],
+                session_manager=None,
+            ),
+        }
+
+        OrchestrationBuilder(configs, agents, agent_defs, {}, {}).build_all()
+
+        passed_def = mock_build.call_args.kwargs["agent_def"]
+        assert "session_manager" in passed_def.model_fields_set
+        assert passed_def.session_manager is None
 
     def test_invalid_entry_name_raises_configuration_error(self) -> None:
         """entry_name not in the node pool raises ConfigurationError."""
@@ -325,4 +472,4 @@ class TestOrchestrationBuilder:
         }
 
         with pytest.raises(ConfigurationError, match="entry_name 'nonexistent' is not defined"):
-            OrchestrationBuilder(configs, agents, {}, {}, {}).build_all()  # ty: ignore
+            OrchestrationBuilder(configs, agents, {}, {}, {}).build_all()
