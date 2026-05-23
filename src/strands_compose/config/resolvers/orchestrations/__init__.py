@@ -30,8 +30,7 @@ if TYPE_CHECKING:
     from strands.tools.mcp import MCPClient as StrandsMCPClient
 
     from ....types import Node
-    from ...schema import AgentDef, AppConfig
-    from ..session_manager import SessionManager
+    from ...schema import AgentDef, AppConfig, SessionManagerDef
 
 
 def resolve_orchestrations(
@@ -40,7 +39,9 @@ def resolve_orchestrations(
     agent_defs: dict[str, AgentDef],
     models: dict[str, Model],
     mcp_clients: dict[str, StrandsMCPClient],
-    session_manager: SessionManager | None = None,
+    *,
+    global_session_manager_def: SessionManagerDef | None = None,
+    session_id: str | None = None,
 ) -> dict[str, Node]:
     """Build all named orchestrations from config.
 
@@ -50,7 +51,12 @@ def resolve_orchestrations(
         agent_defs: Agent definition models keyed by name.
         models: Resolved model instances keyed by name.
         mcp_clients: Resolved MCP clients keyed by name.
-        session_manager: Optional shared session manager.
+        global_session_manager_def: Global session manager def from
+            ``AppConfig.session_manager``, used as a fallback when an
+            orchestration declares no ``session_manager:`` of its own.
+        session_id: Effective session id threaded down from ``load_session``.
+            Passed as ``session_id_override`` to every
+            ``resolve_session_manager`` call made by leaf builders.
 
     Returns:
         Dict of orchestration name -> built Swarm/Graph/Agent.
@@ -65,7 +71,8 @@ def resolve_orchestrations(
         agent_defs,
         models,
         mcp_clients,
-        session_manager,
+        global_session_manager_def=global_session_manager_def,
+        session_id=session_id,
     ).build_all()
 
 

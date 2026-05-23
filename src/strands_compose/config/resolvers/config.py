@@ -10,12 +10,10 @@ from ...mcp.lifecycle import MCPLifecycle
 from ...wire import make_event_queue
 from .mcp import resolve_mcp_client, resolve_mcp_server
 from .models import resolve_model
-from .session_manager import resolve_session_manager
 
 if TYPE_CHECKING:
     from strands import Agent
     from strands.models import Model
-    from strands.session.session_manager import SessionManager
     from strands.tools.mcp import MCPClient as StrandsMCPClient
 
     from ...mcp.server import MCPServer
@@ -79,6 +77,10 @@ class ResolvedInfra:
     This is the pure result of :func:`resolve_infra`.  Lifecycle is cold,
     agents are not yet created.
 
+    Session managers are NOT stored here — they are built per agent and per
+    orchestration at session time, from ``config.session_manager`` (the global
+    def) plus ``effective_session_id`` computed by ``load_session``.
+
     Use :func:`~strands_compose.config.loaders.load` for a fully
     activated system, or manually::
 
@@ -89,15 +91,14 @@ class ResolvedInfra:
 
     models: dict[str, Model] = field(default_factory=dict)
     clients: dict[str, StrandsMCPClient] = field(default_factory=dict)
-    session_manager: SessionManager | None = None
     mcp_lifecycle: MCPLifecycle = field(default_factory=MCPLifecycle)
 
 
 def resolve_infra(config: AppConfig) -> ResolvedInfra:
     """Resolve infrastructure from an AppConfig (pure, no I/O).
 
-    Creates model objects, MCP server/client objects, a lifecycle
-    manager, and a session manager.  Nothing is started.
+    Creates model objects, MCP server/client objects, and a lifecycle
+    manager.  Nothing is started.
 
     Resolution order:
 
@@ -105,7 +106,9 @@ def resolve_infra(config: AppConfig) -> ResolvedInfra:
     2. MCP servers (no dependencies)
     3. MCP clients (depend on servers)
     4. MCP lifecycle (assembles servers + clients, **not** started)
-    5. Session manager (no dependencies)
+    5. Session manager validation only — ``agentcore`` provider rejected
+       globally; no instance is constructed (instances are built per-leaf
+       at session time).
 
     Agents and orchestration are resolved in :func:`load` after
     ``mcp_lifecycle.start()`` because ``Agent.__init__`` auto-starts
@@ -117,8 +120,7 @@ def resolve_infra(config: AppConfig) -> ResolvedInfra:
         config: Parsed AppConfig from YAML.
 
     Returns:
-        A :class:`ResolvedInfra` with models, clients, session manager,
-        and a cold MCP lifecycle.
+        A :class:`ResolvedInfra` with models, clients, and a cold MCP lifecycle.
     """
     # 1. Models
     models: dict[str, Model] = {}
@@ -145,22 +147,21 @@ def resolve_infra(config: AppConfig) -> ResolvedInfra:
     for name, client in clients.items():
         lifecycle.add_client(name, client)
 
-    # 5. Session manager
-    session_manager: SessionManager | None = None
-    if config.session_manager is not None:
-        # Prevent AgentCoreMemorySessionManager from being set globally
-        # Required "actor_id" param makes it unsuitable for global config
-        if config.session_manager.provider.lower() == "agentcore":
-            raise ValueError(
-                "The 'agentcore' session manager cannot be set globally.\n"
-                "Configure it for each agent - required 'actor_id' param."
-            )
-        session_manager = resolve_session_manager(config.session_manager)
-        logger.info("provider=<%s> | resolved session manager", config.session_manager.provider)
+    # 5. Session manager — validation only; instances are built per leaf in
+    # load_session / agents / orchestrations. 'agentcore' provider cannot be
+    # set globally — it requires a unique 'actor_id' per agent and is
+    # therefore unsuitable for a global default. Fail fast at boot.
+    if (
+        config.session_manager is not None
+        and config.session_manager.provider.lower() == "agentcore"
+    ):
+        raise ValueError(
+            "The 'agentcore' session manager cannot be set globally.\n"
+            "Configure it per-agent — 'actor_id' must be unique per agent."
+        )
 
     return ResolvedInfra(
         models=models,
         clients=clients,
-        session_manager=session_manager,
         mcp_lifecycle=lifecycle,
     )

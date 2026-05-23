@@ -8,6 +8,7 @@ then returns the appropriate callable entry point.
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
 from strands import Agent
@@ -24,7 +25,7 @@ from ...schema import (
 )
 from ..agents import build_agent_from_def
 from ..hooks import resolve_hook_entry
-from ..session_manager import resolve_session_manager
+from ..session_manager import resolve_leaf_session_manager
 from .planner import topological_sort
 
 if TYPE_CHECKING:
@@ -33,8 +34,7 @@ if TYPE_CHECKING:
     from strands.tools.mcp import MCPClient as StrandsMCPClient
 
     from ....types import Node
-    from ...schema import AgentDef
-    from ..session_manager import SessionManager
+    from ...schema import AgentDef, SessionManagerDef
 
 logger = logging.getLogger(__name__)
 
@@ -44,12 +44,14 @@ class OrchestrationBuilder:
 
     def __init__(
         self,
-        configs: dict[str, OrchestrationDef],
-        agents: dict[str, Agent],
+        configs: Mapping[str, OrchestrationDef],
+        agents: Mapping[str, Agent],
         agent_defs: dict[str, AgentDef],
         models: dict[str, Model],
         mcp_clients: dict[str, StrandsMCPClient],
-        session_manager: SessionManager | None = None,
+        *,
+        global_session_manager_def: SessionManagerDef | None = None,
+        session_id: str | None = None,
     ) -> None:
         """Initialize the OrchestrationBuilder.
 
@@ -64,10 +66,17 @@ class OrchestrationBuilder:
             agent_defs: Agent schema definitions for delegate forking.
             models: Resolved model objects keyed by name.
             mcp_clients: Resolved MCP client objects keyed by name.
-            session_manager: Global session manager (may be inherited).
+            global_session_manager_def: Global session manager def from
+                ``AppConfig.session_manager``, used as a fallback when an
+                orchestration declares no ``session_manager:`` of its own and
+                has not explicitly opted out.
+            session_id: Effective session id threaded down from ``load_session``.
+                Passed as ``session_id_override`` to every
+                ``resolve_session_manager`` call made by leaf builders.
         """
         self._configs = configs
-        self._session_manager = session_manager
+        self._global_sm_def = global_session_manager_def
+        self._session_id = session_id
         self._nodes: dict[str, Node] = dict(agents)
         self._built: dict[str, Node] = {}
         self._agent_defs = agent_defs
@@ -88,11 +97,9 @@ class OrchestrationBuilder:
         cfg = self._configs[name]
         entry_name = self._resolve_entry(name, cfg)
 
-        session_manager: SessionManager | None = self._session_manager
-        if cfg.session_manager is not None:
-            session_manager = resolve_session_manager(cfg.session_manager)
-
-        result = self._dispatch(name, cfg, entry_name, session_manager)
+        # No session manager resolution here — each builder (delegate/swarm/graph)
+        # applies the uniform leaf chain to cfg + global_session_manager_def + session_id.
+        result = self._dispatch(name, cfg, entry_name)
         self._built[name] = result
         self._nodes[name] = result
         logger.info("orchestration=<%s>, mode=<%s> | built orchestration", name, cfg.mode)
@@ -111,7 +118,6 @@ class OrchestrationBuilder:
         name: str,
         cfg: OrchestrationDef,
         entry_name: str,
-        session_manager: SessionManager | None,
     ) -> Agent | Swarm | Graph:
         if isinstance(cfg, DelegateOrchestrationDef):
             return build_delegate(
@@ -122,7 +128,8 @@ class OrchestrationBuilder:
                 self._agent_defs,
                 self._models,
                 self._mcp_clients,
-                session_manager=session_manager,
+                global_session_manager_def=self._global_sm_def,
+                session_id=self._session_id,
             )
         if isinstance(cfg, SwarmOrchestrationDef):
             return build_swarm(
@@ -130,7 +137,8 @@ class OrchestrationBuilder:
                 cfg,
                 self._nodes,
                 entry_name,
-                session_manager=session_manager,
+                global_session_manager_def=self._global_sm_def,
+                session_id=self._session_id,
             )
         if isinstance(cfg, GraphOrchestrationDef):
             return build_graph(
@@ -138,7 +146,8 @@ class OrchestrationBuilder:
                 cfg,
                 self._nodes,
                 entry_name,
-                session_manager=session_manager,
+                global_session_manager_def=self._global_sm_def,
+                session_id=self._session_id,
             )
         raise ConfigurationError(f"Unknown orchestration config type: {type(cfg).__name__}")
 
@@ -151,7 +160,9 @@ def build_delegate(
     agent_defs: dict[str, AgentDef],
     models: dict[str, Model],
     mcp_clients: dict[str, StrandsMCPClient],
-    session_manager: SessionManager | None = None,
+    *,
+    global_session_manager_def: SessionManagerDef | None = None,
+    session_id: str | None = None,
 ) -> Agent:
     """Build delegate orchestration: construct a new Agent with delegate tools.
 
@@ -168,7 +179,11 @@ def build_delegate(
         agent_defs: All declared agent definitions.
         models: Resolved model objects keyed by name.
         mcp_clients: Resolved MCP client objects keyed by name.
-        session_manager: Global session manager (may be inherited).
+        global_session_manager_def: Global session manager def from
+            ``AppConfig.session_manager``, used as a fallback when neither the
+            orchestration nor the entry agent declares a ``session_manager:``.
+        session_id: Effective session id threaded down from ``load_session``.
+            Passed as ``session_id_override`` to ``resolve_session_manager``.
 
     Returns:
         A **new** Agent with delegate tools registered.
@@ -205,16 +220,25 @@ def build_delegate(
             update={"agent_kwargs": {**entry_def.agent_kwargs, **config.agent_kwargs}}
         )
 
+    # Merge delegate-orch session_manager into the forked entry_def, same shape as
+    # the existing agent_kwargs merge. Then build_agent_from_def applies the uniform
+    # leaf chain:
+    #   - config.session_manager set        → wins over entry_def.session_manager
+    #   - config.session_manager: ~ (null)  → opts the forked entry agent out
+    #   - field absent on config            → entry_def's chain is untouched
+    if "session_manager" in config.model_fields_set:
+        entry_def = entry_def.model_copy(update={"session_manager": config.session_manager})
+
     # Build a NEW agent from the (possibly overridden) blueprint + delegate tools.
     agent = build_agent_from_def(
         name=name,
         agent_def=entry_def,
         models=models,
         mcp_clients=mcp_clients,
-        session_manager=session_manager,
+        global_session_manager_def=global_session_manager_def,
+        session_id=session_id,
         extra_tools=delegate_tools,
         extra_hooks=orch_hooks,
-        session_manager_override=session_manager if config.session_manager is not None else None,
     )
 
     logger.info(
@@ -231,7 +255,9 @@ def build_swarm(
     config: SwarmOrchestrationDef,
     nodes: dict[str, Node],
     entry_name: str,
-    session_manager: SessionManager | None = None,
+    *,
+    global_session_manager_def: SessionManagerDef | None = None,
+    session_id: str | None = None,
 ) -> Swarm:
     """Build swarm orchestration using strands Swarm.
 
@@ -243,7 +269,11 @@ def build_swarm(
         config: Swarm orchestration config.
         nodes: Dict of name -> Agent or MultiAgentBase.
         entry_name: Name of the entry/starting agent.
-        session_manager: Optional session manager for the swarm.
+        global_session_manager_def: Global session manager def from
+            ``AppConfig.session_manager``, used as a fallback when the
+            orchestration declares no ``session_manager:`` of its own.
+        session_id: Effective session id threaded down from ``load_session``.
+            Passed as ``session_id_override`` to ``resolve_session_manager``.
 
     Returns:
         A strands Swarm instance — callable with ``swarm(task)``.
@@ -252,6 +282,13 @@ def build_swarm(
         ConfigurationError: If any referenced node is not an Agent.
     """
     from strands import Agent as _Agent
+
+    session_manager = resolve_leaf_session_manager(
+        leaf_def=config.session_manager,
+        leaf_is_set="session_manager" in config.model_fields_set,
+        global_def=global_session_manager_def,
+        session_id=session_id,
+    )
 
     node_agents = []
     for agent_name in config.agents:
@@ -290,7 +327,9 @@ def build_graph(
     config: GraphOrchestrationDef,
     nodes: dict[str, Node],
     entry_name: str,
-    session_manager: SessionManager | None = None,
+    *,
+    global_session_manager_def: SessionManagerDef | None = None,
+    session_id: str | None = None,
 ) -> Graph:
     """Build graph orchestration using strands GraphBuilder.
 
@@ -303,13 +342,23 @@ def build_graph(
         config: Graph orchestration config with edges.
         nodes: Dict of name -> Agent or MultiAgentBase.
         entry_name: Name of the entry node.
-        session_manager: Optional session manager for the graph.
+        global_session_manager_def: Global session manager def from
+            ``AppConfig.session_manager``, used as a fallback when the
+            orchestration declares no ``session_manager:`` of its own.
+        session_id: Effective session id threaded down from ``load_session``.
+            Passed as ``session_id_override`` to ``resolve_session_manager``.
 
     Returns:
         A strands Graph instance — callable with ``graph(task)``.
     """
     builder = GraphBuilder()
     builder.set_graph_id(name)
+    session_manager = resolve_leaf_session_manager(
+        leaf_def=config.session_manager,
+        leaf_is_set="session_manager" in config.model_fields_set,
+        global_def=global_session_manager_def,
+        session_id=session_id,
+    )
     if session_manager is not None:
         builder.set_session_manager(session_manager)
 

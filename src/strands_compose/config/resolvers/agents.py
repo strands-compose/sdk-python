@@ -13,7 +13,7 @@ from .conversation_manager import resolve_conversation_manager
 from .hooks import resolve_hook_entry
 from .mcp import resolve_tools
 from .models import resolve_model
-from .session_manager import resolve_session_manager
+from .session_manager import resolve_leaf_session_manager
 
 if TYPE_CHECKING:
     from strands.agent.conversation_manager import ConversationManager
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from strands.session.session_manager import SessionManager
     from strands.tools.mcp import MCPClient as StrandsMCPClient
 
-    from ..schema import AgentDef
+    from ..schema import AgentDef, SessionManagerDef
 
 logger = logging.getLogger(__name__)
 
@@ -31,11 +31,11 @@ def build_agent_from_def(
     agent_def: AgentDef,
     models: dict[str, Model],
     mcp_clients: dict[str, StrandsMCPClient],
-    session_manager: SessionManager | None,
     *,
+    global_session_manager_def: SessionManagerDef | None = None,
+    session_id: str | None = None,
     extra_tools: list[Any] | None = None,
     extra_hooks: list[Any] | None = None,
-    session_manager_override: SessionManager | None = None,
     orchestration_agent_names: set[str] | None = None,
 ) -> Agent:
     """Build a single Agent from an AgentDef blueprint.
@@ -50,10 +50,15 @@ def build_agent_from_def(
         agent_def: The agent's schema definition.
         models: Resolved model objects keyed by name.
         mcp_clients: Resolved MCP client objects keyed by name.
-        session_manager: Global session manager (may be inherited).
+        global_session_manager_def: Global session manager def from
+            ``AppConfig.session_manager``, used as a fallback when the agent
+            declares no ``session_manager:`` of its own and has not explicitly
+            opted out (``session_manager: ~``).
+        session_id: Effective session id threaded down from ``load_session``.
+            Passed as ``session_id_override`` to every
+            ``resolve_session_manager`` call made in this function.
         extra_tools: Additional tools to append (e.g. delegate tools).
         extra_hooks: Additional hooks to append (e.g. orchestration-level hooks).
-        session_manager_override: If set, overrides session manager resolution entirely.
         orchestration_agent_names: Agent names in swarm/graph orchestrations (fail-fast on SM).
 
     Returns:
@@ -80,19 +85,17 @@ def build_agent_from_def(
     # 4. MCP clients as tool providers
     tool_providers: list[Any] = [mcp_clients[n] for n in agent_def.mcp]
 
-    # 5. Resolve session manager
-    if session_manager_override is not None:
-        agent_session: SessionManager | None = session_manager_override
-    else:
-        explicitly_opted_out = (
-            "session_manager" in agent_def.model_fields_set and agent_def.session_manager is None
-        )
-        if agent_def.session_manager is not None:
-            agent_session = resolve_session_manager(agent_def.session_manager)
-        elif explicitly_opted_out:
-            agent_session = None
-        else:
-            agent_session = session_manager
+    # 5. Resolve session manager (uniform leaf chain).
+    #   1. agent_def.session_manager set        → resolve it (per-agent override)
+    #   2. agent_def explicit opt-out (None)    → None
+    #   3. global_session_manager_def set       → resolve it (inherited global)
+    #   4. otherwise                            → None
+    agent_session: SessionManager | None = resolve_leaf_session_manager(
+        leaf_def=agent_def.session_manager,
+        leaf_is_set="session_manager" in agent_def.model_fields_set,
+        global_def=global_session_manager_def,
+        session_id=session_id,
+    )
 
     # Fail fast: swarm/graph node agents cannot carry a session manager.
     if (
@@ -162,7 +165,9 @@ def resolve_agents(
     agent_defs: dict[str, AgentDef],
     models: dict[str, Model],
     mcp_clients: dict[str, StrandsMCPClient],
-    session_manager: SessionManager | None,
+    *,
+    global_session_manager_def: SessionManagerDef | None = None,
+    session_id: str | None = None,
     orchestration_agent_names: set[str] | None = None,
 ) -> dict[str, Agent]:
     """Resolve all agents -- flat, no dependencies between them.
@@ -179,7 +184,13 @@ def resolve_agents(
         agent_defs: Agent definitions keyed by name.
         models: Resolved model instances keyed by name.
         mcp_clients: Resolved MCP clients keyed by name.
-        session_manager: Optional shared session manager for all agents.
+        global_session_manager_def: Global session manager def from
+            ``AppConfig.session_manager``, used as a fallback when an agent
+            declares no ``session_manager:`` of its own and has not explicitly
+            opted out (``session_manager: ~``).
+        session_id: Effective session id threaded down from ``load_session``.
+            Passed as ``session_id_override`` to every
+            ``resolve_session_manager`` call made in this function.
         orchestration_agent_names: Names of agents in swarm or graph orchestrations
             (these agents must not have a session manager).
 
@@ -198,7 +209,8 @@ def resolve_agents(
             agent_def=agent_def,
             models=models,
             mcp_clients=mcp_clients,
-            session_manager=session_manager,
+            global_session_manager_def=global_session_manager_def,
+            session_id=session_id,
             orchestration_agent_names=orchestration_agent_names,
         )
         resolved[name] = agent

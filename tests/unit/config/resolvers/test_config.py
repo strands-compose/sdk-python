@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from strands_compose.config.resolvers.config import (
     ResolvedConfig,
     ResolvedInfra,
@@ -33,7 +35,6 @@ class TestResolvedInfra:
         infra = ResolvedInfra()
         assert infra.models == {}
         assert infra.clients == {}
-        assert infra.session_manager is None
         assert infra.mcp_lifecycle is not None
 
 
@@ -46,7 +47,6 @@ class TestResolveAll:
         assert isinstance(result, ResolvedInfra)
         assert result.models == {}
         assert result.clients == {}
-        assert result.session_manager is None
         assert result.mcp_lifecycle._started is False
 
     @patch("strands_compose.config.resolvers.config.resolve_model")
@@ -98,33 +98,37 @@ class TestResolveAll:
         assert "pg" in result.mcp_lifecycle.servers
         assert "pg-client" in result.mcp_lifecycle.clients
 
-    @patch("strands_compose.config.resolvers.config.resolve_session_manager")
-    def test_session_manager_resolved(self, mock_resolve_sm):
-        mock_sm = MagicMock()
-        mock_resolve_sm.return_value = mock_sm
+    @patch("strands_compose.config.resolvers.session_manager.resolve_session_manager")
+    def test_resolve_infra_does_not_create_session_manager(self, mock_resolve_sm):
         config = AppConfig(
             session_manager=SessionManagerDef(provider="file"),
             agents={"main": AgentDef()},
             entry="main",
         )
-        result = resolve_infra(config)
-        mock_resolve_sm.assert_called_once()
-        assert result.session_manager is mock_sm
+        resolve_infra(config)
+        mock_resolve_sm.assert_not_called()
 
     def test_no_session_manager(self):
         config = AppConfig(agents={"main": AgentDef()}, entry="main")
         result = resolve_infra(config)
-        assert result.session_manager is None
+        assert isinstance(result, ResolvedInfra)
+
+    def test_agentcore_provider_globally_raises(self):
+        config = AppConfig(
+            session_manager=SessionManagerDef(provider="agentcore"),
+            agents={"main": AgentDef()},
+            entry="main",
+        )
+        with pytest.raises(ValueError, match="cannot be set globally"):
+            resolve_infra(config)
 
     @patch("strands_compose.config.resolvers.config.resolve_model")
     @patch("strands_compose.config.resolvers.config.resolve_mcp_client")
     @patch("strands_compose.config.resolvers.config.resolve_mcp_server")
-    @patch("strands_compose.config.resolvers.config.resolve_session_manager")
-    def test_full_infra_pipeline(self, mock_sm, mock_server, mock_client, mock_model):
+    def test_full_infra_pipeline(self, mock_server, mock_client, mock_model):
         mock_model.return_value = MagicMock()
         mock_server.return_value = MagicMock()
         mock_client.return_value = MagicMock()
-        mock_sm.return_value = MagicMock()
 
         config = AppConfig(
             models={"gpt": ModelDef(provider="bedrock", model_id="nova")},
@@ -138,7 +142,6 @@ class TestResolveAll:
         assert isinstance(result, ResolvedInfra)
         assert "gpt" in result.models
         assert "pg-client" in result.clients
-        assert result.session_manager is not None
         # Lifecycle assembled but NOT started
         assert "pg" in result.mcp_lifecycle.servers
         assert "pg-client" in result.mcp_lifecycle.clients

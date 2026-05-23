@@ -109,7 +109,10 @@ This step is useful when you want to parse and validate once at process startup,
 - resolved MCP server objects
 - resolved MCP client objects
 - a cold `mcp_lifecycle`
-- the global session manager (if configured)
+
+> **Note:** `resolve_infra()` does **not** build session manager instances. Session managers are
+> created per agent and per orchestration at session time (inside `load_session()`), once a real
+> session ID is known. This avoids creating orphan filesystem folders before a session actually starts.
 
 Important nuance: **resolved** does not mean **started**.
 
@@ -174,12 +177,20 @@ This avoids paying the startup cost repeatedly while still keeping per-session a
 
 ### Session manager nuance
 
-There is one especially important detail in `load_session()`:
+Session manager instances are **not** built during `resolve_infra()`. Instead, `load_session()`
+computes a single `effective_session_id` and threads it down to every agent and orchestration leaf:
 
-- If you pass `session_id=...` **and** the config declares a global `session_manager`, strands-compose creates a **fresh session manager instance** for that session ID.
-- If the config does **not** declare a global `session_manager`, `load_session()` does not invent one just because a `session_id` was provided.
+1. If you pass `session_id="my-id"` to `load_session()`, that value is used as-is.
+2. If you do **not** pass a `session_id` but the config declares a global `session_manager:`,
+   strands-compose looks for a `session_id` in `session_manager.params`. If found, that value is
+   used; otherwise a fresh `uuid.uuid4()` is generated once and shared by all agents in that
+   call — matching the "one folder per CLI run" behaviour.
+3. If neither a `session_id` is provided nor a global `session_manager:` is configured, no session
+   manager instances are created at all. Each individual agent or orchestration with a per-agent
+   `session_manager:` will generate its own ID as usual.
 
-So `session_id` is an override for configured session persistence — not a standalone feature by itself.
+This design guarantees exactly one folder is created per `load_session()` call, never an orphan
+folder from `resolve_infra()`.
 
 ### Mental model
 

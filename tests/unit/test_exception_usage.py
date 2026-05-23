@@ -61,7 +61,7 @@ class TestPlannerRaisesCircularDependencyError:
             ),
         }
         with pytest.raises(CircularDependencyError, match="Circular dependency"):
-            topological_sort(configs)  # ty: ignore
+            topological_sort(configs)
 
     def test_self_referencing_orchestration_raises_circular_error(self):
         configs = {
@@ -71,4 +71,4 @@ class TestPlannerRaisesCircularDependencyError:
             ),
         }
         with pytest.raises(CircularDependencyError, match="Circular dependency"):
-            topological_sort(configs)  # ty: ignore
+            topological_sort(configs)

@@ -26,6 +26,7 @@ Key Features:
 from __future__ import annotations
 
 import logging
+import uuid
 from pathlib import Path
 
 from pydantic import ValidationError
@@ -37,7 +38,6 @@ from ..resolvers import (
     resolve_agents,
     resolve_infra,
     resolve_orchestrations,
-    resolve_session_manager,
 )
 from ..schema import AppConfig, GraphOrchestrationDef, SwarmOrchestrationDef
 from .helpers import merge_raw_configs, parse_single_source, sanitize_collection_keys
@@ -95,7 +95,7 @@ def load(config: ConfigInput | list[ConfigInput]) -> ResolvedConfig:
     3. Sanitize collection keys (spaces/special chars -> underscores)
     4. Merge sources (if multiple), detect duplicate names
     5. Validate against schema (Pydantic)
-    6. Resolve infrastructure (models, MCP, session — pure)
+    6. Resolve infrastructure (models, MCP — pure; no session manager)
     7. Start MCP servers (so clients can connect)
     8. Create agents (Agent.__init__ auto-starts MCP clients)
     9. Wire orchestration / entry point
@@ -207,6 +207,10 @@ def load_session(
     session per HTTP request) while creating **isolated** agents per
     session.
 
+    ``infra`` does NOT carry a session manager; instances are built per
+    agent/orchestration from ``config.session_manager`` plus an
+    ``effective_session_id`` computed here.
+
     Typical server pattern::
 
         app_config = load_config("config.yaml")
@@ -221,20 +225,31 @@ def load_session(
     Args:
         config: The validated AppConfig.
         infra: Resolved infrastructure with servers already started.
-        session_id: Optional runtime session ID. When provided **and**
-            the config declares a ``session_manager``, a fresh
-            SessionManager is created with this ID so that each HTTP
-            session gets its own isolated conversation state.
+        session_id: Optional runtime session ID. Combined with
+            ``config.session_manager.params.session_id`` (if any) and a
+            ``uuid.uuid4()`` fallback to derive a single
+            ``effective_session_id`` that is threaded into every per-agent
+            and per-orchestration session-manager resolution. When ``None``
+            and no global ``session_manager:`` is configured, leaves fall
+            back to their own UUIDs per ``resolve_session_manager``.
 
     Returns:
         ResolvedConfig with freshly created agents and entry point.
+
+    Note:
+        No ``SessionManager`` instance is built in this function; instances
+        are constructed at the leaves (``build_agent_from_def``,
+        ``OrchestrationBuilder._build_one``).
     """
-    session_manager = infra.session_manager
-    if session_id and config.session_manager is not None:
-        session_manager = resolve_session_manager(
-            config.session_manager,
-            session_id_override=session_id,
-        )
+    # Compute a single effective session id for every leaf that will resolve a
+    # global SM. CLI parity: when no real session_id is supplied but the config
+    # declares a global session_manager, all leaves that fall back to that def
+    # share one fresh UUID for the duration of this load_session call (matching
+    # today's "one folder per CLI run" behaviour).
+    effective_session_id: str | None = session_id
+    if effective_session_id is None and config.session_manager is not None:
+        yaml_sid = (config.session_manager.params or {}).get("session_id")
+        effective_session_id = yaml_sid or str(uuid.uuid4())
 
     # Agents used in Swarm or Graph orchestrations cannot have session_manager set.
     # Temporary until strands-agents supports session persistence for orchestration node agents.
@@ -252,7 +267,8 @@ def load_session(
         agent_defs=config.agents,
         models=infra.models,
         mcp_clients=infra.clients,
-        session_manager=session_manager,
+        global_session_manager_def=config.session_manager,
+        session_id=effective_session_id,
         orchestration_agent_names=orchestration_agent_names,
     )
     orchestrators = resolve_orchestrations(
@@ -261,7 +277,8 @@ def load_session(
         agent_defs=config.agents,
         models=infra.models,
         mcp_clients=infra.clients,
-        session_manager=session_manager,
+        global_session_manager_def=config.session_manager,
+        session_id=effective_session_id,
     )
 
     all_nodes = dict(agents) | orchestrators
