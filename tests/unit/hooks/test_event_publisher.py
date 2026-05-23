@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
@@ -96,6 +97,42 @@ class TestEventPublisher:
         assert events[0].data["usage"]["input_tokens"] == 10
         assert events[0].data["usage"]["output_tokens"] == 5
         assert events[0].data["usage"]["total_tokens"] == 15
+
+    def test_complete_with_interrupt_result_emits_interrupt_events(self) -> None:
+        events = []
+        pub = EventPublisher(callback=events.append, agent_name="test")
+
+        complete_event = MagicMock()
+        complete_event.result = SimpleNamespace(
+            stop_reason="interrupt",
+            interrupts=[
+                SimpleNamespace(id="approval-1", name="approve_delete", reason="Delete file?"),
+                SimpleNamespace(id="approval-2", name="approve_deploy", reason={"env": "prod"}),
+            ],
+        )
+        pub._on_complete(complete_event)
+
+        assert [event.type for event in events] == [EventType.INTERRUPT, EventType.INTERRUPT]
+        assert events[0].data == {
+            "interrupt_id": "approval-1",
+            "name": "approve_delete",
+            "reason": "Delete file?",
+        }
+        assert events[1].data == {
+            "interrupt_id": "approval-2",
+            "name": "approve_deploy",
+            "reason": {"env": "prod"},
+        }
+
+    def test_complete_with_interrupt_result_does_not_emit_complete(self) -> None:
+        events = []
+        pub = EventPublisher(callback=events.append, agent_name="test")
+
+        complete_event = MagicMock()
+        complete_event.result = SimpleNamespace(stop_reason="interrupt", interrupts=[])
+        pub._on_complete(complete_event)
+
+        assert [event.type for event in events] == []
 
 
 class TestHandoffEvent:

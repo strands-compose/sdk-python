@@ -39,6 +39,7 @@ asyncio.run(main())
 | `REASONING` | Reasoning/thinking content from LLM |
 | `TOOL_START` | Tool execution begins |
 | `TOOL_END` | Tool execution completes |
+| `INTERRUPT` | Agent pauses for human input |
 | `COMPLETE` | Agent finishes (with usage metrics) |
 | `ERROR` | Model or execution error |
 | `NODE_START` | Graph/swarm node begins |

@@ -38,6 +38,7 @@ renderer.flush()
 | `reasoning` | Streaming reasoning chunk |
 | `tool_start` | Tool call begins |
 | `tool_end` | Tool call finished |
+| `interrupt` | Agent pauses for human input |
 | `complete` | Agent finished (includes token usage) |
 | `node_start` / `node_stop` | Swarm / Graph enters/leaves a node |
 | `handoff` | Swarm transfers control |
