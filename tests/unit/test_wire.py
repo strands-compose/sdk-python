@@ -1,6 +1,8 @@
-"""Tests for core.wire — StreamEvent."""
+"""Tests for strands_compose.wire — StreamEvent dataclass."""
 
 from __future__ import annotations
+
+from datetime import datetime, timedelta, timezone
 
 from strands_compose.types import EventType
 from strands_compose.wire import StreamEvent
@@ -28,8 +30,6 @@ class TestStreamEvent:
 
 class TestStreamEventEquality:
     def test_eq_ignores_timestamp(self):
-        from datetime import datetime, timedelta, timezone
-
         t1 = datetime.now(tz=timezone.utc)
         t2 = t1 + timedelta(seconds=5)
         e1 = StreamEvent(type=EventType.TOKEN, agent_name="a", timestamp=t1, data={"text": "hi"})

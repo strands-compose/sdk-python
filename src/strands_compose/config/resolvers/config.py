@@ -6,6 +6,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+from ...manifest import build_manifest, first_session_id
 from ...mcp.lifecycle import MCPLifecycle
 from ...wire import make_event_queue
 from .mcp import resolve_mcp_client, resolve_mcp_server
@@ -47,9 +48,19 @@ class ResolvedConfig:
     ) -> EventQueue:
         """Wire all agents and orchestrators for event streaming.
 
-        This is the recommended way to set up event streaming.  It calls
-        :func:`~strands_compose.wire.make_event_queue` with this
-        config's agents and orchestrators.
+        This is the recommended way to set up event streaming.  It:
+
+        1. Builds a :class:`~strands_compose.types.SessionManifest` from the
+           resolved runtime objects.
+        2. Wires every agent (and orchestrator) with an
+           :class:`~strands_compose.hooks.EventPublisher` via
+           :func:`~strands_compose.wire.make_event_queue`.
+        3. Emits a SESSION_START event carrying the manifest as the first
+           event on the queue.
+
+        The effective session id is the first non-``None`` ``session_id``
+        found in the manifest (agents first, then orchestrations); it is
+        included in the SESSION_END event payload.
 
         .. warning::
 
@@ -58,16 +69,25 @@ class ResolvedConfig:
             Call it only once per ``ResolvedConfig`` instance.
 
         Args:
-            tool_labels: Optional tool name -> display label mapping.
+            tool_labels: Optional tool name → display label mapping.
 
         Returns:
-            A ready-to-use :class:`~strands_compose.wire.EventQueue`.
+            A ready-to-use :class:`~strands_compose.wire.EventQueue` with
+            SESSION_START already on it.
+
+        Raises:
+            ValueError: If the entry node cannot be resolved by object identity.
         """
-        return make_event_queue(
+        manifest = build_manifest(self.agents, self.orchestrators, self.entry)
+        event_queue = make_event_queue(
             self.agents,
             orchestrators=self.orchestrators,
             tool_labels=tool_labels,
+            entry_name=manifest.entry.name,
+            session_id=first_session_id(manifest),
         )
+        event_queue.emit_session_start(manifest)
+        return event_queue
 
 
 @dataclass

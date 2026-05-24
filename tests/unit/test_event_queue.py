@@ -9,6 +9,7 @@ import pytest
 from strands.multiagent import Swarm
 
 from strands_compose.hooks import EventPublisher
+from strands_compose.types import EventType
 from strands_compose.wire import EventQueue, StreamEvent, make_event_queue
 
 # ---------------------------------------------------------------------------
@@ -32,6 +33,11 @@ class TestEventQueue:
             queue = asyncio.Queue()
             eq = EventQueue(queue)
             await eq.close()
+            # First get() returns SESSION_END event
+            session_end = await eq.get()
+            assert session_end is not None
+            assert session_end.type == EventType.SESSION_END
+            # Second get() returns None (sentinel)
             return await eq.get()
 
         assert asyncio.run(_run()) is None
