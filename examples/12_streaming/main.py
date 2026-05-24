@@ -21,7 +21,6 @@ STARTER = "Analyse the impact of large language models on software engineering."
 
 async def _stream(prompt: str, entry, queue):
     """Invoke the entry agent and render the event stream."""
-    queue.flush()
     result = None
 
     async def _invoke() -> None:
@@ -46,7 +45,6 @@ async def _main() -> None:
     resolved = load(CONFIG)
     entry = resolved.entry
     queue = resolved.wire_event_queue()
-
     print(f"\n{52 * '-'}")
     print(f"Try: {STARTER}\n")
     print("researcher -> analyst -> coordinator (with live streaming)")
