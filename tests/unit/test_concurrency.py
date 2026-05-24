@@ -12,6 +12,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from strands_compose.mcp.lifecycle import MCPLifecycle
+from strands_compose.types import EventType
 from strands_compose.wire import EventQueue, StreamEvent
 
 # ---------------------------------------------------------------------------
@@ -61,7 +62,10 @@ class TestEventQueueConcurrency:
                 break
             received.append(event)
 
-        assert len(received) == num_events
+        # Should have 50 producer events + 1 SESSION_END event
+        assert len(received) == num_events + 1
+        # Last event should be SESSION_END
+        assert received[-1].type == EventType.SESSION_END
 
     @pytest.mark.asyncio
     async def test_put_event_thread_safe(self) -> None:
@@ -91,10 +95,15 @@ class TestEventQueueConcurrency:
 
     @pytest.mark.asyncio
     async def test_close_then_get_returns_none(self) -> None:
-        """Closing the queue causes get to return None."""
+        """Closing the queue causes get to return None after SESSION_END."""
         queue = asyncio.Queue()
         eq = EventQueue(queue)
         await eq.close()
+        # First get() returns SESSION_END event
+        session_end = await eq.get()
+        assert session_end is not None
+        assert session_end.type == EventType.SESSION_END
+        # Second get() returns None (sentinel)
         result = await eq.get()
         assert result is None
 

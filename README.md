@@ -387,7 +387,7 @@ async def main():
 asyncio.run(main())
 ```
 
-Event types: `AGENT_START`, `TOKEN`, `REASONING`, `TOOL_START`, `TOOL_END`, `INTERRUPT`, `NODE_START`, `NODE_STOP`, `HANDOFF`, `COMPLETE`, `MULTIAGENT_START`, `MULTIAGENT_COMPLETE`, `ERROR` — each carrying `{type, agent_name, timestamp, data}`. Enough for a real-time frontend, a log aggregator, or a debugging dashboard. The `AnsiRenderer` gives you coloured terminal output out of the box — agent names, tool calls, reasoning traces, all streaming live.
+Event types: `AGENT_START`, `TOKEN`, `REASONING`, `TOOL_START`, `TOOL_END`, `INTERRUPT`, `NODE_START`, `NODE_STOP`, `HANDOFF`, `COMPLETE`, `MULTIAGENT_START`, `MULTIAGENT_COMPLETE`, `ERROR`, `SESSION_START`, `SESSION_END` — each carrying `{type, agent_name, timestamp, data}`. Enough for a real-time frontend, a log aggregator, or a debugging dashboard. The `AnsiRenderer` gives you coloured terminal output out of the box — agent names, tool calls, reasoning traces, all streaming live.
 
 ---
 

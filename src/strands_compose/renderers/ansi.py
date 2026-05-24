@@ -26,7 +26,7 @@ import time
 from collections.abc import Callable
 from typing import Any
 
-from ..types import EventType
+from ..types import EventType, SessionManifest
 from ..wire import StreamEvent
 from .base import EventRenderer
 
@@ -82,6 +82,8 @@ class AnsiRenderer(EventRenderer):
             self._separator_width = shutil.get_terminal_size((70, 24)).columns
 
         self._handlers: dict[str, Callable[[StreamEvent], None]] = {
+            EventType.SESSION_START: self._handle_session_start,
+            EventType.SESSION_END: self._handle_session_end,
             EventType.TOKEN: self._handle_token,
             EventType.AGENT_START: self._handle_agent_start,
             EventType.TOOL_START: self._handle_tool_start,
@@ -110,6 +112,29 @@ class AnsiRenderer(EventRenderer):
             self._in_stream = False
 
     # -- Per-event-type handlers -------------------------------------------
+
+    def _handle_session_start(self, event: StreamEvent) -> None:
+        self._break()
+        manifest = SessionManifest.model_validate(event.data)
+        agent_names = ", ".join(a.name for a in manifest.agents) or "—"
+        orch_names = ", ".join(o.name for o in manifest.orchestrations) or "—"
+        self._out.write(self._separator(manifest.entry.name, "SESSION START", color=self._cyan))
+        self._out.write(
+            f"  {self._dim}entry:          {manifest.entry.name} ({manifest.entry.kind})\n"
+            f"  agents:         {agent_names}\n"
+        )
+        if manifest.orchestrations:
+            self._out.write(f"  orchestrations: {orch_names}\n")
+        self._out.write(self._reset)
+        self._out.flush()
+
+    def _handle_session_end(self, event: StreamEvent) -> None:
+        self._break()
+        session_id = event.data.get("session_id")
+        sid_str = session_id if session_id else "—"
+        self._out.write(self._separator(event.agent_name, "SESSION END", color=self._cyan))
+        self._out.write(f"  {self._dim}session_id: {sid_str}{self._reset}\n")
+        self._out.flush()
 
     def _handle_token(self, event: StreamEvent) -> None:
         self._ensure_mode(event.agent_name, "responding")

@@ -4,7 +4,7 @@
 
 ## What this shows
 
-- `wire_event_queue()` — wire all agents to a single async queue that emits `StreamEvent`s
+- `wire_event_queue()` — wire all agents and orchestrators to a single async queue that emits `StreamEvent`s
 - `AnsiRenderer` — built-in terminal renderer that prints events with colours as they arrive
 - How strands-compose turns agent lifecycle events into a consumable stream — the same
   mechanism that powers SSE endpoints, WebSocket feeds, and audit logs
@@ -18,9 +18,9 @@ resolved = load("config.yaml")
 queue = resolved.wire_event_queue()
 ```
 
-`resolved.wire_event_queue()` installs an `EventPublisher` hook on every agent. As the agent runs,
-the hook converts lifecycle events (tokens, tool calls, completions) into `StreamEvent`
-objects and pushes them to the queue. Your consumer loop is simple:
+`resolved.wire_event_queue()` installs an `EventPublisher` hook on every agent and orchestrator.
+As the session runs, hooks convert lifecycle events (tokens, tool calls, completions) into
+`StreamEvent` objects and push them to the queue. Your consumer loop is simple:
 
 ```python
 renderer = AnsiRenderer()
@@ -31,17 +31,25 @@ renderer.flush()
 
 ### Event types
 
-| Type | When it fires |
-|------|---------------|
-| `agent_start` | Agent begins processing |
-| `token` | Streaming text chunk |
-| `reasoning` | Streaming reasoning chunk |
-| `tool_start` | Tool call begins |
-| `tool_end` | Tool call finished |
-| `interrupt` | Agent pauses for human input |
-| `complete` | Agent finished (includes token usage) |
-| `node_start` / `node_stop` | Swarm / Graph enters/leaves a node |
-| `handoff` | Swarm transfers control |
+Every invocation produces a `SESSION_START` as the first event and `SESSION_END` as the last,
+bracketing all per-agent activity.
+
+| Type | When it fires | `data` |
+|------|---------------|--------|
+| `session_start` | Before any agent runs — first event on the queue | Serialised `SessionManifest` (agents, orchestrations, entry, model info) |
+| `agent_start` | Agent begins processing | — |
+| `token` | Streaming text chunk | `{"text": "..."}` |
+| `reasoning` | Streaming reasoning chunk | `{"text": "..."}` |
+| `tool_start` | Tool call begins | tool name, input |
+| `tool_end` | Tool call finished | tool name, status, result |
+| `interrupt` | Agent pauses for human input | interrupt id, reason |
+| `complete` | Agent finished (includes token usage) | usage metrics |
+| `error` | Model or execution error | exception type, message |
+| `node_start` / `node_stop` | Swarm / Graph enters/leaves a node | node id |
+| `handoff` | Swarm transfers control | from/to node ids |
+| `multiagent_start` | Multi-agent orchestration begins | — |
+| `multiagent_complete` | Multi-agent orchestration completes | — |
+| `session_end` | After all agent events — last typed event | `{"session_id": "<id or null>"}` |
 
 ## Good to know
 
@@ -53,7 +61,10 @@ consume the queue and convert events to SSE chunks (see `OpenAIStreamConverter`)
 NDJSON (`RawStreamConverter`).
 
 **`queue.flush()`** resets the queue between turns so events from one invocation
-don't leak into the next.
+don't leak into the next. It also resets the `session_start` / `session_end` guards.
+
+**`queue.close()`** emits `session_end` then signals end-of-stream. Always call it in
+a `finally` block so `session_end` is guaranteed even when an exception occurs.
 
 ## Prerequisites
 
