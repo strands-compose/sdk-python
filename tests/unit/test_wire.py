@@ -38,7 +38,7 @@ class TestStreamEventEquality:
 
     def test_eq_different_type_not_equal(self):
         e1 = StreamEvent(type=EventType.TOKEN, agent_name="a")
-        e2 = StreamEvent(type=EventType.COMPLETE, agent_name="a")
+        e2 = StreamEvent(type=EventType.AGENT_COMPLETE, agent_name="a")
         assert e1 != e2
 
     def test_eq_different_data_not_equal(self):

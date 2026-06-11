@@ -41,7 +41,7 @@ class EventType(StrEnum):
     TOOL_END = "tool_end"
     REASONING = "reasoning"
     INTERRUPT = "interrupt"
-    COMPLETE = "complete"
+    AGENT_COMPLETE = "agent_complete"
     ERROR = "error"
 
     # Multi-agent events
@@ -61,7 +61,7 @@ class StreamEvent:
     """A typed event from agent or multi-agent execution.
 
     Per-agent activity (``AGENT_START``, ``TOKEN``, ``REASONING``,
-    ``TOOL_START``, ``TOOL_END``, ``INTERRUPT``, ``COMPLETE``, ``ERROR``,
+    ``TOOL_START``, ``TOOL_END``, ``INTERRUPT``, ``AGENT_COMPLETE``, ``ERROR``,
     ``NODE_START``, ``NODE_STOP``, ``HANDOFF``, ``MULTIAGENT_START``,
     ``MULTIAGENT_COMPLETE``) is produced by
     :class:`~strands_compose.hooks.EventPublisher`. Session-level events

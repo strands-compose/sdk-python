@@ -94,7 +94,7 @@ class TestAnsiRenderer:
 
     def test_complete(self) -> None:
         r, buf = self._renderer()
-        r.render(_event(EventType.COMPLETE, usage={"input_tokens": 42, "output_tokens": 80}))
+        r.render(_event(EventType.AGENT_COMPLETE, usage={"input_tokens": 42, "output_tokens": 80}))
         output = buf.getvalue()
         assert "complete" in output
         assert "42" in output
@@ -177,7 +177,7 @@ class TestAnsiRenderer:
         """Any non-token event must break the inline token stream."""
         r, buf = self._renderer()
         r.render(_event(EventType.TOKEN, text="partial"))
-        r.render(_event(EventType.COMPLETE, usage={}))
+        r.render(_event(EventType.AGENT_COMPLETE, usage={}))
         output = buf.getvalue()
         # "partial" followed by "\n" followed by the complete line
         idx_partial = output.index("partial")

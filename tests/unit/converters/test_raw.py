@@ -29,7 +29,7 @@ class TestRawStreamConverter:
     def test_convert_returns_list_with_single_element(self) -> None:
         """convert() always returns a list of length 1."""
         conv = RawStreamConverter()
-        event = _event("complete")
+        event = _event("agent_complete")
         result = conv.convert(event)
 
         assert isinstance(result, list)
@@ -53,7 +53,7 @@ class TestRawStreamConverter:
 
     @pytest.mark.parametrize(
         "event_type",
-        ["token", "reasoning", "tool_start", "tool_end", "complete", "error"],
+        ["token", "reasoning", "tool_start", "tool_end", "agent_complete", "error"],
     )
     def test_convert_works_for_all_event_types(self, event_type: str) -> None:
         """convert() handles any event type without raising."""
@@ -94,9 +94,9 @@ class TestStreamEventFromDict:
 
     def test_from_dict_missing_optional_fields_uses_defaults(self) -> None:
         """from_dict() sets agent_name='' and data={} when those keys are absent."""
-        event = StreamEvent.from_dict({"type": "complete"})
+        event = StreamEvent.from_dict({"type": "agent_complete"})
 
-        assert event.type == "complete"
+        assert event.type == "agent_complete"
         assert event.agent_name == ""
         assert event.data == {}
 

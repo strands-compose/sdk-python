@@ -55,7 +55,7 @@ The `SESSION_START` payload is the full wired topology at invocation time. Use i
 | `TOOL_START` | Tool execution begins |
 | `TOOL_END` | Tool execution completes |
 | `INTERRUPT` | Agent pauses for human input |
-| `COMPLETE` | Agent finishes (with usage metrics) |
+| `AGENT_COMPLETE` | Agent finishes (with usage metrics) |
 | `ERROR` | Model or execution error |
 
 ### Multi-agent events

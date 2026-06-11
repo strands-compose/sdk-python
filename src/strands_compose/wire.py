@@ -9,7 +9,7 @@ event (carrying the session manifest) and a SESSION_END event.
 
 :func:`make_event_queue` attaches :class:`~strands_compose.hooks.EventPublisher`
 hooks to every agent so all per-agent events (TOKEN, REASONING, TOOL_START,
-TOOL_END, INTERRUPT, COMPLETE, and — for Swarm/Graph — NODE_START, NODE_STOP,
+TOOL_END, INTERRUPT, AGENT_COMPLETE, and — for Swarm/Graph — NODE_START, NODE_STOP,
 HANDOFF, MULTIAGENT_COMPLETE) flow into the shared queue.
 
 Hooks are wired **once per session**.  Between requests on the same session,
