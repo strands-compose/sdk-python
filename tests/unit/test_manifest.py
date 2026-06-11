@@ -245,10 +245,15 @@ class TestBuildManifest:
             )
 
     def test_manifest_orchestration_kind_delegate(self):
-        """Agent orchestration → kind='delegate'."""
+        """Agent orchestration → kind='delegate'; delegate also appears in agents."""
         agent = _mock_agent()
         delegate = Mock(spec=Agent)
         delegate._session_manager = None
+        delegate.description = None
+        delegate.model = Mock()
+        delegate.model.get_config.return_value = {}
+        delegate.model.__class__.__module__ = "strands.models"
+        delegate.model.__class__.__qualname__ = "TestModel"
 
         manifest = build_manifest(
             agents={"agent1": agent},
@@ -261,6 +266,10 @@ class TestBuildManifest:
         assert manifest.orchestrations[0].nodes == []
         assert manifest.orchestrations[0].edges is None
         assert manifest.orchestrations[0].entry_node_id is None
+        # Delegate agent is also included in manifest.agents under its orch name
+        agent_names = [a.name for a in manifest.agents]
+        assert "agent1" in agent_names
+        assert "delegate1" in agent_names
 
     def test_manifest_orchestration_kind_swarm(self):
         """Swarm orchestration → kind='swarm'."""
@@ -546,10 +555,15 @@ class TestBuildManifest:
         assert manifest.orchestrations[0].entry_node_id is None
 
     def test_manifest_delegate_empty_topology(self):
-        """Delegate orchestration has empty topology."""
+        """Delegate orchestration has empty topology; delegate appears in agents."""
         agent = _mock_agent()
         delegate = Mock(spec=Agent)
         delegate._session_manager = None
+        delegate.description = None
+        delegate.model = Mock()
+        delegate.model.get_config.return_value = {}
+        delegate.model.__class__.__module__ = "strands.models"
+        delegate.model.__class__.__qualname__ = "TestModel"
 
         manifest = build_manifest(
             agents={"agent1": agent},
@@ -561,6 +575,45 @@ class TestBuildManifest:
         assert orch_desc.nodes == []
         assert orch_desc.edges is None
         assert orch_desc.entry_node_id is None
+        assert len(manifest.agents) == 2
+        assert {a.name for a in manifest.agents} == {"agent1", "delegate1"}
+
+    def test_manifest_delegate_agent_descriptor_uses_orchestration_name(self):
+        """Delegate added to agents uses the orchestration name, not the entry agent name."""
+        agent = _mock_agent(model_id="claude-3")
+        delegate = Mock(spec=Agent)
+        delegate._session_manager = None
+        delegate.description = "orchestrator"
+        delegate.model = Mock()
+        delegate.model.get_config.return_value = {"model_id": "claude-3"}
+        delegate.model.__class__.__module__ = "strands.models"
+        delegate.model.__class__.__qualname__ = "TestModel"
+
+        manifest = build_manifest(
+            agents={"manager": agent},
+            orchestrators={"main": delegate},
+            entry=delegate,
+        )
+
+        delegate_agent = next(a for a in manifest.agents if a.name == "main")
+        assert delegate_agent.model.model_id == "claude-3"
+
+    def test_manifest_non_delegate_orchestration_not_added_to_agents(self):
+        """Swarm and Graph orchestrations are not added to manifest.agents."""
+        agent = _mock_agent()
+        swarm = Mock(spec=Swarm)
+        swarm.nodes = {}
+        swarm.entry_point = None
+        swarm.session_manager = None
+
+        manifest = build_manifest(
+            agents={"agent1": agent},
+            orchestrators={"swarm1": swarm},
+            entry=swarm,
+        )
+
+        assert len(manifest.agents) == 1
+        assert manifest.agents[0].name == "agent1"
 
 
 # ── first_session_id ─────────────────────────────────────────────────────────
