@@ -268,6 +268,13 @@ def build_manifest(
 
     Pure function: no I/O, no network calls, no mutation of inputs.
 
+    Delegate orchestrations are built as a new :class:`strands.Agent` forked
+    from an entry agent's blueprint.  Because the delegate agent reports token
+    usage under the orchestration name, it is included in ``manifest.agents``
+    (in addition to the orchestration entry) so consumers can trace any token
+    event back to a model descriptor.  Swarm and Graph orchestrations do not
+    report token usage directly and are therefore not duplicated.
+
     Args:
         agents: Resolved agents keyed by name.
         orchestrators: Resolved orchestrations keyed by name.
@@ -280,8 +287,17 @@ def build_manifest(
     Raises:
         ValueError: If *entry* cannot be resolved by object identity.
     """
+    agent_descriptors = [_agent_descriptor(name, agent) for name, agent in agents.items()]
+
+    # Delegate orchestrations are Agents themselves — they report token usage
+    # under the orchestration name, so include them in agents so consumers can
+    # look up the model for any incoming token event by name.
+    for name, orch in orchestrators.items():
+        if isinstance(orch, Agent):
+            agent_descriptors.append(_agent_descriptor(name, orch))
+
     return SessionManifest(
-        agents=[_agent_descriptor(name, agent) for name, agent in agents.items()],
+        agents=agent_descriptors,
         orchestrations=[
             _orchestration_descriptor(name, orch) for name, orch in orchestrators.items()
         ],
