@@ -118,7 +118,7 @@ class OpenAIStreamConverter(StreamConverter):
             EventType.REASONING: self._handle_reasoning,
             EventType.TOOL_START: self._handle_tool_start,
             EventType.TOOL_END: self._handle_tool_end,
-            EventType.COMPLETE: self._handle_complete,
+            EventType.AGENT_COMPLETE: self._handle_complete,
             EventType.MULTIAGENT_COMPLETE: self._handle_multiagent_complete,
             EventType.ERROR: self._handle_error,
             EventType.NODE_START: self._handle_node_start,
@@ -186,7 +186,7 @@ class OpenAIStreamConverter(StreamConverter):
         """Build the terminal finish_reason chunk and optional trailing usage chunk.
 
         Always emits ``finish_reason: "stop"``.  ``"tool_calls"`` is never used
-        because by the time COMPLETE fires every tool has already run inside the
+        because by the time AGENT_COMPLETE fires every tool has already run inside the
         strands loop — emitting ``"tool_calls"`` would cause clients to wait for
         results that never arrive.
         """
@@ -363,7 +363,7 @@ class OpenAIStreamConverter(StreamConverter):
         return []
 
     def _handle_complete(self, event: StreamEvent, is_entry: bool) -> list[dict[str, Any]]:
-        """COMPLETE → terminal chunks for entry agent; silent for sub-agents."""
+        """AGENT_COMPLETE → terminal chunks for entry agent; silent for sub-agents."""
         if not is_entry:
             return []
         return self._terminal_chunks(event.data.get("usage", {}))

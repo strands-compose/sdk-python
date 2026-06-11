@@ -100,7 +100,7 @@ def entry_name_converter() -> OpenAIStreamConverter:
 
 
 class TestPlainTextStream:
-    """Simple text-only response: tokens then COMPLETE."""
+    """Simple text-only response: tokens then AGENT_COMPLETE."""
 
     def test_token_events_produce_content_delta_chunks(
         self, converter: OpenAIStreamConverter
@@ -136,13 +136,13 @@ class TestPlainTextStream:
         assert "role" not in _delta(chunks[1])
 
     def test_complete_emits_stop_finish_reason(self, converter: OpenAIStreamConverter) -> None:
-        """COMPLETE produces a single chunk with finish_reason='stop' and empty delta."""
+        """AGENT_COMPLETE produces a single chunk with finish_reason='stop' and empty delta."""
         conv = converter
         chunks = _flush(
             conv,
             [
                 _ev(EventType.TOKEN, text="hi"),
-                _ev(EventType.COMPLETE, usage={}),
+                _ev(EventType.AGENT_COMPLETE, usage={}),
             ],
         )
 
@@ -160,7 +160,7 @@ class TestPlainTextStream:
             [
                 _ev(EventType.TOKEN, text="x"),
                 _ev(EventType.TOKEN, text="y"),
-                _ev(EventType.COMPLETE, usage={}),
+                _ev(EventType.AGENT_COMPLETE, usage={}),
             ],
         )
 
@@ -175,7 +175,7 @@ class TestPlainTextStream:
             conv,
             [
                 _ev(
-                    EventType.COMPLETE,
+                    EventType.AGENT_COMPLETE,
                     usage={"input_tokens": 10, "output_tokens": 20, "total_tokens": 30},
                 ),
             ],
@@ -195,7 +195,7 @@ class TestPlainTextStream:
             conv,
             [
                 _ev(EventType.TOKEN, text="hi"),
-                _ev(EventType.COMPLETE, usage={}),
+                _ev(EventType.AGENT_COMPLETE, usage={}),
             ],
         )
 
@@ -315,7 +315,7 @@ class TestToolCallStream:
         assert "4" in html
 
     def test_finish_reason_is_stop_never_tool_calls(self, converter: OpenAIStreamConverter) -> None:
-        """COMPLETE after tool use emits stop, never tool_calls (would cause client loop)."""
+        """AGENT_COMPLETE after tool use emits stop, never tool_calls (would cause client loop)."""
         conv = converter
         _flush(
             conv,
@@ -324,7 +324,7 @@ class TestToolCallStream:
                 _ev(EventType.TOOL_END, tool_use_id="c", result="ok"),
             ],
         )
-        chunks = conv.convert(_ev(EventType.COMPLETE, usage={}))
+        chunks = conv.convert(_ev(EventType.AGENT_COMPLETE, usage={}))
 
         assert _finish(chunks[0]) == "stop"
 
@@ -340,7 +340,7 @@ class TestToolCallStream:
                 _ev(EventType.TOOL_END, tool_use_id="x1", tool_result="1"),
                 _ev(EventType.TOOL_START, tool_name="b", tool_use_id="x2", tool_input={}),
                 _ev(EventType.TOOL_END, tool_use_id="x2", tool_result="2"),
-                _ev(EventType.COMPLETE, usage={}),
+                _ev(EventType.AGENT_COMPLETE, usage={}),
             ],
         )
 
@@ -381,9 +381,9 @@ class TestSubAgentSuppression:
     def test_complete_from_sub_agent_produces_no_chunks(
         self, converter: OpenAIStreamConverter
     ) -> None:
-        """COMPLETE from a sub-agent does not close the stream."""
+        """AGENT_COMPLETE from a sub-agent does not close the stream."""
         conv = converter
-        chunks = conv.convert(_ev(EventType.COMPLETE, agent=SUB, usage={}))
+        chunks = conv.convert(_ev(EventType.AGENT_COMPLETE, agent=SUB, usage={}))
 
         assert chunks == []
 

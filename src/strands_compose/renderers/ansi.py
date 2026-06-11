@@ -88,7 +88,7 @@ class AnsiRenderer(EventRenderer):
             EventType.AGENT_START: self._handle_agent_start,
             EventType.TOOL_START: self._handle_tool_start,
             EventType.TOOL_END: self._handle_tool_end,
-            EventType.COMPLETE: self._handle_complete,
+            EventType.AGENT_COMPLETE: self._handle_complete,
             EventType.ERROR: self._handle_error,
             EventType.NODE_START: self._handle_node_start,
             EventType.NODE_STOP: self._handle_node_stop,

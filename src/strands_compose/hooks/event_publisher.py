@@ -124,7 +124,7 @@ class EventPublisher(HookProvider):
         """Initialize the EventPublisher.
 
         Converts strands hook events into :class:`StreamEvent` objects and
-        delivers them to an external callback.  Emits a COMPLETE event at
+        delivers them to an external callback.  Emits an AGENT_COMPLETE event at
         the end of each invocation with usage metrics from ``EventLoopMetrics``.
 
         For TOKEN and REASONING events use :meth:`as_callback_handler` to
@@ -222,7 +222,7 @@ class EventPublisher(HookProvider):
         )
 
     def _on_complete(self, event: AfterInvocationEvent) -> None:
-        """Emit COMPLETE with usage metrics from EventLoopMetrics.
+        """Emit AGENT_COMPLETE with usage metrics from EventLoopMetrics.
 
         Suppressed when the invocation errored — an ERROR event was
         already emitted via :meth:`_on_model_error`.
@@ -254,7 +254,7 @@ class EventPublisher(HookProvider):
 
         self._callback(
             StreamEvent(
-                type=EventType.COMPLETE,
+                type=EventType.AGENT_COMPLETE,
                 agent_name=self._agent_name,
                 data={
                     "type": "agent",
@@ -274,7 +274,7 @@ class EventPublisher(HookProvider):
 
         Fires for provider-level exceptions such as expired credentials,
         throttling, network errors, or any other model API failure.
-        Sets ``_errored`` to suppress the subsequent misleading COMPLETE.
+        Sets ``_errored`` to suppress the subsequent misleading AGENT_COMPLETE.
         """
         if event.exception is None:
             return

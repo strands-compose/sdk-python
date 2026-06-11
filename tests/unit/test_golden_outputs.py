@@ -27,7 +27,7 @@ class TestGoldenSimpleTextResponse:
     1. AGENT_START
     2. TOKEN("Hello")
     3. TOKEN(" world")
-    4. COMPLETE(usage)
+    4. AGENT_COMPLETE(usage)
     """
 
     def test_simple_text_produces_correct_event_sequence(self) -> None:
@@ -61,7 +61,7 @@ class TestGoldenSimpleTextResponse:
         assert events[1].data["text"] == "Hello"
         assert events[2].type == EventType.TOKEN
         assert events[2].data["text"] == " world"
-        assert events[3].type == EventType.COMPLETE
+        assert events[3].type == EventType.AGENT_COMPLETE
         assert events[3].data["usage"]["input_tokens"] == 50
         assert events[3].data["usage"]["output_tokens"] == 10
 
@@ -79,7 +79,7 @@ class TestGoldenToolCallingAgent:
     2. TOOL_START(search)
     3. TOOL_END(search, success)
     4. TOKEN("Based on the search...")
-    5. COMPLETE(usage)
+    5. AGENT_COMPLETE(usage)
     """
 
     def test_tool_calling_produces_correct_event_sequence(self) -> None:
@@ -124,7 +124,7 @@ class TestGoldenToolCallingAgent:
             EventType.TOOL_START,
             EventType.TOOL_END,
             EventType.TOKEN,
-            EventType.COMPLETE,
+            EventType.AGENT_COMPLETE,
         ]
         assert events[1].data["tool_name"] == "search"
         assert events[1].data["tool_use_id"] == "call_abc"
@@ -144,7 +144,7 @@ class TestGoldenReasoningThenResponse:
     1. AGENT_START
     2. REASONING("Let me think...")
     3. TOKEN("The answer is 42")
-    4. COMPLETE
+    4. AGENT_COMPLETE
     """
 
     def test_reasoning_then_response_produces_correct_sequence(self) -> None:
@@ -169,7 +169,7 @@ class TestGoldenReasoningThenResponse:
         assert events[1].data["text"] == "Let me think..."
         assert events[2].type == EventType.TOKEN
         assert events[2].data["text"] == "The answer is 42"
-        assert events[3].type == EventType.COMPLETE
+        assert events[3].type == EventType.AGENT_COMPLETE
 
 
 # ---------------------------------------------------------------------------
@@ -178,12 +178,12 @@ class TestGoldenReasoningThenResponse:
 
 
 class TestGoldenModelError:
-    """Golden test: model call fails → ERROR emitted, COMPLETE suppressed.
+    """Golden test: model call fails → ERROR emitted, AGENT_COMPLETE suppressed.
 
     Expected event sequence:
     1. AGENT_START
     2. ERROR(expired credentials)
-    (no COMPLETE)
+    (no AGENT_COMPLETE)
     """
 
     def test_model_error_produces_correct_sequence(self) -> None:
@@ -205,7 +205,7 @@ class TestGoldenModelError:
         complete.agent.event_loop_metrics = metrics
         pub._on_complete(complete)
 
-        # Only AGENT_START + ERROR, no COMPLETE
+        # Only AGENT_START + ERROR, no AGENT_COMPLETE
         assert len(events) == 2
         assert events[0].type == EventType.AGENT_START
         assert events[1].type == EventType.ERROR
@@ -296,7 +296,7 @@ class TestGoldenToolError:
     2. TOOL_START(db_query)
     3. TOOL_END(db_query, error)
     4. TOKEN("I encountered an error...")
-    5. COMPLETE
+    5. AGENT_COMPLETE
     """
 
     def test_tool_error_produces_correct_sequence(self) -> None:

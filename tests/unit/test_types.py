@@ -37,7 +37,7 @@ class TestEventTypeEnum:
         [
             ("TOKEN", "token"),
             ("AGENT_START", "agent_start"),
-            ("COMPLETE", "complete"),
+            ("AGENT_COMPLETE", "agent_complete"),
             ("ERROR", "error"),
             ("TOOL_START", "tool_start"),
             ("TOOL_END", "tool_end"),
@@ -73,7 +73,7 @@ class TestEventTypeEnum:
             "TOOL_END",
             "REASONING",
             "INTERRUPT",
-            "COMPLETE",
+            "AGENT_COMPLETE",
             "ERROR",
             "NODE_START",
             "NODE_STOP",

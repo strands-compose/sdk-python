@@ -93,7 +93,7 @@ class TestEventPublisher:
         pub._on_complete(complete_event)
 
         assert len(events) == 1
-        assert events[0].type == EventType.COMPLETE
+        assert events[0].type == EventType.AGENT_COMPLETE
         assert events[0].data["usage"]["input_tokens"] == 10
         assert events[0].data["usage"]["output_tokens"] == 5
         assert events[0].data["usage"]["total_tokens"] == 15
@@ -189,7 +189,7 @@ class TestHandoffEvent:
 
 
 class TestModelErrorCapture:
-    """EventPublisher emits ERROR events on model failures and suppresses COMPLETE."""
+    """EventPublisher emits ERROR events on model failures and suppresses AGENT_COMPLETE."""
 
     def test_model_error_emits_error_event(self) -> None:
         """AfterModelCallEvent with exception emits ERROR."""
@@ -230,7 +230,7 @@ class TestModelErrorCapture:
         assert pub._errored is False
 
     def test_complete_suppressed_after_error(self) -> None:
-        """COMPLETE is not emitted when the invocation errored."""
+        """AGENT_COMPLETE is not emitted when the invocation errored."""
         events: list = []
         pub = EventPublisher(callback=events.append, agent_name="test")
 
@@ -247,12 +247,12 @@ class TestModelErrorCapture:
         complete_event.agent.event_loop_metrics = metrics
         pub._on_complete(complete_event)
 
-        # Only the ERROR event, no COMPLETE
+        # Only the ERROR event, no AGENT_COMPLETE
         assert len(events) == 1
         assert events[0].type == EventType.ERROR
 
     def test_complete_emitted_when_no_error(self) -> None:
-        """COMPLETE is emitted normally when there was no error."""
+        """AGENT_COMPLETE is emitted normally when there was no error."""
         events: list = []
         pub = EventPublisher(callback=events.append, agent_name="test")
 
@@ -264,7 +264,7 @@ class TestModelErrorCapture:
         pub._on_complete(complete_event)
 
         assert len(events) == 1
-        assert events[0].type == EventType.COMPLETE
+        assert events[0].type == EventType.AGENT_COMPLETE
 
     def test_errored_flag_resets_on_next_invocation(self) -> None:
         """_errored resets to False when a new invocation starts."""
