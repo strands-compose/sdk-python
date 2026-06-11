@@ -118,7 +118,7 @@ class OpenAIStreamConverter(StreamConverter):
             EventType.REASONING: self._handle_reasoning,
             EventType.TOOL_START: self._handle_tool_start,
             EventType.TOOL_END: self._handle_tool_end,
-            EventType.AGENT_COMPLETE: self._handle_complete,
+            EventType.AGENT_COMPLETE: self._handle_agent_complete,
             EventType.MULTIAGENT_COMPLETE: self._handle_multiagent_complete,
             EventType.ERROR: self._handle_error,
             EventType.NODE_START: self._handle_node_start,
@@ -362,7 +362,7 @@ class OpenAIStreamConverter(StreamConverter):
             ]
         return []
 
-    def _handle_complete(self, event: StreamEvent, is_entry: bool) -> list[dict[str, Any]]:
+    def _handle_agent_complete(self, event: StreamEvent, is_entry: bool) -> list[dict[str, Any]]:
         """AGENT_COMPLETE → terminal chunks for entry agent; silent for sub-agents."""
         if not is_entry:
             return []

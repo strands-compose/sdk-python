@@ -88,7 +88,7 @@ class AnsiRenderer(EventRenderer):
             EventType.AGENT_START: self._handle_agent_start,
             EventType.TOOL_START: self._handle_tool_start,
             EventType.TOOL_END: self._handle_tool_end,
-            EventType.AGENT_COMPLETE: self._handle_complete,
+            EventType.AGENT_COMPLETE: self._handle_agent_complete,
             EventType.ERROR: self._handle_error,
             EventType.NODE_START: self._handle_node_start,
             EventType.NODE_STOP: self._handle_node_stop,
@@ -187,7 +187,7 @@ class AnsiRenderer(EventRenderer):
             self._out.write(f"  {self._green}✓{self._reset}  [{agent}] tool done\n")
         self._out.flush()
 
-    def _handle_complete(self, event: StreamEvent) -> None:
+    def _handle_agent_complete(self, event: StreamEvent) -> None:
         self._break()
         self._mode = None
         self._active_agent = None
