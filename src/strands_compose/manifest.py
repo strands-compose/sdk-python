@@ -235,9 +235,6 @@ def _orchestration_descriptor(name: str, orch: Node) -> OrchestrationDescriptor:
 # ── Entry resolution ─────────────────────────────────────────────────────────
 
 
-# ── Entry resolution ─────────────────────────────────────────────────────────
-
-
 def _resolve_entry(
     entry: Node,
     agents: dict[str, Agent],
