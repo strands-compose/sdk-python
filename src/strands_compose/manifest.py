@@ -13,6 +13,7 @@ mutation of inputs.
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
 from strands import Agent
@@ -237,8 +238,8 @@ def _orchestration_descriptor(name: str, orch: Node) -> OrchestrationDescriptor:
 
 def _resolve_entry(
     entry: Node,
-    agents: dict[str, Agent],
-    orchestrators: dict[str, Node],
+    agents: Mapping[str, Agent],
+    orchestrators: Mapping[str, Node],
 ) -> EntryDescriptor:
     """Reverse-lookup *entry* in *agents* then *orchestrators* by object identity.
 
@@ -260,8 +261,8 @@ def _resolve_entry(
 
 
 def build_manifest(
-    agents: dict[str, Agent],
-    orchestrators: dict[str, Node],
+    agents: Mapping[str, Agent],
+    orchestrators: Mapping[str, Node],
     entry: Node,
 ) -> SessionManifest:
     """Build a :class:`SessionManifest` from resolved runtime objects.
