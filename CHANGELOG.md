@@ -8,8 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### BREAKING CHANGE
 
--
-Renamed `complete` event type to` agent_complete`. Any client, integration, or custom hook relying on the `complete` or `COMPLETE` event type must be updated to use `agent_complete` / `AGENT_COMPLETE` instead.
+- Renamed `complete` event type to` agent_complete`. Any client, integration, or custom hook relying on the `complete` or `COMPLETE` event type must be updated to use `agent_complete` / `AGENT_COMPLETE` instead.
 
 ### Fix
 
