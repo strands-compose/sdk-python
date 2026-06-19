@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## v0.6.0 (2026-06-20)
+
+### BREAKING CHANGE
+
+-
+Renamed `complete` event type to` agent_complete`. Any client, integration, or custom hook relying on the `complete` or `COMPLETE` event type must be updated to use `agent_complete` / `AGENT_COMPLETE` instead.
+
+### Fix
+
+- **manifest**: add delegate orchestration entry agent to agents collection
+
+### Refactor
+
+- **events**: rename complete event type to agent_complete
+
 ## v0.5.0 (2026-05-24)
 
 ### Feat
