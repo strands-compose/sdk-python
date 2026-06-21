@@ -1,6 +1,6 @@
 [project]
 name = "strands-compose"
-version = "0.6.0"
+version = "0.7.0"
 description = "Zero-code YAML-driven agent orchestration over strands-agents"
 readme = "README.md"
 requires-python = ">=3.11"
