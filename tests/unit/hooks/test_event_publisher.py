@@ -90,6 +90,7 @@ class TestEventPublisher:
         metrics.latest_agent_invocation = None
         metrics.accumulated_usage = {"inputTokens": 10, "outputTokens": 5, "totalTokens": 15}
         complete_event.agent.event_loop_metrics = metrics
+        complete_event.result = None
         pub._on_complete(complete_event)
 
         assert len(events) == 1
@@ -97,6 +98,48 @@ class TestEventPublisher:
         assert events[0].data["usage"]["input_tokens"] == 10
         assert events[0].data["usage"]["output_tokens"] == 5
         assert events[0].data["usage"]["total_tokens"] == 15
+
+    def test_complete_includes_text_and_message_when_result_present(self) -> None:
+        """AGENT_COMPLETE includes text and message fields when result is not None."""
+        events: list = []
+        pub = EventPublisher(callback=events.append, agent_name="test")
+
+        message = {"role": "assistant", "content": [{"text": "Hello!"}]}
+        result = MagicMock()
+        result.__str__ = MagicMock(return_value="Hello!")
+        result.message = message
+        result.stop_reason = "end_turn"
+
+        complete_event = MagicMock()
+        metrics = MagicMock()
+        metrics.latest_agent_invocation = None
+        metrics.accumulated_usage = {"inputTokens": 1, "outputTokens": 1, "totalTokens": 2}
+        complete_event.agent.event_loop_metrics = metrics
+        complete_event.result = result
+        pub._on_complete(complete_event)
+
+        assert len(events) == 1
+        assert events[0].type == EventType.AGENT_COMPLETE
+        assert events[0].data["text"] == "Hello!"
+        assert events[0].data["message"] == message
+
+    def test_complete_defaults_text_and_message_when_result_is_none(self) -> None:
+        """AGENT_COMPLETE uses empty defaults for text and message when result is None."""
+        events: list = []
+        pub = EventPublisher(callback=events.append, agent_name="test")
+
+        complete_event = MagicMock()
+        metrics = MagicMock()
+        metrics.latest_agent_invocation = None
+        metrics.accumulated_usage = {"inputTokens": 1, "outputTokens": 1, "totalTokens": 2}
+        complete_event.agent.event_loop_metrics = metrics
+        complete_event.result = None
+        pub._on_complete(complete_event)
+
+        assert len(events) == 1
+        assert events[0].type == EventType.AGENT_COMPLETE
+        assert events[0].data["text"] == ""
+        assert events[0].data["message"] == {}
 
     def test_complete_with_interrupt_result_emits_interrupt_events(self) -> None:
         events = []
