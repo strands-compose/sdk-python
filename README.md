@@ -24,8 +24,6 @@
 
 You describe the shape of your agent system in YAML, and strands-compose resolves, validates, and starts everything — models, MCP servers & clients, hooks, tools, orchestration topology — as a live, fully wired multi-agent system.
 
-**Already working with strands? Guess what — you already know strands-compose.** After `load()` resolves your YAML, what you get back are plain strands objects. Every agent **is** a `strands.Agent`. Every MCP client **is** a `strands.tools.mcp.MCPClient`. Every orchestrator **is** a `strands.multiagent.Swarm` or `Graph` or just `strands.Agent`. No wrappers, no subclasses, no magic. Just the real deal, fully wired and ready to go.
-
 ```yaml
 models:
   default:
@@ -69,6 +67,8 @@ print(result)
 ```
 
 Three agents, orchestration wiring, model sharing — **zero plumbing code**.
+
+**Already working with strands? Guess what — you already know strands-compose.** After `load()` resolves your YAML, what you get back are plain strands objects. Every agent **is** a `strands.Agent`. Every MCP client **is** a `strands.tools.mcp.MCPClient`. Every orchestrator **is** a `strands.multiagent.Swarm` or `Graph` or just `strands.Agent`. No wrappers, no subclasses, no magic. Just the real deal, fully wired and ready to go.
 
 ---
 

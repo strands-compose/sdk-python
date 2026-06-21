@@ -43,7 +43,7 @@ bracketing all per-agent activity.
 | `tool_start` | Tool call begins | tool name, input |
 | `tool_end` | Tool call finished | tool name, status, result |
 | `interrupt` | Agent pauses for human input | interrupt id, reason |
-| `complete` | Agent finished (includes token usage) | usage metrics |
+| `agent_complete` | Agent finished | `{"usage": {...}, "text": "...", "message": {...}}` |
 | `error` | Model or execution error | exception type, message |
 | `node_start` / `node_stop` | Swarm / Graph enters/leaves a node | node id |
 | `handoff` | Swarm transfers control | from/to node ids |
