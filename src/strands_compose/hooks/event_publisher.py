@@ -252,18 +252,22 @@ class EventPublisher(HookProvider):
         invocation = metrics.latest_agent_invocation
         usage = invocation.usage if invocation else metrics.accumulated_usage
 
+        data: dict[str, Any] = {
+            "type": "agent",
+            "usage": {
+                "input_tokens": usage.get("inputTokens", 0),
+                "output_tokens": usage.get("outputTokens", 0),
+                "total_tokens": usage.get("totalTokens", 0),
+            },
+            "text": str(result) if result is not None else "",
+            "message": result.message if result is not None else {},
+        }
+
         self._callback(
             StreamEvent(
                 type=EventType.AGENT_COMPLETE,
                 agent_name=self._agent_name,
-                data={
-                    "type": "agent",
-                    "usage": {
-                        "input_tokens": usage.get("inputTokens", 0),
-                        "output_tokens": usage.get("outputTokens", 0),
-                        "total_tokens": usage.get("totalTokens", 0),
-                    },
-                },
+                data=data,
             ),
         )
 
