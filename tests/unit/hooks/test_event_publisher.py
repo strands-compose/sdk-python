@@ -246,7 +246,7 @@ class TestModelErrorCapture:
         assert len(events) == 1
         assert events[0].type == EventType.ERROR
         assert events[0].agent_name == "test"
-        assert "Token has expired" in events[0].data["message"]
+        assert "Token has expired" in events[0].data["text"]
         assert events[0].data["exception_type"] == "RuntimeError"
 
     def test_model_error_sets_errored_flag(self) -> None:

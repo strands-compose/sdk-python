@@ -209,7 +209,7 @@ class TestGoldenModelError:
         assert len(events) == 2
         assert events[0].type == EventType.AGENT_START
         assert events[1].type == EventType.ERROR
-        assert "Credentials expired" in events[1].data["message"]
+        assert "Credentials expired" in events[1].data["text"]
 
 
 # ---------------------------------------------------------------------------

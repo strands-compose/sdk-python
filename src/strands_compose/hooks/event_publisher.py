@@ -281,14 +281,13 @@ class EventPublisher(HookProvider):
             return
 
         self._errored = True
-        exc = event.exception
         self._callback(
             StreamEvent(
                 type=EventType.ERROR,
                 agent_name=self._agent_name,
                 data={
-                    "message": f"{type(exc).__name__}: {exc}",
-                    "exception_type": type(exc).__name__,
+                    "text": f"{event.exception}",
+                    "exception_type": type(event.exception).__name__,
                 },
             ),
         )
