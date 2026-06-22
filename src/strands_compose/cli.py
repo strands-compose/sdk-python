@@ -118,7 +118,7 @@ def _render_check_success_ansi(app_config: AppConfig) -> None:
 
     # Collect rows as (label, value) pairs, then align on the colon.
     rows: list[tuple[str, str]] = [
-        ("entry", str(app_config.entry)),
+        ("entry", app_config.entry),
         ("agents", agent_str),
     ]
     if app_config.models:

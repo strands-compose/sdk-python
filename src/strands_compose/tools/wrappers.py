@@ -17,7 +17,7 @@ from strands import Agent
 from strands.tools.decorator import DecoratedFunctionTool, tool
 from strands.types.content import Message
 
-from .extractors import extract_last_message, extract_text_from_message
+from .extractors import extract_last_message, extract_text
 
 if TYPE_CHECKING:
     from ..types import Node
@@ -75,7 +75,7 @@ def _message_to_tool_result(message: Message) -> dict[str, Any]:
     if content:
         return {"status": "success", "content": content}
 
-    return {"status": "success", "content": [{"text": extract_text_from_message(message) or ""}]}
+    return {"status": "success", "content": [{"text": extract_text(message)}]}
 
 
 def node_as_tool(

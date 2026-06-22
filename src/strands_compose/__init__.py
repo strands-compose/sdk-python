@@ -26,6 +26,7 @@ from .renderers import AnsiRenderer
 from .tools import (
     node_as_async_tool,
     node_as_tool,
+    serialize_multiagent_result,
 )
 from .types import EventType, StreamEvent
 from .utils import cli_errors
@@ -61,4 +62,5 @@ __all__ = [
     "node_as_async_tool",
     "node_as_tool",
     "resolve_infra",
+    "serialize_multiagent_result",
 ]

@@ -17,10 +17,11 @@ from strands.types.content import Message
 from strands_compose.tools import (
     node_as_async_tool,
     node_as_tool,
+    serialize_multiagent_result,
 )
 from strands_compose.tools.extractors import (
     extract_last_message,
-    extract_text_from_message,
+    extract_text,
     resolve_last_node_id,
 )
 
@@ -112,35 +113,35 @@ def _fake_graph_nodes(*names: str) -> list[Any]:
 
 
 # ===========================================================================
-# extract_text_from_message
+# extract_text
 # ===========================================================================
 
 
-class TestExtractTextFromMessage:
-    """Unit tests for extract_text_from_message."""
+class TestExtractText:
+    """Unit tests for extract_text."""
 
     def test_returns_last_text_block(self) -> None:
         """Multiple text blocks in content returns the last one."""
         msg = _msg([_text_block("first"), _text_block("second")])
-        assert extract_text_from_message(msg) == "second"
+        assert extract_text(msg) == "second"
 
-    def test_returns_none_for_no_text_blocks(self) -> None:
-        """Content with only toolUse blocks returns None."""
+    def test_returns_empty_string_for_no_text_blocks(self) -> None:
+        """Content with only toolUse blocks returns an empty string."""
         msg = _msg([_tool_use_block()])
-        assert extract_text_from_message(msg) is None
+        assert extract_text(msg) == ""
 
-    def test_returns_none_for_empty_content(self) -> None:
-        """Empty content list returns None."""
-        assert extract_text_from_message(_msg([])) is None
+    def test_returns_empty_string_for_empty_content(self) -> None:
+        """Empty content list returns an empty string."""
+        assert extract_text(_msg([])) == ""
 
-    def test_returns_none_for_none_message(self) -> None:
-        """None message returns None."""
-        assert extract_text_from_message(None) is None
+    def test_returns_empty_string_for_none_message(self) -> None:
+        """None message returns an empty string."""
+        assert extract_text(None) == ""
 
     def test_skips_non_dict_blocks(self) -> None:
         """Non-dict items in content are safely skipped."""
         msg = cast(Message, {"role": "assistant", "content": ["raw string", _text_block("ok")]})
-        assert extract_text_from_message(msg) == "ok"
+        assert extract_text(msg) == "ok"
 
 
 # ===========================================================================
@@ -244,7 +245,7 @@ class TestExtractLastMessageSwarmResult:
     def test_empty_results_returns_descriptive_fallback(self) -> None:
         """SwarmResult with no node results returns a descriptive text message."""
         swarm_result = SwarmResult(status=Status.COMPLETED, results={}, node_history=[])
-        text = extract_text_from_message(extract_last_message(swarm_result))
+        text = extract_text(extract_last_message(swarm_result))
         assert text is not None and "no message output" in text
 
     def test_last_node_not_in_results_falls_back_to_reverse_scan(self) -> None:
@@ -318,7 +319,7 @@ class TestExtractMessageFromNodeResult:
         """NodeResult wrapping an Exception returns a descriptive error string."""
         node_result = _node_result(RuntimeError("something broke"))
         message = extract_last_message(node_result)
-        text = extract_text_from_message(message)
+        text = extract_text(message)
         assert text is not None
         assert "something broke" in text
 
@@ -631,3 +632,201 @@ class TestNodeAsAsyncTool:
         tool = node_as_async_tool(multi, name="graph_orch", description="Graph")
 
         assert await tool("q") == _tool_result([_text_block("graph async final")])
+
+
+# ===========================================================================
+# serialize_multiagent_result
+# ===========================================================================
+
+
+@dataclass
+class _FakeGraphEdgeObj:
+    """Edge represented as a GraphEdge-like object with from_node / to_node attrs."""
+
+    from_node: _FakeGraphNode
+    to_node: _FakeGraphNode
+
+
+class TestSerializeMultiagentResult:
+    """Unit tests for serialize_multiagent_result."""
+
+    # -- SwarmResult ---------------------------------------------------------
+
+    def test_swarm_includes_last_node_id(self) -> None:
+        """last_node_id is the final entry in node_history."""
+        result = SwarmResult(
+            status=Status.COMPLETED,
+            results={"a": _node_result(_agent_result_with_text("a text"))},
+            node_history=_fake_swarm_nodes("a"),
+        )
+        data = serialize_multiagent_result(result)
+        assert data["last_node_id"] == "a"
+
+    def test_swarm_includes_response_text(self) -> None:
+        """response is the plain-text answer from the last node."""
+        result = SwarmResult(
+            status=Status.COMPLETED,
+            results={"lead": _node_result(_agent_result_with_text("approved"))},
+            node_history=_fake_swarm_nodes("lead"),
+        )
+        data = serialize_multiagent_result(result)
+        assert data["response"] == "approved"
+
+    def test_swarm_node_history_preserves_order_and_repeats(self) -> None:
+        """swarm.node_history captures execution order including repeated visits."""
+        result = SwarmResult(
+            status=Status.COMPLETED,
+            results={
+                "drafter": _node_result(_agent_result_with_text("draft")),
+                "reviewer": _node_result(_agent_result_with_text("review")),
+                "lead": _node_result(_agent_result_with_text("final")),
+            },
+            node_history=_fake_swarm_nodes("drafter", "lead", "reviewer", "lead", "lead"),
+        )
+        data = serialize_multiagent_result(result)
+        assert data["swarm"]["node_history"] == ["drafter", "lead", "reviewer", "lead", "lead"]
+
+    def test_swarm_last_node_id_from_history_not_dict_order(self) -> None:
+        """last_node_id uses node_history, not results dict insertion order."""
+        # results dict insertion order ends with "reviewer", but last in history is "lead"
+        result = SwarmResult(
+            status=Status.COMPLETED,
+            results={
+                "drafter": _node_result(_agent_result_with_text("draft")),
+                "lead": _node_result(_agent_result_with_text("APPROVED")),
+                "reviewer": _node_result(_agent_result_with_text("looks good")),
+            },
+            node_history=_fake_swarm_nodes("drafter", "lead", "reviewer", "lead"),
+        )
+        data = serialize_multiagent_result(result)
+        assert data["last_node_id"] == "lead"
+        assert data["response"] == "APPROVED"
+
+    def test_swarm_no_graph_section(self) -> None:
+        """SwarmResult serialization does not produce a graph section."""
+        result = SwarmResult(
+            status=Status.COMPLETED,
+            results={"a": _node_result(_agent_result_with_text("x"))},
+            node_history=_fake_swarm_nodes("a"),
+        )
+        data = serialize_multiagent_result(result)
+        assert "graph" not in data
+
+    def test_swarm_includes_base_to_dict_fields(self) -> None:
+        """Output includes all standard MultiAgentResult.to_dict() fields."""
+        result = SwarmResult(
+            status=Status.COMPLETED,
+            results={"a": _node_result(_agent_result_with_text("x"))},
+            node_history=_fake_swarm_nodes("a"),
+        )
+        data = serialize_multiagent_result(result)
+        for key in ("type", "status", "results", "execution_count", "execution_time"):
+            assert key in data
+
+    # -- GraphResult ---------------------------------------------------------
+
+    def test_graph_includes_last_node_id(self) -> None:
+        """last_node_id is the final entry in execution_order."""
+        result = GraphResult(
+            status=Status.COMPLETED,
+            results={"writer": _node_result(_agent_result_with_text("written"))},
+            execution_order=_fake_graph_nodes("fetcher", "writer"),
+        )
+        data = serialize_multiagent_result(result)
+        assert data["last_node_id"] == "writer"
+
+    def test_graph_includes_response_text(self) -> None:
+        """response is the plain-text answer from the last execution_order node."""
+        result = GraphResult(
+            status=Status.COMPLETED,
+            results={"writer": _node_result(_agent_result_with_text("final output"))},
+            execution_order=_fake_graph_nodes("fetcher", "writer"),
+        )
+        data = serialize_multiagent_result(result)
+        assert data["response"] == "final output"
+
+    def test_graph_execution_order_preserved(self) -> None:
+        """graph.execution_order lists node ids in execution sequence."""
+        result = GraphResult(
+            status=Status.COMPLETED,
+            results={"c": _node_result(_agent_result_with_text("c"))},
+            execution_order=_fake_graph_nodes("a", "b", "c"),
+        )
+        data = serialize_multiagent_result(result)
+        assert data["graph"]["execution_order"] == ["a", "b", "c"]
+
+    def test_graph_edges_as_tuples(self) -> None:
+        """graph.edges serializes tuple-based edges as [from, to] pairs."""
+        n1, n2 = _FakeGraphNode("n1"), _FakeGraphNode("n2")
+        result = GraphResult(
+            status=Status.COMPLETED,
+            results={"n2": _node_result(_agent_result_with_text("out"))},
+            execution_order=cast(Any, [n1, n2]),
+            edges=cast(Any, [(n1, n2)]),
+        )
+        data = serialize_multiagent_result(result)
+        assert data["graph"]["edges"] == [["n1", "n2"]]
+
+    def test_graph_edges_as_objects(self) -> None:
+        """graph.edges serializes GraphEdge-like objects via from_node/to_node."""
+        n1, n2 = _FakeGraphNode("src"), _FakeGraphNode("dst")
+        edge = _FakeGraphEdgeObj(from_node=n1, to_node=n2)
+        result = GraphResult(
+            status=Status.COMPLETED,
+            results={"dst": _node_result(_agent_result_with_text("done"))},
+            execution_order=cast(Any, [n1, n2]),
+            edges=cast(Any, [edge]),
+        )
+        data = serialize_multiagent_result(result)
+        assert data["graph"]["edges"] == [["src", "dst"]]
+
+    def test_graph_entry_points(self) -> None:
+        """graph.entry_points lists entry node ids."""
+        entry = _FakeGraphNode("start")
+        result = GraphResult(
+            status=Status.COMPLETED,
+            results={"start": _node_result(_agent_result_with_text("go"))},
+            execution_order=cast(Any, [entry]),
+            entry_points=cast(Any, [entry]),
+        )
+        data = serialize_multiagent_result(result)
+        assert data["graph"]["entry_points"] == ["start"]
+
+    def test_graph_node_counts(self) -> None:
+        """graph section includes completed, failed, and interrupted node counts."""
+        result = GraphResult(
+            status=Status.COMPLETED,
+            results={"a": _node_result(_agent_result_with_text("x"))},
+            execution_order=_fake_graph_nodes("a"),
+            completed_nodes=3,
+            failed_nodes=1,
+            interrupted_nodes=0,
+        )
+        data = serialize_multiagent_result(result)
+        assert data["graph"]["completed_nodes"] == 3
+        assert data["graph"]["failed_nodes"] == 1
+        assert data["graph"]["interrupted_nodes"] == 0
+
+    def test_graph_no_swarm_section(self) -> None:
+        """GraphResult serialization does not produce a swarm section."""
+        result = GraphResult(
+            status=Status.COMPLETED,
+            results={"a": _node_result(_agent_result_with_text("x"))},
+            execution_order=_fake_graph_nodes("a"),
+        )
+        data = serialize_multiagent_result(result)
+        assert "swarm" not in data
+
+    # -- Base MultiAgentResult -----------------------------------------------
+
+    def test_base_result_no_swarm_or_graph_section(self) -> None:
+        """Plain MultiAgentResult produces neither swarm nor graph section."""
+        result = MultiAgentResult(
+            status=Status.COMPLETED,
+            results={"a": _node_result(_agent_result_with_text("plain"))},
+        )
+        data = serialize_multiagent_result(result)
+        assert "swarm" not in data
+        assert "graph" not in data
+        assert data["last_node_id"] is None
+        assert data["response"] == "plain"
