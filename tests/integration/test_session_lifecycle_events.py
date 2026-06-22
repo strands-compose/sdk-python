@@ -61,7 +61,9 @@ class TestSessionLifecycleEventsSingleAgent:
         assert event is not None
         assert event.type == EventType.SESSION_START
 
-        manifest = event.data
+        assert isinstance(event.data, dict)
+        assert event.data["session_id"] is None
+        manifest = event.data["manifest"]
         assert isinstance(manifest, dict)
         assert "agents" in manifest
         assert "orchestrations" in manifest
@@ -109,7 +111,7 @@ class TestSessionLifecycleEventsMultipleAgents:
         assert events[-1].type == EventType.SESSION_END
         assert events[-1].agent_name == "coordinator"
 
-        manifest = events[0].data
+        manifest = events[0].data["manifest"]
         agent_names = {agent["name"] for agent in manifest["agents"]}
         assert "researcher" in agent_names
         assert "writer" in agent_names
@@ -143,7 +145,7 @@ class TestSessionLifecycleEventsSwarmOrchestration:
         assert events[-1].type == EventType.SESSION_END
         assert events[-1].agent_name == "team"
 
-        manifest = events[0].data
+        manifest = events[0].data["manifest"]
         assert len(manifest["orchestrations"]) > 0
         swarm = manifest["orchestrations"][0]
         assert swarm["kind"] == "swarm"
@@ -179,7 +181,7 @@ class TestSessionLifecycleEventsGraphOrchestration:
         assert events[-1].type == EventType.SESSION_END
         assert events[-1].agent_name == "pipeline"
 
-        manifest = events[0].data
+        manifest = events[0].data["manifest"]
         assert len(manifest["orchestrations"]) > 0
         graph = manifest["orchestrations"][0]
         assert graph["kind"] == "graph"
