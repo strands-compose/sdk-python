@@ -4,10 +4,15 @@ Provides helpers for:
 - Loading ``@tool``-decorated functions from files, modules, and directories.
 - Wrapping ``Agent`` / ``MultiAgentBase`` nodes as ``AgentTool`` instances
   (``node_as_tool``, ``node_as_async_tool``) for delegation.
+- Serializing multi-agent results with full execution metadata.
 """
 
 from __future__ import annotations
 
+from .extractors import (
+    resolve_last_node_id,
+    serialize_multiagent_result,
+)
 from .loaders import (
     load_tool_function,
     load_tools_from_directory,
@@ -28,6 +33,8 @@ __all__ = [
     "load_tools_from_module",
     "node_as_async_tool",
     "node_as_tool",
+    "resolve_last_node_id",
     "resolve_tool_spec",
     "resolve_tool_specs",
+    "serialize_multiagent_result",
 ]
