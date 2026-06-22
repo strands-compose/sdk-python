@@ -5,6 +5,9 @@ from __future__ import annotations
 import io
 import time
 
+import pytest
+from pydantic import ValidationError
+
 from strands_compose.renderers import AnsiRenderer
 from strands_compose.types import EventType
 from strands_compose.wire import StreamEvent
@@ -250,3 +253,128 @@ class TestAnsiRendererTypewriterDelay:
         r.render(_event(EventType.TOKEN, text=text))
         elapsed = time.monotonic() - start
         assert elapsed >= delay * len(text)
+
+
+class TestAnsiRendererSessionLifecycle:
+    """AnsiRenderer renders SESSION_START and SESSION_END correctly."""
+
+    def _renderer(self) -> tuple[AnsiRenderer, io.StringIO]:
+        buf = io.StringIO()
+        return AnsiRenderer(file=buf), buf
+
+    def _session_start_event(
+        self,
+        entry_name: str = "coordinator",
+        entry_kind: str = "agent",
+        agents: list[str] | None = None,
+        orchestrations: list[str] | None = None,
+    ) -> StreamEvent:
+        """Build a SESSION_START event with the correct envelope shape."""
+        return StreamEvent(
+            type=EventType.SESSION_START,
+            agent_name=entry_name,
+            data={
+                "session_id": None,
+                "manifest": {
+                    "agents": [
+                        {
+                            "name": n,
+                            "description": None,
+                            "model": {"model_id": None, "provider": "mock"},
+                            "session_manager": None,
+                        }
+                        for n in (agents or [entry_name])
+                    ],
+                    "orchestrations": [
+                        {
+                            "name": n,
+                            "kind": "swarm",
+                            "session_manager": None,
+                            "nodes": [],
+                            "edges": None,
+                            "entry_node_id": None,
+                        }
+                        for n in (orchestrations or [])
+                    ],
+                    "entry": {"name": entry_name, "kind": entry_kind},
+                },
+            },
+        )
+
+    def test_session_start_renders_session_start_header(self) -> None:
+        """SESSION_START event renders a SESSION START header."""
+        r, buf = self._renderer()
+        r.render(self._session_start_event())
+        assert "SESSION START" in buf.getvalue()
+
+    def test_session_start_renders_entry_name(self) -> None:
+        """SESSION_START event renders the entry point name."""
+        r, buf = self._renderer()
+        r.render(self._session_start_event(entry_name="coordinator"))
+        assert "coordinator" in buf.getvalue()
+
+    def test_session_start_renders_agent_names(self) -> None:
+        """SESSION_START event renders all agent names."""
+        r, buf = self._renderer()
+        r.render(self._session_start_event(agents=["researcher", "writer"]))
+        output = buf.getvalue()
+        assert "researcher" in output
+        assert "writer" in output
+
+    def test_session_start_renders_orchestration_names(self) -> None:
+        """SESSION_START event renders orchestration names when present."""
+        r, buf = self._renderer()
+        r.render(self._session_start_event(agents=["a"], orchestrations=["pipeline"]))
+        assert "pipeline" in buf.getvalue()
+
+    def test_session_start_omits_orchestrations_line_when_none(self) -> None:
+        """SESSION_START event omits the orchestrations line when there are none."""
+        r, buf = self._renderer()
+        r.render(self._session_start_event(agents=["a"], orchestrations=[]))
+        assert "orchestrations" not in buf.getvalue()
+
+    def test_session_start_raises_on_flat_manifest_payload(self) -> None:
+        """SESSION_START with old flat manifest (pre-envelope) raises a validation error.
+
+        Guards against regression to the old payload shape where event.data was
+        the raw SessionManifest dict instead of {"session_id": ..., "manifest": ...}.
+        """
+
+        r, buf = self._renderer()
+        flat_event = StreamEvent(
+            type=EventType.SESSION_START,
+            agent_name="agent",
+            data={
+                "agents": [],
+                "orchestrations": [],
+                "entry": {"name": "agent", "kind": "agent"},
+            },
+        )
+        with pytest.raises((KeyError, ValidationError)):
+            r.render(flat_event)
+
+    def test_session_end_renders_session_end_header(self) -> None:
+        """SESSION_END event renders a SESSION END header."""
+        r, buf = self._renderer()
+        r.render(_event(EventType.SESSION_END, session_id="abc-123"))
+        assert "SESSION END" in buf.getvalue()
+
+    def test_session_end_renders_session_id(self) -> None:
+        """SESSION_END event renders the session id."""
+        r, buf = self._renderer()
+        r.render(_event(EventType.SESSION_END, session_id="abc-123"))
+        assert "abc-123" in buf.getvalue()
+
+    def test_session_end_renders_dash_when_session_id_is_none(self) -> None:
+        """SESSION_END event renders '—' when session_id is None."""
+        r, buf = self._renderer()
+        r.render(_event(EventType.SESSION_END, session_id=None))
+        assert "—" in buf.getvalue()
+
+    def test_session_start_breaks_token_stream(self) -> None:
+        """SESSION_START must break an active inline token stream."""
+        r, buf = self._renderer()
+        r.render(_event(EventType.TOKEN, text="partial"))
+        r.render(self._session_start_event())
+        output = buf.getvalue()
+        assert "partial\n" in output
