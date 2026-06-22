@@ -75,7 +75,7 @@ def _message_to_tool_result(message: Message) -> dict[str, Any]:
     if content:
         return {"status": "success", "content": content}
 
-    return {"status": "success", "content": [{"text": extract_text(message) or ""}]}
+    return {"status": "success", "content": [{"text": extract_text(message)}]}
 
 
 def node_as_tool(

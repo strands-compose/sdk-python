@@ -17,6 +17,7 @@ from strands.types.content import Message
 from strands_compose.tools import (
     node_as_async_tool,
     node_as_tool,
+    serialize_multiagent_result,
 )
 from strands_compose.tools.extractors import (
     extract_last_message,
@@ -636,12 +637,6 @@ class TestNodeAsAsyncTool:
 # ===========================================================================
 # serialize_multiagent_result
 # ===========================================================================
-
-
-
-@dataclass
-class _FakeGraphEdgeTuple:
-    """Edge represented as a plain tuple (from_node, to_node)."""
 
 
 @dataclass
