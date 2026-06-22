@@ -637,7 +637,6 @@ class TestNodeAsAsyncTool:
 # serialize_multiagent_result
 # ===========================================================================
 
-from strands_compose.tools.extractors import serialize_multiagent_result  # noqa: E402
 
 
 @dataclass
