@@ -115,7 +115,7 @@ class AnsiRenderer(EventRenderer):
 
     def _handle_session_start(self, event: StreamEvent) -> None:
         self._break()
-        manifest = SessionManifest.model_validate(event.data)
+        manifest = SessionManifest.model_validate(event.data["manifest"])
         agent_names = ", ".join(a.name for a in manifest.agents) or "—"
         orch_names = ", ".join(o.name for o in manifest.orchestrations) or "—"
         self._out.write(self._separator(manifest.entry.name, "SESSION START", color=self._cyan))
