@@ -6,7 +6,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from ...manifest import build_manifest, first_session_id
+from ...manifest import build_manifest
 from ...mcp.lifecycle import MCPLifecycle
 from ...wire import make_event_queue
 from .mcp import resolve_mcp_client, resolve_mcp_server
@@ -44,6 +44,7 @@ class ResolvedConfig:
     def wire_event_queue(
         self,
         *,
+        session_id: str | None = None,
         tool_labels: dict[str, str] | None = None,
     ) -> EventQueue:
         """Wire all agents and orchestrators for event streaming.
@@ -58,10 +59,6 @@ class ResolvedConfig:
         3. Emits a SESSION_START event carrying the manifest as the first
            event on the queue.
 
-        The effective session id is the first non-``None`` ``session_id``
-        found in the manifest (agents first, then orchestrations); it is
-        included in the SESSION_END event payload.
-
         .. warning::
 
             This **mutates** the agents and orchestrators stored on this
@@ -69,6 +66,7 @@ class ResolvedConfig:
             Call it only once per ``ResolvedConfig`` instance.
 
         Args:
+            session_id: Optional session ID to embed in events.
             tool_labels: Optional tool name → display label mapping.
 
         Returns:
@@ -84,7 +82,7 @@ class ResolvedConfig:
             orchestrators=self.orchestrators,
             tool_labels=tool_labels,
             entry_name=manifest.entry.name,
-            session_id=first_session_id(manifest),
+            session_id=session_id,
         )
         event_queue.emit_session_start(manifest)
         return event_queue

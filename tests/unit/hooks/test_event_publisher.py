@@ -45,7 +45,7 @@ class TestEventPublisher:
         assert len(events) == 1
         assert events[0].type == EventType.AGENT_START
         assert events[0].agent_name == "test"
-        assert events[0].data == {"type": "agent"}
+        assert events[0].data == {}
 
     def test_tool_start_and_end_events(self):
         events = []
@@ -258,7 +258,7 @@ class TestModelErrorCapture:
         model_event.exception = ValueError("bad request")
         pub._on_model_error(model_event)
 
-        assert pub._errored is True
+        assert pub._errored
 
     def test_successful_model_call_does_not_emit_error(self) -> None:
         """AfterModelCallEvent without exception emits nothing."""
@@ -322,7 +322,7 @@ class TestModelErrorCapture:
         # Second invocation: agent_start resets the flag
         agent_start_event = MagicMock()
         pub._on_agent_start(agent_start_event)
-        assert pub._errored is False
+        assert not pub._errored
 
     def test_register_hooks_includes_model_error(self) -> None:
         """register_hooks registers AfterModelCallEvent callback."""

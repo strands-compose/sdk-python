@@ -40,10 +40,10 @@ These two events bracket every invocation. They are produced by the queue layer,
 
 | Event Type | Description | `data` payload |
 |------------|-------------|----------------|
-| `SESSION_START` | First event on the queue — emitted before any agent activity | Serialised `SessionManifest`: agents, orchestrations, entry point, model info, session manager locations |
+| `SESSION_START` | First event on the queue — emitted before any agent activity | `{"session_id": "<id or null>", "manifest": {SessionManifest}}` — agents, orchestrations, entry point, model info, session manager locations |
 | `SESSION_END` | Last typed event before the stream closes | `{"session_id": "<id or null>"}` |
 
-The `SESSION_START` payload is the full wired topology at invocation time. Use it to restore conversation history, render an architecture diagram, or audit which models are in use — before any agent has run.
+The `SESSION_START` payload wraps the full wired topology snapshot together with the effective session id. Use the `manifest` key to restore conversation history, render an architecture diagram, or audit which models are in use — before any agent has run.
 
 ### Per-agent events
 
@@ -87,8 +87,9 @@ A typical consumer pattern that handles the session lifecycle:
 ```python
 while (event := await queue.get()) is not None:
     if event.type == "session_start":
-        manifest = event.data          # full topology snapshot
-        entry = manifest["entry"]      # {"name": "...", "kind": "agent|orchestration"}
+        session_id = event.data.get("session_id")
+        manifest = event.data["manifest"]  # full topology snapshot
+        entry = manifest["entry"]          # {"name": "...", "kind": "agent|orchestration"}
     elif event.type == "session_end":
         session_id = event.data.get("session_id")
     else:

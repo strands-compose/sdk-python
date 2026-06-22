@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from strands import Agent
 from strands.multiagent import Swarm
@@ -62,22 +62,6 @@ class EventQueue:
         *entry_name* and *session_id* parameterise the SESSION_START and
         SESSION_END events emitted by :meth:`emit_session_start` and
         :meth:`close` respectively.
-
-        Example::
-
-            events = make_event_queue(config.agents)
-
-
-            async def _run():
-                try:
-                    await config.entry.invoke_async(prompt)
-                finally:
-                    await events.close()
-
-
-            asyncio.create_task(_run())
-            while (event := await events.get()) is not None:
-                yield event.asdict()
 
         Args:
             queue: The underlying asyncio.Queue to wrap.
@@ -132,8 +116,8 @@ class EventQueue:
 
         Args:
             manifest: The :class:`SessionManifest` describing the wired
-                session.  Serialised via ``.model_dump()`` into the event
-                payload.
+                session.  Placed in the event payload as
+                ``{"session_id": <session_id>, "manifest": manifest.model_dump()}``.
         """
         if self._session_start_emitted:
             return
@@ -142,7 +126,10 @@ class EventQueue:
             StreamEvent(
                 type=EventType.SESSION_START,
                 agent_name=self._entry_name,
-                data=manifest.model_dump(),
+                data={
+                    "session_id": self._session_id,
+                    "manifest": manifest.model_dump(),
+                },
             )
         )
         logger.debug("entry=<%s> | session_start emitted", self._entry_name)
@@ -164,7 +151,7 @@ class EventQueue:
         """
         self._put(event)
 
-    async def close(self) -> None:
+    async def close(self, data: dict[str, Any] = {}) -> None:
         """Signal end-of-stream.
 
         Emits a SESSION_END event before placing the sentinel on the queue.
@@ -175,6 +162,10 @@ class EventQueue:
 
         Typically called in a ``finally`` block after the agent invocation
         finishes.
+
+        Args:
+            data: Additional data to include in the SESSION_END event.
+
         """
         if not self._session_end_emitted:
             self._session_end_emitted = True
@@ -182,7 +173,7 @@ class EventQueue:
                 StreamEvent(
                     type=EventType.SESSION_END,
                     agent_name=self._entry_name,
-                    data={"session_id": self._session_id},
+                    data={"session_id": self._session_id, **data},
                 )
             )
             logger.debug(

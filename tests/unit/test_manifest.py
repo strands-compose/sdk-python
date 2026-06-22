@@ -13,18 +13,12 @@ from strands.session import FileSessionManager, S3SessionManager
 from strands_compose.manifest import (
     build_manifest,
     build_session_manager_descriptor,
-    first_session_id,
 )
 from strands_compose.types import (
     AgentCoreProviderDescriptor,
-    AgentDescriptor,
     CustomProviderDescriptor,
-    EntryDescriptor,
     FileProviderDescriptor,
-    ModelDescriptor,
     S3ProviderDescriptor,
-    SessionManagerDescriptor,
-    SessionManifest,
 )
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -614,56 +608,3 @@ class TestBuildManifest:
 
         assert len(manifest.agents) == 1
         assert manifest.agents[0].name == "agent1"
-
-
-# ── first_session_id ─────────────────────────────────────────────────────────
-
-
-def _file_descriptor(session_id: str) -> FileProviderDescriptor:
-    return FileProviderDescriptor(provider="file", session_id=session_id, storage_dir="/tmp")
-
-
-class TestFirstSessionId:
-    """Tests for first_session_id."""
-
-    def _empty_entry(self) -> EntryDescriptor:
-        return EntryDescriptor(name="x", kind="agent")
-
-    def _agent(self, sm: SessionManagerDescriptor | None) -> AgentDescriptor:
-        return AgentDescriptor(
-            name="a",
-            description=None,
-            model=ModelDescriptor(model_id=None, provider="P"),
-            session_manager=sm,
-        )
-
-    def test_returns_none_when_no_managers(self):
-        manifest = SessionManifest(entry=self._empty_entry())
-        assert first_session_id(manifest) is None
-
-    def test_returns_first_agent_session_id(self):
-        manifest = SessionManifest(
-            agents=[
-                self._agent(None),
-                self._agent(_file_descriptor("sess-1")),
-                self._agent(_file_descriptor("sess-2")),
-            ],
-            entry=self._empty_entry(),
-        )
-        assert first_session_id(manifest) == "sess-1"
-
-    def test_falls_back_to_orchestration_when_no_agents_have_sm(self):
-        from strands_compose.types import OrchestrationDescriptor
-
-        manifest = SessionManifest(
-            agents=[self._agent(None)],
-            orchestrations=[
-                OrchestrationDescriptor(
-                    name="o",
-                    kind="swarm",
-                    session_manager=_file_descriptor("orch-sess"),
-                ),
-            ],
-            entry=self._empty_entry(),
-        )
-        assert first_session_id(manifest) == "orch-sess"

@@ -175,7 +175,6 @@ class EventPublisher(HookProvider):
             StreamEvent(
                 type=EventType.AGENT_START,
                 agent_name=self._agent_name,
-                data={"type": "agent"},
             ),
         )
 
@@ -246,14 +245,12 @@ class EventPublisher(HookProvider):
                 )
             return
 
-        metrics = event.agent.event_loop_metrics
-
         # Usage from the latest invocation (current turn only).
+        metrics = event.agent.event_loop_metrics
         invocation = metrics.latest_agent_invocation
         usage = invocation.usage if invocation else metrics.accumulated_usage
 
         data: dict[str, Any] = {
-            "type": "agent",
             "usage": {
                 "input_tokens": usage.get("inputTokens", 0),
                 "output_tokens": usage.get("outputTokens", 0),

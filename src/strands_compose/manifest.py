@@ -304,24 +304,3 @@ def build_manifest(
         ],
         entry=_resolve_entry(entry, agents, orchestrators),
     )
-
-
-def first_session_id(manifest: SessionManifest) -> str | None:
-    """Return the first non-None ``session_id`` found in the manifest.
-
-    Iterates ``manifest.agents`` first, then ``manifest.orchestrations``,
-    returning the first ``session_manager.session_id`` that is set.  Used by
-    :meth:`ResolvedConfig.wire_event_queue` to determine the effective session
-    id for the SESSION_END event payload.
-
-    Args:
-        manifest: The session manifest.
-
-    Returns:
-        The first session id found, or ``None`` when no descriptor in the
-        manifest has a session manager set.
-    """
-    for descriptor in (*manifest.agents, *manifest.orchestrations):
-        if descriptor.session_manager is not None:
-            return descriptor.session_manager.session_id
-    return None

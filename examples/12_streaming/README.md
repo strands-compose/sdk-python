@@ -36,7 +36,7 @@ bracketing all per-agent activity.
 
 | Type | When it fires | `data` |
 |------|---------------|--------|
-| `session_start` | Before any agent runs — first event on the queue | Serialised `SessionManifest` (agents, orchestrations, entry, model info) |
+| `session_start` | Before any agent runs — first event on the queue | `{"session_id": null \| "...", "manifest": {agents, orchestrations, entry, model info}}` |
 | `agent_start` | Agent begins processing | — |
 | `token` | Streaming text chunk | `{"text": "..."}` |
 | `reasoning` | Streaming reasoning chunk | `{"text": "..."}` |
