@@ -17,17 +17,12 @@ not here.
 | Area | Skill to load |
 |------|---------------|
 | **Library source** (`src/strands_compose/`) | `.kiro/skills/library-development/SKILL.md` + `.kiro/skills/library-development/references/project-map.md` |
+| **Library tests** (`tests/`) | `.kiro/skills/library-testing/SKILL.md` + `.kiro/skills/library-testing/references/test-patterns.md` |
 
-If you work on the library source, read the `library-development` skill. It
-describes the target standard — follow it, not whatever pattern happened to be
-written before the skill existed.
-
-Two more skills activate automatically and should be used when relevant:
-
-| Skill | Use when |
-|-------|----------|
-| `.github/skills/strands-api-lookup/SKILL.md` | Working with any strands API — check upstream before implementing |
-| `.github/skills/check-and-test/SKILL.md` | Validating, linting, type-checking, or testing |
+If you work on the library source, read the `library-development` skill; if you
+work on tests, read the `library-testing` skill. They describe the target
+standard — follow it, not whatever pattern happened to be written before the
+skill existed.
 
 ---
 
@@ -70,28 +65,3 @@ When in doubt, apply these in order.
 - **Never add files or change code outside the scope of the task.**
 - **Verify before done** — `uv run just check` then `uv run just test` (see the
   `check-and-test` skill).
-
----
-
-## Path-Specific Instructions
-
-Targeted rules in `.github/instructions/` are applied automatically based on
-file paths:
-
-| File | Applies to |
-|------|-----------|
-| `source.instructions.md` | `src/**/*.py` |
-| `tests.instructions.md` | `tests/**/*.py` |
-| `examples.instructions.md` | `examples/**/*.py`, `examples/**/*.yaml` |
-| `docs.instructions.md` | `docs/**/*.md` |
-
-## Custom Agents
-
-Specialized agents in `.github/agents/` — select the right one for your task:
-
-| Agent | Purpose |
-|-------|---------|
-| `developer` | Implement features and fix bugs |
-| `reviewer` | Review PRs for correctness and compliance (read-only) |
-| `tester` | Write and improve tests |
-| `docs-writer` | Write and update documentation |

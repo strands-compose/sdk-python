@@ -3,6 +3,7 @@
 .kiro/specs
 .sessions
 .converter
+.hypothesis
 
 # Ignore Python cache and compiled files
 __pycache__/

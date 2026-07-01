@@ -1,8 +1,0 @@
-session_manager:
-  provider: file
-  params:
-    session_id: test-session
-agents:
-  assistant:
-    system_prompt: "You are helpful."
-entry: assistant

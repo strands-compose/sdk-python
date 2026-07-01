@@ -1,0 +1,3 @@
+agents:
+  helper:
+    system_prompt: "You help."

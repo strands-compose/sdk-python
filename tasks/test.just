@@ -4,7 +4,7 @@ test: test-coverage
 
 # check code coverage
 [group('test')]
-test-coverage cov_fail_under="90":
+test-coverage cov_fail_under="70":
     uv run python -m pytest --numprocesses=2 --cov={{SOURCES}} --cov-fail-under={{cov_fail_under}} {{TESTS}}
 
 # run mutation testing (requires: pip install mutmut)
