@@ -26,8 +26,7 @@ import time
 from collections.abc import Callable
 from typing import Any
 
-from ..types import EventType, SessionManifest
-from ..wire import StreamEvent
+from ..types import EventType, SessionManifest, StreamEvent
 from .base import EventRenderer
 
 

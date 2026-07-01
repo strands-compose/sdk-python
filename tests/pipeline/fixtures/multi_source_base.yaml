@@ -1,0 +1,4 @@
+agents:
+  planner:
+    system_prompt: "You plan."
+entry: planner

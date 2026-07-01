@@ -8,7 +8,7 @@ import importlib
 import importlib.util
 import logging
 import sys
-from collections.abc import Iterator
+from collections.abc import Generator
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -28,7 +28,7 @@ def import_from_path(import_path: str) -> Any:
         The imported object.
 
     Raises:
-        ValueError: If format is invalid (missing ``:``)."
+        ValueError: If format is invalid (missing ``:``).
         ImportError: If module cannot be imported.
         AttributeError: If object does not exist in module.
     """
@@ -131,8 +131,7 @@ def load_module_from_file(path: str | Path) -> ModuleType:
         raise ImportError(f"Failed to load file {file_path}: {exc}") from exc
 
     # Remove from sys.modules to avoid polluting the global module namespace.
-    # The returned module object remains usable —
-    # only the sys.modules entry is dropped.
+    # The returned module object remains usable — only the sys.modules entry is dropped.
     # This means subsequent ``import <module_name>`` statements won't resolve,
     # It's intentional: these are user-provided files, not library modules.
     # For hot-reload, the ``del`` above ensures a fresh exec on every call.
@@ -169,7 +168,7 @@ def _format_exception(exc: BaseException) -> str:
 
 
 @contextlib.contextmanager
-def cli_errors(*, exit_code: int = 1) -> Iterator[None]:
+def cli_errors(*, exit_code: int = 1) -> Generator[None]:
     """Catch unhandled exceptions and print a clean, user-friendly message.
 
     .. warning::

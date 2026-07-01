@@ -26,6 +26,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import logging
 import sys
 import textwrap
 from importlib.metadata import version as pkg_version
@@ -38,6 +39,9 @@ from .utils import cli_errors
 
 if TYPE_CHECKING:
     from .config.resolvers import ResolvedConfig
+
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # ANSI helpers
@@ -75,6 +79,9 @@ def _get_version() -> str:
     try:
         return pkg_version("strands-compose")
     except Exception:
+        logger.warning(
+            "package=<strands-compose> | failed to read installed version", exc_info=True
+        )
         return "unknown"
 
 

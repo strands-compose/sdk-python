@@ -1,1 +1,0 @@
-"""strands-compose test suite."""

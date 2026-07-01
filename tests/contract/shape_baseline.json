@@ -1,0 +1,60 @@
+{
+  "agent_descriptor": [
+    "description",
+    "model",
+    "name",
+    "session_manager"
+  ],
+  "edge_ref": [
+    "from_id",
+    "to_id"
+  ],
+  "entry_descriptor": [
+    "kind",
+    "name"
+  ],
+  "event_types": [
+    "agent_complete",
+    "agent_start",
+    "error",
+    "handoff",
+    "interrupt",
+    "multiagent_complete",
+    "multiagent_start",
+    "node_start",
+    "node_stop",
+    "reasoning",
+    "session_end",
+    "session_start",
+    "token",
+    "tool_end",
+    "tool_start"
+  ],
+  "model_descriptor": [
+    "model_id",
+    "provider"
+  ],
+  "node_ref": [
+    "id",
+    "kind"
+  ],
+  "orchestration_descriptor": [
+    "edges",
+    "entry_node_id",
+    "kind",
+    "name",
+    "nodes",
+    "session_manager"
+  ],
+  "session_manifest": [
+    "agents",
+    "entry",
+    "orchestrations"
+  ],
+  "stream_event_fields": [
+    "agent_name",
+    "data",
+    "timestamp",
+    "type"
+  ]
+}

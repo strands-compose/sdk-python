@@ -16,7 +16,7 @@ default_stages: [pre-commit, pre-push]
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: 'v5.0.0'
+    rev: 'v6.0.0'
     hooks:
       - id: check-added-large-files
       - id: check-case-conflict
@@ -29,7 +29,7 @@ repos:
       - id: trailing-whitespace
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: 'v0.9.9'
+    rev: 'v0.15.20'
     hooks:
       - id: ruff          # lint  — commit + push
       - id: ruff-format   # format — commit + push
@@ -42,7 +42,7 @@ repos:
         files: \.(py|yaml|yml|md|toml|json|env)$
 
   - repo: https://github.com/commitizen-tools/commitizen
-    rev: 'v4.4.1'
+    rev: 'v4.16.4'
     hooks:
       - id: commitizen         # validates commit message format
         stages: [commit-msg]   # only on commit-msg event, not push

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..wire import StreamEvent
+from ..types import StreamEvent
 from .base import StreamConverter
 
 
