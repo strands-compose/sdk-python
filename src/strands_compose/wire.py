@@ -151,7 +151,7 @@ class EventQueue:
         """
         self._put(event)
 
-    async def close(self, data: dict[str, Any] = {}) -> None:
+    async def close(self, data: dict[str, Any] | None = None) -> None:
         """Signal end-of-stream.
 
         Emits a SESSION_END event before placing the sentinel on the queue.
@@ -173,7 +173,7 @@ class EventQueue:
                 StreamEvent(
                     type=EventType.SESSION_END,
                     agent_name=self._entry_name,
-                    data={"session_id": self._session_id, **data},
+                    data={"session_id": self._session_id, **(data or {})},
                 )
             )
             logger.debug(

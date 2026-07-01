@@ -140,35 +140,35 @@ def resolve_infra(config: AppConfig) -> ResolvedInfra:
     Returns:
         A :class:`ResolvedInfra` with models, clients, and a cold MCP lifecycle.
     """
-    # 1. Models
+    # Models
     models: dict[str, Model] = {}
     for name, model_def in config.models.items():
         models[name] = resolve_model(model_def)
         logger.info("model=<%s>, provider=<%s> | resolved model", name, model_def.provider)
 
-    # 2. MCP servers
+    # MCP servers
     servers: dict[str, MCPServer] = {}
     for name, server_def in config.mcp_servers.items():
         servers[name] = resolve_mcp_server(server_def, name=name)
         logger.info("server=<%s> | resolved MCP server", name)
 
-    # 3. MCP clients (resolved but NOT started)
+    # MCP clients (resolved but NOT started)
     clients: dict[str, StrandsMCPClient] = {}
     for name, client_def in config.mcp_clients.items():
         clients[name] = resolve_mcp_client(client_def, servers, name=name)
         logger.info("client=<%s> | resolved MCP client", name)
 
-    # 4. MCP lifecycle (cold — not started)
+    # MCP lifecycle (cold — not started)
     lifecycle = MCPLifecycle()
     for name, server in servers.items():
         lifecycle.add_server(name, server)
     for name, client in clients.items():
         lifecycle.add_client(name, client)
 
-    # 5. Session manager — validation only; instances are built per leaf in
-    # load_session / agents / orchestrations. 'agentcore' provider cannot be
-    # set globally — it requires a unique 'actor_id' per agent and is
-    # therefore unsuitable for a global default. Fail fast at boot.
+    # Session manager — validation only
+    # Instances are built per leaf in load_session / agents / orchestrations.
+    # Provider 'agentcore' cannot be set globally -
+    # it requires a unique 'actor_id' per agent. Fail fast at boot.
     if (
         config.session_manager is not None
         and config.session_manager.provider.lower() == "agentcore"

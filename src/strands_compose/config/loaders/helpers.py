@@ -94,11 +94,11 @@ def update_references(raw: dict, rename_map: dict[str, str]) -> None:
     def _rename(name: str) -> str:
         return rename_map.get(name, name)
 
-    # 1. Entry reference
+    # Entry reference
     if isinstance(raw.get("entry"), str):
         raw["entry"] = _rename(raw["entry"])
 
-    # 2. Agent definitions — model and mcp refs
+    # Agent definitions — model and mcp refs
     agents = raw.get("agents", {})
     if isinstance(agents, dict):
         for agent_def in agents.values():
@@ -109,14 +109,14 @@ def update_references(raw: dict, rename_map: dict[str, str]) -> None:
             if isinstance(agent_def.get("mcp"), list):
                 agent_def["mcp"] = [_rename(m) for m in agent_def["mcp"]]
 
-    # 3. MCP client server references
+    # MCP client server references
     clients = raw.get("mcp_clients", {})
     if isinstance(clients, dict):
         for client_def in clients.values():
             if isinstance(client_def, dict) and isinstance(client_def.get("server"), str):
                 client_def["server"] = _rename(client_def["server"])
 
-    # 4. Orchestration definitions — driven by reference_fields() descriptors
+    # Orchestration definitions — driven by reference_fields() descriptors
     _ORCH_DEFS = {
         "delegate": DelegateOrchestrationDef,
         "swarm": SwarmOrchestrationDef,
@@ -244,14 +244,14 @@ def rewrite_relative_paths(raw: dict, config_dir: Path) -> None:
             if not isinstance(agent_def, dict):
                 continue
 
-            # tools: list[str]
+            # tools
             tools = agent_def.get("tools")
             if isinstance(tools, list):
                 agent_def["tools"] = [
                     make_absolute(s, config_dir) if isinstance(s, str) else s for s in tools
                 ]
 
-            # hooks: list[str | dict]
+            # hooks
             hooks = agent_def.get("hooks")
             if isinstance(hooks, list):
                 for i, hook in enumerate(hooks):
@@ -263,7 +263,7 @@ def rewrite_relative_paths(raw: dict, config_dir: Path) -> None:
                         if isinstance(hook_type, str):
                             hook_d["type"] = make_absolute(hook_type, config_dir)
 
-            # type: str (custom agent factory)
+            # type
             if isinstance(agent_def.get("type"), str):
                 agent_def["type"] = make_absolute(agent_def["type"], config_dir)
 

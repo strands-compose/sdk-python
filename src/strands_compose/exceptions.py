@@ -1,17 +1,4 @@
-"""Shared exception types for strands-compose configuration errors.
-
-Hierarchy
----------
-
-::
-
-    ValueError
-    └── ConfigurationError               — base for all config errors
-        ├── SchemaValidationError         — Pydantic validation failures
-        ├── UnresolvedReferenceError      — missing model/agent/mcp references
-        ├── CircularDependencyError       — cycles in orchestration graphs
-        └── ImportResolutionError         — failed load_object() imports
-"""
+"""Shared exception types for strands-compose configuration errors."""
 
 from __future__ import annotations
 

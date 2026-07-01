@@ -4,12 +4,6 @@ Supports both flat (single orchestration) and nested (named orchestrations
 that reference each other) configurations.  Node references in delegate
 connections, swarm agents, and graph edges can point to either an agent name
 or a named orchestration.
-
-Submodules
-----------
-_tools      node_as_tool / node_as_async_tool wrappers
-_builders   Mode-specific builders (delegate, swarm, graph)
-_planner    Dependency resolution & multi-orchestration build
 """
 
 from __future__ import annotations

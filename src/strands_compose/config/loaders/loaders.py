@@ -241,11 +241,10 @@ def load_session(
         are constructed at the leaves (``build_agent_from_def``,
         ``OrchestrationBuilder._build_one``).
     """
-    # Compute a single effective session id for every leaf that will resolve a
-    # global SM. CLI parity: when no real session_id is supplied but the config
-    # declares a global session_manager, all leaves that fall back to that def
-    # share one fresh UUID for the duration of this load_session call (matching
-    # today's "one folder per CLI run" behaviour).
+    # Compute a single effective session id for every leaf that will resolve a global SM.
+    # CLI parity:
+    # when no real session_id is supplied but the config declares a global session_manager,
+    # all leaves that fall back to that def share one fresh UUID
     effective_session_id: str | None = session_id
     if effective_session_id is None and config.session_manager is not None:
         yaml_sid = (config.session_manager.params or {}).get("session_id")

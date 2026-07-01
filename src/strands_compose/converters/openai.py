@@ -11,7 +11,7 @@ from ..types import EventType
 from .base import StreamConverter
 
 if TYPE_CHECKING:
-    from ..wire import StreamEvent
+    from ..types import StreamEvent
 
 
 @dataclass

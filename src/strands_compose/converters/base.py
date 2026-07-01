@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any
 
-from ..wire import StreamEvent
+from ..types import StreamEvent
 
 
 class StreamConverter(ABC):

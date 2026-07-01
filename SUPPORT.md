@@ -31,4 +31,4 @@ If you discover a potential security issue, please see [SECURITY.md](SECURITY.md
 
 ## Strands Agents SDK
 
-strands-compose is built on top of the [Strands Agents SDK](https://github.com/strands-agents/sdk-python). For questions about the underlying agent framework, model providers, or hook system, refer to the Strands documentation.
+strands-compose is built on top of the [Strands Agents SDK](https://github.com/strands-agents/harness-sdk). For questions about the underlying agent framework, model providers, or hook system, refer to the Strands documentation.

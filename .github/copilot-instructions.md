@@ -1,6 +1,6 @@
 # strands-compose — Copilot Instructions
 
-This is **strands-compose**: a declarative multi-agent orchestration library for [strands-agents](https://github.com/strands-agents/sdk-python).
+This is **strands-compose**: a declarative multi-agent orchestration library for [strands-agents](https://github.com/strands-agents/harness-sdk).
 It reads YAML configs and returns fully wired, plain `strands` objects — no wrappers, no subclasses.
 
 ---
