@@ -76,10 +76,12 @@ def test_is_fs_spec_detects_paths_and_rejects_module_specs():
     assert not is_fs_spec("my_package.tools:greet")
 
 
-def test_make_absolute_rewrites_relative_file_spec():
-    result = make_absolute("./tools/greet.py:greet", Path("/project/cfg"))
-    assert result.startswith("/project/cfg/tools/greet.py:greet") or result.startswith("/")
-    assert result.endswith(":greet")
+def test_make_absolute_rewrites_relative_file_spec(tmp_path):
+    result = make_absolute("./tools/greet.py:greet", tmp_path)
+    path_part, sep, attr = result.rpartition(":")
+    assert sep == ":"
+    assert attr == "greet"
+    assert Path(path_part).is_absolute()
 
 
 def test_make_absolute_leaves_module_specs_unchanged():
@@ -124,7 +126,10 @@ def test_parse_single_source_rewrites_relative_tool_path_to_absolute(tmp_path):
     )
     raw = parse_single_source(path)
     tool_spec = raw["agents"]["a"]["tools"][0]
-    assert Path(tool_spec.split(":")[0]).is_absolute()
+    # Split on the LAST colon to avoid tripping on a Windows drive letter (C:\...).
+    path_part, sep, _attr = tool_spec.rpartition(":")
+    assert sep == ":"
+    assert Path(path_part).is_absolute()
 
 
 def test_parse_single_source_applies_per_source_interpolation(tmp_path, monkeypatch):

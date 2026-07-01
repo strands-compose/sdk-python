@@ -37,9 +37,9 @@ async def _run_agent(prompt: str, agent: Agent, eq) -> list:
         finally:
             await eq.close()
 
-    task = asyncio.create_task(_invoke())
+    task: asyncio.Task[None] = asyncio.create_task(_invoke())
     events = await _drain(eq)
-    await task
+    await task  # ensure the task finishes and any exception surfaces
     return events
 
 

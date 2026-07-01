@@ -154,9 +154,10 @@ class FakeMCPServer(MCPServer):
         label: str = "server",
     ) -> None:
         """Store the reported URL, readiness result, and optional shared order log."""
+        super().__init__(name=label)
         self.calls: list[str] = []
         self._url = url
-        self._ready: bool = ready
+        self._will_be_ready: bool = ready
         self._record = record
         self._label = label
 
@@ -170,7 +171,7 @@ class FakeMCPServer(MCPServer):
     def wait_ready(self, timeout: float = 30) -> bool:
         """Record a readiness probe and return the configured result."""
         self.calls.append("wait_ready")
-        return self._ready
+        return self._will_be_ready
 
     def stop(self) -> None:
         """Record a stop (and its order relative to clients, when a log is shared)."""
