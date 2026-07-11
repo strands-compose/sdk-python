@@ -33,6 +33,25 @@ def test_reasoning_text_is_written():
     assert "thinking" in _render(_ev(EventType.REASONING, text="thinking"))
 
 
+def test_leading_whitespace_token_does_not_open_responding_section():
+    assert _render(_ev(EventType.TOKEN, text="\n")) == ""
+
+
+def test_leading_whitespace_reasoning_does_not_open_reasoning_section():
+    assert _render(_ev(EventType.REASONING, text=" \t")) == ""
+
+
+def test_whitespace_after_content_is_written():
+    assert "hello\n" in _render(
+        _ev(EventType.TOKEN, text="hello"),
+        _ev(EventType.TOKEN, text="\n"),
+    )
+    assert "thinking\n" in _render(
+        _ev(EventType.REASONING, text="thinking"),
+        _ev(EventType.REASONING, text="\n"),
+    )
+
+
 def test_agent_start_shows_agent_name():
     assert "worker" in _render(_ev(EventType.AGENT_START))
 
