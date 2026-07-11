@@ -136,14 +136,20 @@ class AnsiRenderer(EventRenderer):
         self._out.flush()
 
     def _handle_token(self, event: StreamEvent) -> None:
-        self._ensure_mode(event.agent_name, "responding")
         text = event.data.get("text", "")
+        already_streaming = self._mode == "responding" and self._active_agent == event.agent_name
+        if not already_streaming and not text.strip():
+            return
+        self._ensure_mode(event.agent_name, "responding")
         self._write_with_delay(text)
         self._in_stream = True
 
     def _handle_reasoning(self, event: StreamEvent) -> None:
-        self._ensure_mode(event.agent_name, "reasoning")
         text = event.data.get("text", "")
+        already_streaming = self._mode == "reasoning" and self._active_agent == event.agent_name
+        if not already_streaming and not text.strip():
+            return
+        self._ensure_mode(event.agent_name, "reasoning")
         self._out.write(self._yellow)
         self._write_with_delay(text)
         self._out.write(self._reset)
