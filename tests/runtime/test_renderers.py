@@ -95,3 +95,31 @@ def test_session_end_shows_session_id():
 def test_mode_switch_between_reasoning_and_responding_renders_both():
     out = _render(_ev(EventType.REASONING, text="think"), _ev(EventType.TOKEN, text="answer"))
     assert "think" in out and "answer" in out
+
+
+def test_whitespace_only_token_before_content_does_not_open_responding_section():
+    out = _render(_ev(EventType.TOKEN, text="\n"))
+    assert "RESPONDING" not in out
+
+
+def test_whitespace_only_reasoning_before_content_does_not_open_reasoning_section():
+    out = _render(_ev(EventType.REASONING, text="\n"))
+    assert "REASONING" not in out
+
+
+def test_whitespace_token_after_real_content_is_preserved():
+    out = _render(
+        _ev(EventType.TOKEN, text="hello"),
+        _ev(EventType.TOKEN, text="\n"),
+    )
+    assert "RESPONDING" in out
+    assert "hello\n" in out
+
+
+def test_whitespace_reasoning_after_real_content_is_preserved():
+    out = _render(
+        _ev(EventType.REASONING, text="think"),
+        _ev(EventType.REASONING, text="\n"),
+    )
+    assert "REASONING" in out
+    assert "think" in out
