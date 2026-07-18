@@ -34,6 +34,7 @@ from strands.hooks.events import (
     BeforeToolCallEvent,
 )
 
+from ..manifest import model_descriptor
 from ..types import EventType, StreamEvent
 
 logger = logging.getLogger(__name__)
@@ -223,6 +224,10 @@ class EventPublisher(HookProvider):
     def _on_complete(self, event: AfterInvocationEvent) -> None:
         """Emit AGENT_COMPLETE with usage metrics from EventLoopMetrics.
 
+        Includes a ``model`` dict with ``model_id`` and ``provider`` (same
+        values reported in the session manifest) so consumers can compute
+        cost directly from this event without a manifest round-trip.
+
         Suppressed when the invocation errored — an ERROR event was
         already emitted via :meth:`_on_model_error`.
         """
@@ -250,11 +255,17 @@ class EventPublisher(HookProvider):
         invocation = metrics.latest_agent_invocation
         usage = invocation.usage if invocation else metrics.accumulated_usage
 
+        model = model_descriptor(event.agent)
+
         data: dict[str, Any] = {
             "usage": {
                 "input_tokens": usage.get("inputTokens", 0),
                 "output_tokens": usage.get("outputTokens", 0),
                 "total_tokens": usage.get("totalTokens", 0),
+            },
+            "model": {
+                "model_id": model.model_id,
+                "provider": model.provider,
             },
             "text": str(result) if result is not None else "",
             "message": result.message if result is not None else {},

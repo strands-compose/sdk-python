@@ -56,6 +56,17 @@ async def test_text_response_emits_start_tokens_and_complete():
     assert "".join(tokens) == "Hello world"
 
 
+async def test_agent_complete_includes_model_id_and_provider():
+    agent = Agent(model=FakeModel(["hi"], model_id="us.anthropic.claude-sonnet-4-6"))
+    eq = make_event_queue({"a": agent}, entry_name="a")
+
+    events = await _run_agent("hi", agent, eq)
+    complete = next(e for e in events if e.type == EventType.AGENT_COMPLETE)
+
+    assert complete.data["model"]["model_id"] == "us.anthropic.claude-sonnet-4-6"
+    assert complete.data["model"]["provider"] == f"{FakeModel.__module__}.{FakeModel.__qualname__}"
+
+
 async def test_stream_is_bracketed_by_session_end():
     agent = Agent(model=FakeModel(["hi"]))
     eq = make_event_queue({"a": agent}, entry_name="a")

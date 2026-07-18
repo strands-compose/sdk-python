@@ -118,8 +118,12 @@ def _descriptor_or_none(
 # ── Agent descriptor ─────────────────────────────────────────────────────────
 
 
-def _model_descriptor(agent: Agent) -> ModelDescriptor:
-    """Extract a :class:`ModelDescriptor` from an agent's model."""
+def model_descriptor(agent: Agent) -> ModelDescriptor:
+    """Extract a :class:`ModelDescriptor` from an agent's model.
+
+    Public so other components (e.g. :class:`~strands_compose.hooks.EventPublisher`)
+    can derive the same ``model_id``/``provider`` pair without a manifest round-trip.
+    """
     config = agent.model.get_config()
     if isinstance(config, dict):
         model_id = config.get("model_id")
@@ -136,7 +140,7 @@ def _agent_descriptor(name: str, agent: Agent) -> AgentDescriptor:
     return AgentDescriptor(
         name=name,
         description=agent.description,
-        model=_model_descriptor(agent),
+        model=model_descriptor(agent),
         session_manager=_descriptor_or_none(agent._session_manager),
     )
 

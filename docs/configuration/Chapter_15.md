@@ -55,7 +55,7 @@ The `SESSION_START` payload wraps the full wired topology snapshot together with
 | `TOOL_START` | Tool execution begins |
 | `TOOL_END` | Tool execution completes |
 | `INTERRUPT` | Agent pauses for human input |
-| `AGENT_COMPLETE` | Agent finishes — `data` carries `usage` metrics, `text` (final output string), and `message` (raw message dict) |
+| `AGENT_COMPLETE` | Agent finishes — `data` carries `usage` metrics, `model` (`model_id`, `provider`), `text` (final output string), and `message` (raw message dict) |
 | `ERROR` | Model or execution error |
 
 ### Multi-agent events
