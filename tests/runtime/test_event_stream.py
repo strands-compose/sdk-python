@@ -63,8 +63,8 @@ async def test_agent_complete_includes_model_id_and_provider():
     events = await _run_agent("hi", agent, eq)
     complete = next(e for e in events if e.type == EventType.AGENT_COMPLETE)
 
-    assert complete.data["model_id"] == "us.anthropic.claude-sonnet-4-6"
-    assert complete.data["provider"] == f"{FakeModel.__module__}.{FakeModel.__qualname__}"
+    assert complete.data["model"]["model_id"] == "us.anthropic.claude-sonnet-4-6"
+    assert complete.data["model"]["provider"] == f"{FakeModel.__module__}.{FakeModel.__qualname__}"
 
 
 async def test_stream_is_bracketed_by_session_end():

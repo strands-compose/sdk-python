@@ -224,9 +224,9 @@ class EventPublisher(HookProvider):
     def _on_complete(self, event: AfterInvocationEvent) -> None:
         """Emit AGENT_COMPLETE with usage metrics from EventLoopMetrics.
 
-        Includes ``model_id`` and ``provider`` (same values reported in the
-        session manifest) so consumers can compute cost directly from this
-        event without a manifest round-trip.
+        Includes a ``model`` dict with ``model_id`` and ``provider`` (same
+        values reported in the session manifest) so consumers can compute
+        cost directly from this event without a manifest round-trip.
 
         Suppressed when the invocation errored — an ERROR event was
         already emitted via :meth:`_on_model_error`.
@@ -263,8 +263,10 @@ class EventPublisher(HookProvider):
                 "output_tokens": usage.get("outputTokens", 0),
                 "total_tokens": usage.get("totalTokens", 0),
             },
-            "model_id": model.model_id,
-            "provider": model.provider,
+            "model": {
+                "model_id": model.model_id,
+                "provider": model.provider,
+            },
             "text": str(result) if result is not None else "",
             "message": result.message if result is not None else {},
         }
