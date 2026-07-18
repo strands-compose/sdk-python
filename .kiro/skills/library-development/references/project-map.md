@@ -111,7 +111,7 @@ for the chapter-by-chapter reference.
 
 ## Stack notes
 
-- **Python ≥ 3.11** (ruff/ty target 3.13). Runtime deps: `strands-agents`
+- **Python ≥ 3.11** (ruff/ty target 3.14). Runtime deps: `strands-agents`
   (>=1.35,<2), `pydantic` v2, `pyyaml`, `mcp`. Optional extras:
   `agentcore-memory`, `ollama`, `openai`, `gemini`.
 - **MCP servers** run on a background daemon thread with a self-managed
