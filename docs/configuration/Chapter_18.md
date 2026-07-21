@@ -24,7 +24,7 @@ log_level: "WARNING"  # Optional: DEBUG, INFO, WARNING, ERROR
 ```yaml
 models:
   name:
-    provider: bedrock | openai | ollama | gemini | module.path:CustomModel
+    provider: bedrock | anthropic | openai | ollama | gemini | module.path:CustomModel
     model_id: "model-identifier"
     params: {}        # Provider-specific kwargs
 ```

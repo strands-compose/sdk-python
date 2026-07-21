@@ -65,7 +65,7 @@ def graph_orchestration(
     entry_name: str, edges: list[tuple[str, str]], **overrides: Any
 ) -> GraphOrchestrationDef:
     """Build a graph orchestration from ``(from, to)`` edge tuples."""
-    edge_defs = [GraphEdgeDef(from_agent=a, to_agent=b) for a, b in edges]  # ty: ignore[unknown-argument, missing-argument]
+    edge_defs = [GraphEdgeDef(from_agent=a, to_agent=b) for a, b in edges]
     return GraphOrchestrationDef(entry_name=entry_name, edges=edge_defs, **overrides)
 
 
