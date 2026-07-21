@@ -14,7 +14,7 @@ models:
 
   creative:
     provider: openai
-    model_id: gpt-4o
+    model_id: gpt-5.5
     params:
       temperature: 0.9
 
@@ -30,9 +30,26 @@ models:
 | Provider | Package Required | Example `model_id` |
 |----------|-----------------|---------------------|
 | `bedrock` | *(included)* | `us.anthropic.claude-sonnet-4-6-v1:0` |
-| `openai` | `pip install strands-compose[openai]` | `gpt-4o` |
+| `openai` | `pip install strands-compose[openai]` | `gpt-5.5` |
 | `ollama` | `pip install strands-compose[ollama]` | `llama3.2` |
-| `gemini` | `pip install strands-compose[gemini]` | `gemini-2.0-flash` |
+| `gemini` | `pip install strands-compose[gemini]` | `gemini-3.6-flash` |
+| `anthropic` | `pip install strands-compose[anthropic]` | `claude-sonnet-4-6` |
+
+> **Anthropic note:** the `anthropic` provider talks to the Anthropic API directly
+> (not through Bedrock) and **requires `max_tokens` in `params`** — the API mandates
+> it, unlike the other providers:
+>
+> ```yaml
+> models:
+>   claude:
+>     provider: anthropic
+>     model_id: claude-sonnet-4-6
+>     params:
+>       max_tokens: 4096          # required by the Anthropic API
+> ```
+>
+> Set the API key via the `ANTHROPIC_API_KEY` environment variable, or pass
+> `params.client_args.api_key`.
 
 ## How Agents Reference Models
 
@@ -97,7 +114,7 @@ models:
 
 > **Tips & Tricks**
 >
-> - When combined with `vars`, you can swap models at runtime: `MODEL=gpt-4o python main.py`. See [Chapter 3](Chapter_03.md).
+> - When combined with `vars`, you can swap models at runtime: `MODEL=gpt-5.5 python main.py`. See [Chapter 3](Chapter_03.md).
 > - If you omit `model` on an agent entirely, strands picks its built-in default (Bedrock). This is fine for quick tests but explicit is better for production.
 > - The `params` dict preserves types from YAML — integers stay integers, floats stay floats. This matters for parameters like `max_tokens` that must be an int.
 

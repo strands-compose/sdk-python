@@ -44,6 +44,9 @@ openai = [
 gemini = [
     "strands-agents[gemini]>=1.35.0,<2.0.0",
 ]
+anthropic = [
+    "strands-agents[anthropic]>=1.35.0,<2.0.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/strands-compose/sdk-python"

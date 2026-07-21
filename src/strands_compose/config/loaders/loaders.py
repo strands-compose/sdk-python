@@ -66,15 +66,12 @@ def normalize(raw: dict) -> dict:
     """
     raw = dict(raw)  # do not mutate the input
     version = str(raw.get("version", "1"))
-    match version:
-        case "1":
-            pass  # current canonical schema
-        case _:
-            raise ValueError(
-                f"This config declares schema version '{version}', but this "
-                f"strands-compose version only supports version '1'.\n"
-                f"Upgrade: pip install --upgrade strands-compose"
-            )
+    if version != "1":
+        raise ValueError(
+            f"This config declares schema version '{version}', but this "
+            f"strands-compose version only supports version '1'.\n"
+            f"Upgrade: pip install --upgrade strands-compose"
+        )
     raw["version"] = "1"
     return raw
 

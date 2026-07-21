@@ -19,8 +19,9 @@ logger = logging.getLogger(__name__)
 def resolve_model(model_def: ModelDef) -> Model:
     """Resolve a ModelDef to a strands model instance.
 
-    Built-in providers (``"ollama"``, ``"bedrock"``, ``"openai"``,
-    ``"gemini"``) are dispatched via :func:`~strands_compose.models.create_model`.
+    Built-in providers (``"bedrock"``, ``"anthropic"``, ``"ollama"``,
+    ``"openai"``, ``"gemini"``) are dispatched via
+    :func:`~strands_compose.models.create_model`.
     Any other ``provider`` value is treated as an import spec
     (``module.path:ClassName``) for a custom :class:`~strands.models.Model`
     subclass.

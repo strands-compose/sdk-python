@@ -114,7 +114,7 @@ A bug report comes in. You have the exact YAML config. Load it, replay it, debug
 |---------|-------------|
 | **YAML-first config** | Models, agents, tools, hooks, MCP, orchestrations — all in one file |
 | **Full YAML power** | Variables (`${VAR:-default}`), anchors (`&ref` / `*ref`), `x-` scratch pads, multi-file merge |
-| **Multi-model support** | Bedrock, OpenAI, Ollama, Gemini — swap with one line |
+| **Multi-model support** | Bedrock, Anthropic, OpenAI, Ollama, Gemini — swap with one line |
 | **MCP servers & clients** | Launch local servers from Python files, connect to remote HTTP endpoints, or spawn stdio subprocesses |
 | **MCP lifecycle management** | Startup ordering, readiness polling, graceful shutdown — servers before clients, always |
 | **Orchestration modes** | Delegate (agent-as-tool), Swarm (peer handoffs), Graph (DAG pipelines) — arbitrarily nestable |
