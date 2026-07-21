@@ -1,0 +1,50 @@
+# 15_plugins — Plugins
+#
+# Plugins are reusable packages of agent behaviour: skills, context injection,
+# response-quality loops, steering, context offloading. Each entry under a
+# ``plugins:`` key resolves to a strands.plugins.Plugin and is passed to
+# Agent(plugins=[...]).
+#
+# This config wires three vended plugins, each solving a real problem:
+#   1. AgentSkills   — on-demand instructions the agent loads only when needed.
+#   2. ContextInjector — folds the live UTC time into every model call.
+#   3. GoalLoop      — retries until the answer meets a quality bar.
+#
+# Run from the example directory:
+#   uv run python examples/15_plugins/main.py
+
+models:
+  default:
+    provider: bedrock
+    model_id: openai.gpt-oss-20b-1:0
+
+agents:
+  assistant:
+    model: default
+
+    plugins:
+      # Skills — progressive disclosure. Skill names/descriptions are injected
+      # up front; full instructions load only when the agent activates a skill.
+      # https://strandsagents.com/docs/user-guide/concepts/plugins/skills/
+      - type: strands:AgentSkills
+        params:
+          skills: ./skills
+
+      # Context injection — ContextInjector needs a callable, which a YAML
+      # scalar can't express, so a factory builds it.
+      # The clock text is folded into each model call and never persisted to history.
+      # https://strandsagents.com/docs/user-guide/concepts/plugins/context-injector/
+      - type: ./plugins.py:make_clock_injector
+
+      # Goal loop — validates each response and re-invokes with feedback until
+      # it passes or the attempt budget runs out.
+      # https://strandsagents.com/docs/user-guide/concepts/plugins/goal-loop/
+      - type: strands.vended_plugins.goal:GoalLoop
+        params:
+          goal: "Respond concisely and skip filler, hedging, and restating the question."
+          max_attempts: 2
+
+    system_prompt: |
+      You are a helpful assistant.
+
+entry: assistant

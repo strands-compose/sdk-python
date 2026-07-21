@@ -175,6 +175,10 @@ orchestrations:
 > - Hooks are the right place for cross-cutting concerns: rate limiting, audit logging, cost tracking, safety guardrails.
 > - Combine `MaxToolCallsGuard` and `ToolNameSanitizer` as a baseline for any agent that uses tools — they handle the most common edge cases.
 
+## Related: Plugins
+
+A hook is a single lifecycle callback. A plugin is a reusable behaviour package — [skills](https://strandsagents.com/docs/user-guide/concepts/plugins/skills/), [steering](https://strandsagents.com/docs/user-guide/concepts/plugins/steering/), [context management](https://strandsagents.com/docs/user-guide/concepts/plugins/context-offloader/), [goal loops](https://strandsagents.com/docs/user-guide/concepts/plugins/goal-loop/) — that can bundle hooks, tools, and setup in one object. Reach for a plugin when you want packaged behaviour instead of a one-off callback. See [Chapter 19 — Plugins](Chapter_19.md).
+
 ---
 
 [Next: Chapter 7 — Session Persistence →](Chapter_07.md)

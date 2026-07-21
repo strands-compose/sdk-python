@@ -41,6 +41,15 @@ def test_named_model_reference_is_wired_onto_the_agent():
     assert agent.model is model
 
 
+def test_declared_plugin_contributes_its_tool_to_the_agent():
+    # A plugin's @tool reaching agent.tool_names proves the resolved plugins
+    # list is passed to Agent(plugins=[...]) and discovered by strands.
+    agent = build_agent_from_def(
+        "a", agent_def(model="fast", plugins=["tests.fakes:FakePlugin"]), _models(), {}
+    )
+    assert "fake_plugin_tool" in agent.tool_names
+
+
 def test_agent_id_matches_the_config_name():
     agent = build_agent_from_def("greeter", agent_def(model="fast"), _models(), {})
     assert agent.agent_id == "greeter"

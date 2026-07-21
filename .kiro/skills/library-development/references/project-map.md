@@ -112,8 +112,8 @@ for the chapter-by-chapter reference.
 ## Stack notes
 
 - **Python ≥ 3.11** (ruff/ty target 3.13). Runtime deps: `strands-agents`
-  (>=1.35,<2), `pydantic` v2, `pyyaml`, `mcp`. Optional extras:
-  `agentcore-memory`, `ollama`, `openai`, `gemini`.
+  (>=1.48,<2), `pydantic` v2, `pyyaml`, `mcp`. Optional extras:
+  `agentcore-memory`, `ollama`, `openai`, `gemini`. `anthropic`.
 - **MCP servers** run on a background daemon thread with a self-managed
   `uvicorn.Server` (HTTP transports only — `streamable-http`, `sse`); `stdio`
   is client-side (the client spawns a subprocess).

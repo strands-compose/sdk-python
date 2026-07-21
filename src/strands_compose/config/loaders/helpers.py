@@ -228,6 +228,7 @@ def rewrite_relative_paths(raw: dict, config_dir: Path) -> None:
     Fields rewritten:
     - ``agents.<name>.tools[]`` — tool spec strings
     - ``agents.<name>.hooks[]`` — string import specs and ``HookDef.type``
+    - ``agents.<name>.plugins[]`` — string import specs and ``PluginDef.type``
     - ``agents.<name>.type`` — custom agent factory path
     - ``mcp_servers.<name>.type`` — MCP server factory path
     - ``models.<name>.provider`` — custom model class path
@@ -262,6 +263,19 @@ def rewrite_relative_paths(raw: dict, config_dir: Path) -> None:
                         hook_type = hook_d.get("type")
                         if isinstance(hook_type, str):
                             hook_d["type"] = make_absolute(hook_type, config_dir)
+
+            # plugins — same shape as hooks. params are opaque kwargs, so any
+            # paths inside them are left as written.
+            plugins = agent_def.get("plugins")
+            if isinstance(plugins, list):
+                for i, plugin in enumerate(plugins):
+                    if isinstance(plugin, str):
+                        plugins[i] = make_absolute(plugin, config_dir)
+                    elif isinstance(plugin, dict):
+                        plugin_d = cast(dict[str, Any], plugin)
+                        plugin_type = plugin_d.get("type")
+                        if isinstance(plugin_type, str):
+                            plugin_d["type"] = make_absolute(plugin_type, config_dir)
 
             # type
             if isinstance(agent_def.get("type"), str):

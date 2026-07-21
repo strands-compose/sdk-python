@@ -28,6 +28,7 @@ No prior YAML expertise required. We start simple and build up.
 16. [Name Sanitization — How Names Are Handled](Chapter_16.md)
 17. [The Loading Pipeline — What Happens Under the Hood](Chapter_17.md)
 18. [Full Reference — Every Field at a Glance](Chapter_18.md)
+19. [Plugins — Reusable Agent Behaviors](Chapter_19.md)
 
 **Bonus**: [Quick Recipes](Quick_Recipes.md) — Copy-paste-ready configs for common patterns.
 

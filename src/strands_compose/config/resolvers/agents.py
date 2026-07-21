@@ -13,6 +13,7 @@ from .conversation_manager import resolve_conversation_manager
 from .hooks import resolve_hook_entry
 from .mcp import resolve_tools
 from .models import resolve_model
+from .plugins import resolve_plugin_entry
 from .session_manager import resolve_leaf_session_manager
 
 if TYPE_CHECKING:
@@ -79,8 +80,9 @@ def build_agent_from_def(
     # 2. Resolve tool specs
     tools = resolve_tools(agent_def.tools)
 
-    # 3. Resolve hooks — module:ClassName or inline HookDef
+    # 3. Resolve hooks and plugins — module:ClassName or inline Def
     hooks = [resolve_hook_entry(h) for h in agent_def.hooks]
+    plugins = [resolve_plugin_entry(p) for p in agent_def.plugins]
 
     # 4. MCP clients as tool providers
     tool_providers: list[Any] = [mcp_clients[n] for n in agent_def.mcp]
@@ -134,6 +136,7 @@ def build_agent_from_def(
             description=agent_def.description,
             tools=all_tools,
             hooks=all_hooks,
+            plugins=plugins,
             conversation_manager=conversation_manager,
             session_manager=agent_session,
             **agent_def.agent_kwargs,
@@ -147,6 +150,7 @@ def build_agent_from_def(
             description=agent_def.description,
             tools=all_tools,
             hooks=all_hooks,
+            plugins=plugins,
             conversation_manager=conversation_manager,
             session_manager=agent_session,
             load_tools_from_directory=False,
