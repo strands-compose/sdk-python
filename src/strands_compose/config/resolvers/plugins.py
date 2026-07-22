@@ -27,24 +27,17 @@ def resolve_plugin(plugin_def: PluginDef) -> Plugin:
         Instantiated Plugin.
 
     Raises:
-        ValueError: If ``type`` is not in ``module:Class`` format.
+        ImportResolutionError: If ``type`` is not a valid ``module:Class`` /
+            ``./file.py:Class`` spec (a ``ValueError`` subclass, from ``load_object``).
         TypeError: If calling the resolved object does not produce a Plugin.
     """
 
-    type_str = plugin_def.type
-    if ":" not in type_str:
-        raise ValueError(
-            f"Plugin type {type_str!r} is not a valid import spec.\n"
-            f"Use 'module.path:ClassName' (e.g. 'strands:AgentSkills') "
-            f"or './path/to/file.py:ClassName'."
-        )
-
-    obj = load_object(type_str, target="plugin")
+    obj = load_object(plugin_def.type, target="plugin")
 
     plugin = obj(**plugin_def.params)
     if not isinstance(plugin, Plugin):
         raise TypeError(
-            f"Plugin {type_str!r} returned {type(plugin).__name__}, "
+            f"Plugin {plugin_def.type!r} returned {type(plugin).__name__}, "
             f"expected strands.plugins.Plugin subclass."
         )
     return plugin
