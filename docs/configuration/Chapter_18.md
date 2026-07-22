@@ -41,6 +41,7 @@ agents:
     description: "..."             # Agent description (used in orchestration tools)
     tools: []                      # List of tool spec strings
     hooks: []                      # List of HookDef objects or import path strings
+    plugins: []                    # List of PluginDef objects or import path strings
     mcp: []                        # List of MCP client names
     tool_labels: {}                # Tool name -> display label mapping
     conversation_manager: null     # ConversationManagerDef
@@ -54,6 +55,22 @@ hooks:
   # Inline object form
   - type: module.path:ClassName    # or ./file.py:ClassName
     params: {}                     # Constructor kwargs
+
+  # String shorthand (no params)
+  - module.path:ClassName
+```
+
+## PluginDef
+
+A plugin is a reusable behaviour package — skills, context injection, steering, goal loops —
+resolved to a `strands.plugins.Plugin` and passed to the agent. See
+[Chapter 19 — Plugins](Chapter_19.md) for the full reference.
+
+```yaml
+plugins:
+  # Inline object form
+  - type: module.path:ClassName    # or ./file.py:ClassName — class or factory
+    params: {}                     # Constructor / factory kwargs
 
   # String shorthand (no params)
   - module.path:ClassName

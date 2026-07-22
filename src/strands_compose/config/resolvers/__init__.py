@@ -9,6 +9,7 @@ from .hooks import resolve_hook, resolve_hook_entry
 from .mcp import resolve_mcp_client, resolve_mcp_server, resolve_tools
 from .models import resolve_model
 from .orchestrations import resolve_orchestrations
+from .plugins import resolve_plugin, resolve_plugin_entry
 from .session_manager import resolve_session_manager
 
 __all__ = [
@@ -19,6 +20,8 @@ __all__ = [
     "resolve_infra",
     "resolve_hook",
     "resolve_hook_entry",
+    "resolve_plugin",
+    "resolve_plugin_entry",
     "resolve_mcp_client",
     "resolve_mcp_server",
     "resolve_model",

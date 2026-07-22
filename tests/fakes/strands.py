@@ -11,7 +11,9 @@ from __future__ import annotations
 
 from typing import Any
 
+from strands import tool
 from strands.models import Model
+from strands.plugins import Plugin
 
 from strands_compose.mcp.server import MCPServer
 
@@ -183,6 +185,29 @@ class FakeMCPServer(MCPServer):
     def url(self) -> str:
         """Return the reported URL."""
         return self._url
+
+
+class FakePlugin(Plugin):
+    """Minimal Plugin that contributes one identifiable ``@tool``.
+
+    ``prefix`` lets a test tell instances apart and appears in the tool result.
+    """
+
+    name = "fake-plugin"
+
+    def __init__(self, *, prefix: str = "") -> None:
+        super().__init__()
+        self.prefix = prefix
+
+    @tool  # type: ignore[misc]
+    def fake_plugin_tool(self) -> str:
+        """Signal that the fake plugin is wired."""
+        return f"{self.prefix}ok"
+
+
+def fake_plugin_factory(*, prefix: str = "") -> FakePlugin:
+    """Return a :class:`FakePlugin` — the callable path of plugin resolution."""
+    return FakePlugin(prefix=prefix)
 
 
 class FakeMCPClient:

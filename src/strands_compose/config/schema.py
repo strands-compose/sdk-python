@@ -38,6 +38,19 @@ class HookDef(BaseModel):
     params: dict[str, Any] = Field(default_factory=dict)
 
 
+class PluginDef(BaseModel):
+    """Agent plugin reference.
+
+    ``type`` must be a ``module.path:ClassName`` import path or a
+    ``./file.py:ClassName`` file-based import path, resolving to a ``Plugin``
+    subclass or a factory returning one.  ``params`` are forwarded as
+    constructor (or factory) kwargs.  See ``docs/configuration/Chapter_19.md``.
+    """
+
+    type: str
+    params: dict[str, Any] = Field(default_factory=dict)
+
+
 class ConversationManagerDef(BaseModel):
     """Conversation manager configuration.
 
@@ -135,6 +148,10 @@ class AgentDef(BaseModel):
     ``hooks`` accepts import-path strings (``"module.path:ClassName"`` or
     ``"./file.py:ClassName"``) or inline :class:`HookDef` objects with
     explicit type + optional params.
+
+    ``plugins`` mirrors ``hooks``: import-path strings (``"module.path:ClassName"``
+    or ``"./file.py:ClassName"``) or inline :class:`PluginDef` objects with
+    explicit type + optional params.  See ``docs/configuration/Chapter_19.md``.
     """
 
     type: str | None = None
@@ -148,7 +165,7 @@ class AgentDef(BaseModel):
     """Additional keyword arguments passed to strands.Agent() or custom factory.
 
     Valid Agent parameters: messages, callback_handler,
-    record_direct_tool_call, trace_attributes, state, plugins,
+    record_direct_tool_call, trace_attributes, state,
     structured_output_prompt, structured_output_model, tool_executor,
     retry_strategy, concurrent_invocation_mode, load_tools_from_directory.
 
@@ -161,6 +178,7 @@ class AgentDef(BaseModel):
     description: str | None = None
     tools: list[str] = Field(default_factory=list)
     hooks: list[HookDef | str] = Field(default_factory=list)
+    plugins: list[PluginDef | str] = Field(default_factory=list)
     mcp: list[str] = Field(default_factory=list)
     tool_labels: dict[str, str] = Field(default_factory=dict)
     conversation_manager: ConversationManagerDef | None = None

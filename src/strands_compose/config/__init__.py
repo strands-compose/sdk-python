@@ -20,6 +20,7 @@ from .schema import (
     MCPServerDef,
     ModelDef,
     OrchestrationDef,
+    PluginDef,
     SessionManagerDef,
     SwarmOrchestrationDef,
 )
@@ -40,6 +41,7 @@ __all__ = [
     "MCPServerDef",
     "ModelDef",
     "OrchestrationDef",
+    "PluginDef",
     "SessionManagerDef",
     "SwarmOrchestrationDef",
     "ResolvedConfig",

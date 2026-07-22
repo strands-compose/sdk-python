@@ -2,12 +2,22 @@
 
 from __future__ import annotations
 
-from .strands import BoomModel, FakeMCPClient, FakeMCPServer, FakeModel, ToolThenTextModel
+from .strands import (
+    BoomModel,
+    FakeMCPClient,
+    FakeMCPServer,
+    FakeModel,
+    FakePlugin,
+    ToolThenTextModel,
+    fake_plugin_factory,
+)
 
 __all__ = [
     "BoomModel",
     "FakeMCPClient",
     "FakeMCPServer",
     "FakeModel",
+    "FakePlugin",
     "ToolThenTextModel",
+    "fake_plugin_factory",
 ]

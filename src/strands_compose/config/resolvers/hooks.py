@@ -27,24 +27,17 @@ def resolve_hook(hook_def: HookDef) -> HookProvider:
         Instantiated HookProvider.
 
     Raises:
-        ValueError: If ``type`` is not in ``module:Class`` format.
+        ImportResolutionError: If ``type`` is not a valid ``module:Class`` /
+            ``./file.py:Class`` spec (a ``ValueError`` subclass, from ``load_object``).
         TypeError: If the resolved object is not a HookProvider subclass.
     """
 
-    type_str = hook_def.type
-    if ":" not in type_str:
-        raise ValueError(
-            f"Hook type {type_str!r} is not a valid import spec.\n"
-            f"Use 'module.path:ClassName' (e.g. 'strands_compose.hooks:StopGuard') "
-            f"or './path/to/file.py:ClassName'."
-        )
-
-    cls = load_object(type_str, target="hook")
+    cls = load_object(hook_def.type, target="hook")
 
     hook = cls(**hook_def.params)
     if not isinstance(hook, HookProvider):
         raise TypeError(
-            f"Hook {type_str!r} returned {type(hook).__name__}, expected HookProvider subclass."
+            f"Hook {hook_def.type!r} returned {type(hook).__name__}, expected HookProvider subclass."
         )
     return hook
 
