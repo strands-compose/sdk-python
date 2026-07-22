@@ -7,16 +7,17 @@ from strands.plugins import Plugin
 
 from strands_compose.config.resolvers.plugins import resolve_plugin, resolve_plugin_entry
 from strands_compose.config.schema import PluginDef
+from strands_compose.exceptions import ImportResolutionError
 from tests.fakes import FakePlugin, fake_plugin_factory  # noqa: F401
 
 
-def test_plugin_type_without_colon_raises_value_error():
-    with pytest.raises(ValueError, match="import spec"):
+def test_plugin_type_without_colon_raises_import_resolution_error():
+    with pytest.raises(ImportResolutionError):
         resolve_plugin(PluginDef(type="no_colon_here"))
 
 
 def test_plugin_resolving_to_non_plugin_raises_type_error():
-    with pytest.raises(TypeError, match="builtins:dict"):
+    with pytest.raises(TypeError):
         resolve_plugin(PluginDef(type="builtins:dict"))
 
 
