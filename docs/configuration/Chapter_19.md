@@ -109,12 +109,15 @@ agents:
 > the config from a directory where that path is valid. (This may change in a future
 > release.)
 
-A skill is just a `SKILL.md` directory that `AgentSkills` discovers — authoring it (the
-frontmatter fields, progressive disclosure, resource files) is owned by strands and the
-open Agent Skills format, not by strands-compose. See
-[strands — Skills](https://strandsagents.com/docs/user-guide/concepts/plugins/skills/) and
-the [Agent Skills specification](https://agentskills.io/specification), and
-`examples/15_plugins/` for a working one.
+A skill is just a `SKILL.md` directory that `AgentSkills` discovers. Authoring one — the
+frontmatter fields, progressive disclosure, resource files — is owned by strands and the
+open Agent Skills format, not by strands-compose; `examples/15_plugins/` ships a working one.
+
+### Further reading
+
+- [strands — Skills](https://strandsagents.com/docs/user-guide/concepts/plugins/skills/) — how `AgentSkills` discovers, activates, and persists skills (start here).
+- [Agent Skills specification](https://agentskills.io/specification) and the [agentskills/agentskills](https://github.com/agentskills/agentskills) repo — the open format itself, plus the `skills-ref` validator.
+- [Anthropic — Equipping agents for the real world with Agent Skills](https://www.anthropic.com/engineering/equipping-agents-for-the-real-world-with-agent-skills) — the rationale behind the format.
 
 ---
 
