@@ -1939,7 +1939,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.12.5" },
     { name = "pyyaml", specifier = ">=6.0.0" },
     { name = "strands-agents", specifier = ">=1.48.0,<2.0.0" },
-    { name = "strands-agents", extras = ["anthropic"], marker = "extra == 'anthropic'", specifier = ">=1.35.0,<2.0.0" },
+    { name = "strands-agents", extras = ["anthropic"], marker = "extra == 'anthropic'", specifier = ">=1.48.0,<2.0.0" },
     { name = "strands-agents", extras = ["gemini"], marker = "extra == 'gemini'", specifier = ">=1.48.0,<2.0.0" },
     { name = "strands-agents", extras = ["ollama"], marker = "extra == 'ollama'", specifier = ">=1.48.0,<2.0.0" },
     { name = "strands-agents", extras = ["openai"], marker = "extra == 'openai'", specifier = ">=1.48.0,<2.0.0" },
