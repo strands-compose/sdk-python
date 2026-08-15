@@ -101,7 +101,7 @@ Setting `session_manager: ~` (YAML null) on an agent **explicitly opts it out** 
 
 When no `session_id` is provided, strands-compose generates a random UUID — meaning each run gets a fresh session. The resolution order is:
 
-1. **Runtime override** — via `load_session(..., session_id="abc")`
+1. **Runtime override** — via `load(..., session_id="abc")`
 2. **`params.session_id`** — from YAML config
 3. **Random UUID** — fresh session per run
 
@@ -134,31 +134,29 @@ The fix: add `session_manager: ~` to each swarm agent to opt out.
 > **Tips & Tricks**
 >
 > - For development, `file` provider with a fixed `session_id` is great — restart your script and the agent remembers your conversation.
-> - For server/API deployments, use `load_session()` with a per-request `session_id`. strands-compose
+> - For server/API deployments, use `load()` with a per-session `session_id`. strands-compose
 >   computes a single `effective_session_id` from your value and threads it to every agent and
 >   orchestration, so all agents in one request share the same session folder. See
->   [the multi-tenant pattern](#the-multi-tenant-server-pattern) below.
+>   [the multi-session pattern](#the-multi-session-server-pattern) below.
 > - Delete the `.sessions/` directory to "factory reset" your agent's memory.
 
-## The Multi-Tenant Server Pattern
+## The Multi-Session Server Pattern
 
-For web servers where each HTTP request needs its own session:
+For web servers where each request needs its own session:
 
 ```python
-from strands_compose import load_config, resolve_infra, load_session
+from strands_compose import load, load_config
 
-# Once at startup
+# Once at startup — parse and validate, no live objects yet
 app_config = load_config("config.yaml")
-infra = resolve_infra(app_config)
-infra.mcp_lifecycle.start()
 
-# Per request
-def handle_request(user_session_id: str, message: str):
-    resolved = load_session(app_config, infra, session_id=user_session_id)
+# Per session
+def handle_session(user_session_id: str, message: str):
+    resolved = load(app_config, session_id=user_session_id)
     return resolved.entry(message)
 ```
 
-MCP servers are shared across sessions (started once), but agents and their conversation state are created fresh per session.
+YAML is parsed once; every `load()` call builds its own agents, so sessions never share conversation state. Cache the `ResolvedConfig` for follow-up turns within the same session.
 
 ---
 

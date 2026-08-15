@@ -24,7 +24,7 @@ This library is a **thin translator**: YAML text → validated `*Def` data → l
 `Agent`, `Swarm`, `Graph`, `Model`, `MCPClient`, or strands' hook events — so we
 never test them and never mock them. We test **our translation**: that the right
 config produces the right wired object, that bad config fails with the right
-error, and that our runtime edges (streaming, lifecycle, manifest) behave.
+error, and that our runtime edges (streaming, guards, manifest) behave.
 
 Read `references/test-patterns.md` for the concrete, copy-paste templates (owned
 fakes, the resolve-seam patches, config builders, the wiring test, the contract
@@ -69,11 +69,10 @@ the library is mostly glue. Weight effort roughly in this order; let the code
 under test decide, not dogma.
 
 - **Resolution / wiring (the core, most tests).** Drive the resolvers and the
-  `load` / `resolve_infra` / `load_session` seams against small configs and
-  assert the *wiring*: entry is the expected type, the agent got the right
-  model/tools/hooks/system-prompt, orchestration topology is correct, the
-  session-manager leaf-chain resolves per the rules, the infra-vs-session split
-  holds (one `resolve_infra`, many `load_session`, no session manager on infra).
+  `load` seam against small configs and assert the *wiring*: entry is the
+  expected type, the agent got the right model/tools/hooks/system-prompt,
+  orchestration topology is correct, the session-manager leaf-chain resolves per
+  the rules, and each `load` call yields isolated agents.
   This is where real bugs live and where tests survive refactors.
 - **Schema validation contracts (fast, no strands).** Good config validates;
   bad config raises the **right `ConfigurationError` subclass**
@@ -87,8 +86,8 @@ under test decide, not dogma.
   deterministic functions — test them directly, property-based where a rule
   generalises (see below).
 - **Runtime edges (behaviour, per edge).** The `StreamEvent` stream through
-  `make_event_queue`; MCP lifecycle ordering and idempotency; `build_manifest`
-  introspection. Test the *observable* contract, not the private handlers.
+  `make_event_queue`; the hook guards; `build_manifest` introspection. Test the
+  *observable* contract, not the private handlers.
 - **The pipeline end-to-end (a thin top layer).** `load()` over real YAML
   fixtures and over every `examples/` config, with strands faked at our seams.
   Asserts the whole flow wires up and the entry object exists — not business
@@ -109,7 +108,7 @@ This list is as important as the one above. Do not write tests that assert on:
 - **Mock interactions.** `registry.add_callback.call_args_list`,
   `mock.assert_called_once_with(...)` on our own internals, call order/counts.
   These freeze implementation, not behaviour. (Asserting a *faked seam* was hit
-  is acceptable only when the seam-hit *is* the contract, e.g. lifecycle order.)
+  is acceptable only when the seam-hit *is* the contract.)
 - **Log output, warning text, error/exception *messages*, human copy.** Only the
   error *type* is contract. When tempted to assert on a message, assert on the
   **type or state** behind it.
@@ -138,7 +137,7 @@ tests/
 ├── conftest.py         # root: markers + shared infrastructure fixtures only
 ├── factories.py        # *Def builders and YAML-string builders (defaults + overrides)
 ├── fakes/              # hand-written fakes for owned seams
-│   └── strands.py          # FakeModel · FakeAgent · FakeMCPServer · FakeMCPClient
+│   └── strands.py          # FakeModel · ToolThenTextModel · BoomModel · FakeMCPClient · FakePlugin
 ├── contract/
 │   └── test_shape.py       # the ONE manifest + StreamEvent shape snapshot + baseline
 ├── property/           # Hypothesis property tests for pure transforms
@@ -150,8 +149,8 @@ tests/
 ├── resolve/            # *Def -> live object wiring, through public seams (the core)
 │   ├── test_agents.py · test_models.py · test_mcp.py
 │   ├── test_orchestrations.py · test_session_manager.py · test_hooks.py
-├── runtime/            # streaming, lifecycle, manifest behaviour
-│   ├── test_event_stream.py · test_mcp_lifecycle.py · test_manifest.py
+├── runtime/            # streaming, guards, manifest behaviour
+│   ├── test_event_stream.py · test_guards.py · test_manifest.py
 └── pipeline/           # end-to-end load() (integration marker)
     ├── fixtures/           # small worked YAML configs
     ├── test_load.py        # load() wiring over fixtures
@@ -175,18 +174,19 @@ Rules:
 ## Mocking Policy — Fake at Our Seam, Never Mock strands
 
 Our only true external dependencies are the **strands runtime** (model provider
-network calls, the MCP subprocess/uvicorn machinery) and **the environment**
-(env vars, filesystem). Everything else is our own code and must run for real.
+network calls, the MCP connection and its stdio subprocess) and **the
+environment** (env vars, filesystem). Everything else is our own code and must
+run for real.
 
 - **Never mock strands or MCP internals directly, and never fabricate strands
   events with `MagicMock`.** Mock at the thin seam *we* own — the resolver or
   factory. The canonical seams to substitute are `resolve_model`,
-  `resolve_mcp_server`, `resolve_mcp_client`, and (for streaming) the model that
-  drives an `Agent`. Patch them to return a **fake** from `tests/fakes/`.
+  `resolve_mcp_client`, and (for streaming) the model that drives an `Agent`.
+  Patch them to return a **fake** from `tests/fakes/`.
 - **Prefer fakes over `Mock`.** A fake is a real object with a working
   implementation; it survives strands upgrades and reads clearly. A `FakeModel`
-  emits a canned event stream; a `FakeMCPServer` records `start`/`wait_ready`/
-  `stop`. Reserve `unittest.mock` for forcing hard-to-produce conditions
+  emits a canned event stream; a `FakeMCPClient` records `start`/`stop` and
+  contributes no tools. Reserve `unittest.mock` for forcing hard-to-produce conditions
   (a provider raising, a queue full), and when you must, use `spec_set=` so API
   drift fails loudly.
 - **Never mock our own resolvers, loaders, or the objects under test.** Use the
@@ -208,9 +208,11 @@ network calls, the MCP subprocess/uvicorn machinery) and **the environment**
 - **The provider seam is the fake boundary.** `resolve_model` → `FakeModel`
   keeps us off the network while exercising every line of our own agent/model
   wiring. Never reach past it into a provider SDK.
-- **MCP is faked at the server/client factory.** Assert the *observable* order
-  contract (servers ready before clients connect, clients stop before servers,
-  `start()` idempotent) via the fake's recorded calls — never via `_started`.
+- **MCP is faked at `resolve_mcp_client`.** We do not own client lifetime —
+  strands connects a client on first tool load and stops it when the last
+  consuming agent goes away — so there is no start/stop ordering of ours to
+  assert. Test that a `*Def` produces the right client and that the client
+  reaches the agent.
 - **Filesystem via `tmp_path`; env via `monkeypatch.setenv`.** Never touch the
   real home dir, real `~/.aws`, or real network. Never rely on ambient env.
 - **Streaming is deterministic.** A `FakeModel` yields a fixed event list;
@@ -258,7 +260,7 @@ replace the contract or pipeline tests.
 - **Coverage is a floor and a gap-finder, never a goal.** A high number with
   weak assertions is false confidence. Tests that execute lines without asserting
   are forbidden. Do not chase 100%, and do not add a test purely to move the
-  number. The `≥70%` gate is a safety net, not the definition of done.
+  number. The `≥80%` gate is a safety net, not the definition of done.
 - **Assertion quality is the real signal.** For the modules that matter most —
   `config/schema.py` validators, `config/loaders/validators.py`, the resolvers,
   `utils.load_object`, `config/interpolation.py` — validate the suite with

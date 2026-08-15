@@ -6,11 +6,8 @@ from .config import (
     AppConfig,
     ConfigInput,
     ResolvedConfig,
-    ResolvedInfra,
     load,
     load_config,
-    load_session,
-    resolve_infra,
 )
 from .config.resolvers.orchestrations import OrchestrationBuilder
 from .exceptions import (
@@ -21,7 +18,7 @@ from .exceptions import (
     UnresolvedReferenceError,
 )
 from .hooks import EventPublisher, MaxToolCallsGuard, StopGuard, ToolNameSanitizer
-from .mcp import MCPLifecycle, create_mcp_client, create_mcp_server
+from .mcp import create_mcp_client
 from .renderers import AnsiRenderer
 from .tools import (
     multiagent_as_tool,
@@ -41,11 +38,9 @@ __all__ = [
     "EventQueue",
     "EventType",
     "ImportResolutionError",
-    "MCPLifecycle",
     "MaxToolCallsGuard",
     "OrchestrationBuilder",
     "ResolvedConfig",
-    "ResolvedInfra",
     "SchemaValidationError",
     "StopGuard",
     "StreamEvent",
@@ -53,12 +48,9 @@ __all__ = [
     "UnresolvedReferenceError",
     "cli_errors",
     "create_mcp_client",
-    "create_mcp_server",
     "load",
     "load_config",
-    "load_session",
     "make_event_queue",
     "multiagent_as_tool",
-    "resolve_infra",
     "serialize_multiagent_result",
 ]

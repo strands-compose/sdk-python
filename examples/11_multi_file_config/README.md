@@ -20,7 +20,7 @@ load(["base.yaml", "agents.yaml"])
 ```
 
 **Merging rules:**
-- **Collections** (`agents`, `models`, `mcp_servers`, etc.) are **combined** — each file
+- **Collections** (`agents`, `models`, `mcp_clients`, etc.) are **combined** — each file
   contributes unique names
 - **Singletons** (`entry`, `log_level`) use **last-wins** — the last file to define it wins
 - **Duplicate names** across files raise `ValueError` — intentional, not a bug
@@ -33,7 +33,7 @@ load(["base.yaml", "agents.yaml"])
 
 ## Good to know
 
-**Infra / app separation.** One team owns `base.yaml` (models, MCP servers), another
+**Infra / app separation.** One team owns `base.yaml` (models, MCP clients), another
 owns `agents.yaml` (agent definitions). Swap `base.yaml` per environment without
 touching agent logic.
 

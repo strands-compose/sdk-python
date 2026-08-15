@@ -2,7 +2,7 @@
 
 Usage::
 
-    from strands_compose.config import load
+    from strands_compose import load
 
     # Single file
     resolved = load("config.yaml")
@@ -13,14 +13,12 @@ Usage::
     # Raw YAML string
     resolved = load("agents:\\n  a:\\n    system_prompt: hi")
 
-    with resolved.mcp_lifecycle:
-        result = resolved.entry("Hello!")
+    result = resolved.entry("Hello!")
 
-Key Features:
-    - Single-file and multi-file config loading with automatic merging
-    - Per-source variable interpolation and anchor stripping
-    - Automatic MCP server startup before agent creation
-    - Session-level isolation for multi-tenant server deployments
+A server parses once and resolves per session::
+
+    app_config = load_config("config.yaml")
+    resolved = load(app_config, session_id="abc")
 """
 
 from __future__ import annotations
@@ -28,20 +26,30 @@ from __future__ import annotations
 import logging
 import uuid
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from pydantic import ValidationError
 
 from ...exceptions import SchemaValidationError
 from ..resolvers import (
     ResolvedConfig,
-    ResolvedInfra,
     resolve_agents,
-    resolve_infra,
+    resolve_mcp_client,
+    resolve_model,
     resolve_orchestrations,
 )
-from ..schema import AppConfig, GraphOrchestrationDef, SwarmOrchestrationDef
+from ..schema import (
+    AppConfig,
+    GraphOrchestrationDef,
+    SessionManagerDef,
+    SwarmOrchestrationDef,
+)
 from .helpers import merge_raw_configs, parse_single_source, sanitize_collection_keys
 from .validators import validate_references
+
+if TYPE_CHECKING:
+    from strands.models import Model
+    from strands.tools.mcp import MCPClient as StrandsMCPClient
 
 logger = logging.getLogger(__name__)
 
@@ -76,68 +84,96 @@ def normalize(raw: dict) -> dict:
     return raw
 
 
-def load(config: ConfigInput | list[ConfigInput]) -> ResolvedConfig:
-    """Load config from file(s) or YAML string(s) and resolve to live objects.
+def load(
+    config: ConfigInput | list[ConfigInput] | AppConfig,
+    *,
+    session_id: str | None = None,
+) -> ResolvedConfig:
+    """Load config and resolve it to live strands objects.
 
-    This is the main entry point for zero-code usage.
-    Accepts a single source or a list of sources. Each source is either
-    a file path (``str`` or ``Path``) or a raw YAML string. File paths
-    are detected by checking if the path exists on disk; anything else
-    is parsed as inline YAML.
+    Pass a file path, a raw YAML string, a list of either, or an
+    already-validated :class:`AppConfig`.  File paths are detected by checking
+    if the path exists on disk; anything else is parsed as inline YAML.
+
+    Every call builds **fresh** agents and MCP clients, so each call is an
+    isolated session — N sessions against a ``command:`` client means N stdio
+    subprocesses.  A long-running server parses once with :func:`load_config`
+    and then calls this per session with the ``AppConfig`` and a ``session_id``.
 
     ### Pipeline:
 
-    1. Parse each source (file read or inline YAML)
+    1. Parse each source (file read or inline YAML) — skipped for an ``AppConfig``
     2. Per-source: strip anchors, interpolate variables
     3. Sanitize collection keys (spaces/special chars -> underscores)
     4. Merge sources (if multiple), detect duplicate names
-    5. Validate against schema (Pydantic)
-    6. Resolve infrastructure (models, MCP — pure; no session manager)
-    7. Start MCP servers (so clients can connect)
-    8. Create agents (Agent.__init__ auto-starts MCP clients)
-    9. Wire orchestration / entry point
+    5. Validate against schema (Pydantic) and check cross-references
+    6. Resolve models and MCP clients
+    7. Create agents, wire orchestrations, pick the entry point
 
     Args:
-        config: File path, raw YAML string, or list of either.
+        config: File path, raw YAML string, list of either, or a validated
+            ``AppConfig``.
+        session_id: Optional session ID.  Combined with
+            ``session_manager.params.session_id`` (if any) and a
+            ``uuid.uuid4()`` fallback to derive a single effective session ID
+            that is threaded into every per-agent and per-orchestration
+            session-manager resolution.  When ``None`` and no global
+            ``session_manager:`` is configured, leaves fall back to their own
+            UUIDs per ``resolve_session_manager``.
 
     Returns:
-        ResolvedConfig with agents, entry (callable), and mcp_lifecycle.
+        ResolvedConfig with agents, orchestrators, and entry (callable).
 
     Raises:
         FileNotFoundError: Config file doesn't exist.
-        ConfigurationError: Invalid YAML syntax, schema validation failure, or invalid references.
-
-    ---
-    ## REMARKS:
-
-    When multiple sources are provided, collection sections (``agents``,
-    ``models``, ``mcp_servers``, ``mcp_clients``, ``orchestrations``) are
-    merged. Duplicate names within the same section raise ``ValueError``.
-    Singleton fields (``entry``, ``session_manager``, ``log_level``) use
-    last-wins semantics.
-
-    **Side effect**: this function starts MCP servers during resolution.
-    ``Agent.__init__`` auto-starts MCP clients (via ``process_tools()`` ->
-    ``MCPClient.load_tools()``), and those clients need running servers to
-    connect to. ``MCPLifecycle.start()`` is called **before** agent
-    creation to satisfy this dependency.
-
-    ``MCPLifecycle.start()`` is idempotent, so the caller's context
-    manager (``async with resolved.mcp_lifecycle:``) is a no-op on enter
-    but **still required for graceful shutdown** — ``__aexit__`` stops
-    clients first, then servers.
+        ConfigurationError: Invalid YAML syntax, schema validation failure, or
+            invalid references.
+        ValueError: The global ``session_manager`` uses the ``agentcore``
+            provider, which requires a unique ``actor_id`` per agent.
     """
-    app_config = load_config(config)
 
-    logging.getLogger("strands_compose").setLevel(app_config.log_level.upper())
+    if isinstance(config, AppConfig):
+        app_config = config
+    else:
+        app_config = load_config(config)
+        # Apply the configured level only when this call parsed the config
+        logging.getLogger("strands_compose").setLevel(app_config.log_level.upper())
 
-    infra = resolve_infra(app_config)
+    _reject_global_agentcore_session_manager(app_config.session_manager)
 
-    # Start MCP servers BEFORE creating agents.
-    # Initializing Agent starts MCP clients, so we need servers up first.
-    infra.mcp_lifecycle.start()
+    models: dict[str, Model] = {}
+    for name, model_def in app_config.models.items():
+        models[name] = resolve_model(model_def)
+        logger.info("model=<%s>, provider=<%s> | resolved model", name, model_def.provider)
 
-    return load_session(app_config, infra)
+    clients: dict[str, StrandsMCPClient] = {}
+    for name, client_def in app_config.mcp_clients.items():
+        clients[name] = resolve_mcp_client(client_def)
+        logger.info("client=<%s> | resolved MCP client", name)
+
+    effective_session_id = _effective_session_id(app_config, session_id)
+
+    agents = resolve_agents(
+        agent_defs=app_config.agents,
+        models=models,
+        mcp_clients=clients,
+        global_session_manager_def=app_config.session_manager,
+        session_id=effective_session_id,
+        orchestration_agent_names=_orchestration_agent_names(app_config),
+    )
+    orchestrators = resolve_orchestrations(
+        app_config,
+        agents,
+        agent_defs=app_config.agents,
+        models=models,
+        mcp_clients=clients,
+        global_session_manager_def=app_config.session_manager,
+        session_id=effective_session_id,
+    )
+
+    entry = (dict(agents) | orchestrators)[app_config.entry]
+
+    return ResolvedConfig(agents=agents, orchestrators=orchestrators, entry=entry)
 
 
 def load_config(config: ConfigInput | list[ConfigInput]) -> AppConfig:
@@ -150,13 +186,16 @@ def load_config(config: ConfigInput | list[ConfigInput]) -> AppConfig:
       otherwise they are parsed as inline YAML content.
 
     When multiple sources are provided, their collection sections
-    (``agents``, ``models``, ``mcp_servers``, ``mcp_clients``,
-    ``orchestrations``) are merged. Duplicate names within the same
-    section raise ``ValueError``. Singleton fields (``entry``,
-    ``session_manager``, ``log_level``) use last-wins semantics.
+    (``agents``, ``models``, ``mcp_clients``, ``orchestrations``) are
+    merged. Duplicate names within the same section raise ``ValueError``.
+    Singleton fields (``entry``, ``session_manager``, ``log_level``) use
+    last-wins semantics.
 
     Each source's ``vars:`` block is applied only to that source
     (interpolation is per-source).
+
+    Use this when you want to parse and validate once — at process startup,
+    or in CI — and hand the result to :func:`load` one or more times.
 
     Args:
         config: File path, raw YAML string, or list of either.
@@ -191,98 +230,67 @@ def load_config(config: ConfigInput | list[ConfigInput]) -> AppConfig:
     return app_config
 
 
-def load_session(
-    config: AppConfig,
-    infra: ResolvedInfra,
-    *,
-    session_id: str | None = None,
-) -> ResolvedConfig:
-    """Create agents and orchestration from already-started infrastructure.
+def _reject_global_agentcore_session_manager(session_manager: SessionManagerDef | None) -> None:
+    """Reject the ``agentcore`` session provider when set globally.
 
-    This is the session-level counterpart to :func:`load`. Use it when
-    you want to share MCP servers across multiple sessions (e.g. one
-    session per HTTP request) while creating **isolated** agents per
-    session.
+    ``agentcore`` requires a unique ``actor_id`` per agent, so a single global
+    definition cannot be shared. Fail fast rather than silently giving every
+    agent the same actor.
 
-    ``infra`` does NOT carry a session manager; instances are built per
-    agent/orchestration from ``config.session_manager`` plus an
-    ``effective_session_id`` computed here.
+    Args:
+        session_manager: The global ``AppConfig.session_manager`` def.
 
-    Typical server pattern::
+    Raises:
+        ValueError: If the global provider is ``agentcore``.
+    """
+    if session_manager is not None and session_manager.provider.lower() == "agentcore":
+        raise ValueError(
+            "The 'agentcore' session manager cannot be set globally.\n"
+            "Configure it per-agent — 'actor_id' must be unique per agent."
+        )
 
-        app_config = load_config("config.yaml")
-        infra = resolve_infra(app_config)
-        infra.mcp_lifecycle.start()
 
-        # Per request:
-        resolved = load_session(app_config, infra, session_id="abc")
+def _effective_session_id(config: AppConfig, session_id: str | None) -> str | None:
+    """Derive the one session ID shared by every leaf that falls back to the global def.
 
-    ``infra.mcp_lifecycle`` must already be started before calling this.
+    Precedence: the caller's ``session_id`` -> ``session_manager.params.session_id``
+    -> a fresh UUID. Returns ``None`` when no global ``session_manager:`` is
+    configured, letting each leaf generate its own ID.
 
     Args:
         config: The validated AppConfig.
-        infra: Resolved infrastructure with servers already started.
-        session_id: Optional runtime session ID. Combined with
-            ``config.session_manager.params.session_id`` (if any) and a
-            ``uuid.uuid4()`` fallback to derive a single
-            ``effective_session_id`` that is threaded into every per-agent
-            and per-orchestration session-manager resolution. When ``None``
-            and no global ``session_manager:`` is configured, leaves fall
-            back to their own UUIDs per ``resolve_session_manager``.
+        session_id: The caller-supplied session ID, if any.
 
     Returns:
-        ResolvedConfig with freshly created agents and entry point.
-
-    Note:
-        No ``SessionManager`` instance is built in this function; instances
-        are constructed at the leaves (``build_agent_from_def``,
-        ``OrchestrationBuilder._build_one``).
+        The effective session ID, or ``None``.
     """
-    # Compute a single effective session id for every leaf that will resolve a global SM.
-    # CLI parity:
-    # when no real session_id is supplied but the config declares a global session_manager,
-    # all leaves that fall back to that def share one fresh UUID
-    effective_session_id: str | None = session_id
-    if effective_session_id is None and config.session_manager is not None:
-        yaml_sid = (config.session_manager.params or {}).get("session_id")
-        effective_session_id = yaml_sid or str(uuid.uuid4())
+    if session_id is not None:
+        return session_id
+    if config.session_manager is None:
+        return None
+    yaml_session_id = (config.session_manager.params or {}).get("session_id")
+    return yaml_session_id or str(uuid.uuid4())
 
-    # Agents used in Swarm or Graph orchestrations cannot have session_manager set.
-    # Temporary until strands-agents supports session persistence for orchestration node agents.
-    orchestration_agent_names: set[str] = set()
+
+def _orchestration_agent_names(config: AppConfig) -> set[str]:
+    """Collect the agents used as nodes in a Swarm or Graph orchestration.
+
+    Those agents cannot carry a session manager — a strands-agents limitation
+    that ``resolve_agents`` reports as a config error.
+
+    Args:
+        config: The validated AppConfig.
+
+    Returns:
+        Names of every agent referenced by a swarm or graph orchestration.
+    """
+    names: set[str] = set()
     for orch in config.orchestrations.values():
         if isinstance(orch, SwarmOrchestrationDef):
-            orchestration_agent_names.update(orch.agents)
+            names.update(orch.agents)
         elif isinstance(orch, GraphOrchestrationDef):
-            orchestration_agent_names.add(orch.entry_name)
+            names.add(orch.entry_name)
             for edge in orch.edges:
-                orchestration_agent_names.add(edge.from_agent)
-                orchestration_agent_names.add(edge.to_agent)
-
-    agents = resolve_agents(
-        agent_defs=config.agents,
-        models=infra.models,
-        mcp_clients=infra.clients,
-        global_session_manager_def=config.session_manager,
-        session_id=effective_session_id,
-        orchestration_agent_names=orchestration_agent_names,
-    )
-    orchestrators = resolve_orchestrations(
-        config,
-        agents,
-        agent_defs=config.agents,
-        models=infra.models,
-        mcp_clients=infra.clients,
-        global_session_manager_def=config.session_manager,
-        session_id=effective_session_id,
-    )
-
-    all_nodes = dict(agents) | orchestrators
-    entry = all_nodes[config.entry]
-
-    return ResolvedConfig(
-        agents=agents,
-        orchestrators=orchestrators,
-        entry=entry,
-        mcp_lifecycle=infra.mcp_lifecycle,
-    )
+                names.add(edge.from_agent)
+                names.add(edge.to_agent)
+    return names

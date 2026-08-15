@@ -1,9 +1,8 @@
-"""06_mcp — MCP: All Connection Modes in One Example.
+"""06_mcp — MCP: Both Connection Modes in One Example.
 
-Demonstrates all three MCP client connection modes in a single agent:
-  - server:  local Python MCP server (managed lifecycle via mcp_servers)
-  - url:     real external HTTP server (AWS Knowledge MCP, no API key needed)
-  - command: stdio subprocess (shown in config comments)
+Demonstrates both MCP client connection modes in a single agent:
+  - command: stdio subprocess (local calculator_server.py)
+  - url:     external HTTP server (AWS Knowledge MCP, no API key needed)
 
 Usage:
     uv run python examples/06_mcp/main.py
@@ -24,7 +23,7 @@ def main() -> None:
     agent = resolved.entry
     print(f"\n{52 * '-'}")
     print(f"Try: {STARTER}\n")
-    print("Tools: calc_add/multiply/percentage (local MCP) + aws_* (AWS Knowledge MCP).")
+    print("Tools: calc_add/multiply/percentage (stdio MCP) + aws_* (AWS Knowledge MCP).")
     print("Type a message and press Enter. Empty line to exit.\n")
     try:
         while True:
@@ -36,8 +35,6 @@ def main() -> None:
             print("\n" + 52 * "-" + "\n")
     except KeyboardInterrupt:
         print("\nGoodbye!")
-    finally:
-        resolved.mcp_lifecycle.stop()
 
 
 # ── entry point ───────────────────────────────────────────────────────────────

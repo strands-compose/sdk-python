@@ -17,9 +17,6 @@ def resolve_hook(hook_def: HookDef) -> HookProvider:
       ``"strands_compose.hooks:StopGuard"``)
     - ``"./path/to/hooks.py:ClassName"`` -- file-based import
 
-    No short-name aliases are supported.  Use the full import path so that
-    submodules and third-party hooks work without ambiguity.
-
     Args:
         hook_def: Hook definition from YAML.
 

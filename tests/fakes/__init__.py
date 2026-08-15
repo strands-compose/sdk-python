@@ -5,7 +5,6 @@ from __future__ import annotations
 from .strands import (
     BoomModel,
     FakeMCPClient,
-    FakeMCPServer,
     FakeModel,
     FakePlugin,
     ToolThenTextModel,
@@ -15,7 +14,6 @@ from .strands import (
 __all__ = [
     "BoomModel",
     "FakeMCPClient",
-    "FakeMCPServer",
     "FakeModel",
     "FakePlugin",
     "ToolThenTextModel",

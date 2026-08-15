@@ -39,28 +39,8 @@ class FakeModel:
             yield event
 
 
-class FakeMCPServer:
-    """Records lifecycle calls; asserts ordering/idempotency without a real server."""
-
-    def __init__(self) -> None:
-        self.calls: list[str] = []
-        self.started = False
-
-    def start(self) -> None:
-        self.calls.append("start")
-        self.started = True
-
-    def wait_ready(self, timeout: float) -> bool:
-        self.calls.append("wait_ready")
-        return True
-
-    def stop(self) -> None:
-        self.calls.append("stop")
-        self.started = False
-
-
 class FakeMCPClient:
-    """Minimal MCP client stand-in for lifecycle tests."""
+    """Stands in for a strands MCPClient — contributes no tools, hits no network."""
 
     def __init__(self) -> None:
         self.calls: list[str] = []
@@ -80,29 +60,24 @@ agent when construction is genuinely too costly for the test's purpose.
 
 ## 2. Faking the resolve seams — the patch boundary
 
-Patch **our** resolvers, not strands. The seams live where `resolve_infra` /
-`load_session` call them, so patch them there (patch where used, not where
-defined).
+Patch **our** resolvers, not strands. The seams live where `load` calls them,
+so patch them there (patch where used, not where defined).
 
 ```python
 from unittest.mock import patch
 
-from tests.fakes.strands import FakeMCPClient, FakeMCPServer, FakeModel
+from tests.fakes.strands import FakeMCPClient, FakeModel
 
 
 def fake_runtime():
     """Context managers that swap the strands-facing seams for fakes."""
     return (
         patch(
-            "strands_compose.config.resolvers.config.resolve_model",
+            "strands_compose.config.loaders.loaders.resolve_model",
             lambda model_def: FakeModel(),
         ),
         patch(
-            "strands_compose.config.resolvers.config.resolve_mcp_server",
-            lambda *a, **k: FakeMCPServer(),
-        ),
-        patch(
-            "strands_compose.config.resolvers.config.resolve_mcp_client",
+            "strands_compose.config.loaders.loaders.resolve_mcp_client",
             lambda *a, **k: FakeMCPClient(),
         ),
     )
@@ -165,7 +140,7 @@ from __future__ import annotations
 
 from strands import Agent
 
-from strands_compose.config import load_config, resolve_infra, load_session
+from strands_compose.config import load
 from tests.factories import app_config, agent_def
 
 
@@ -176,8 +151,7 @@ def test_agent_receives_configured_model_and_prompt(fake_runtime):
         entry="a",
     )
     with fake_runtime:
-        infra = resolve_infra(config)
-        resolved = load_session(config, infra)
+        resolved = load(config)                     # load() accepts an AppConfig
 
     entry = resolved.entry
     assert isinstance(entry, Agent)                 # correct *type* of wired object
@@ -317,30 +291,34 @@ Merge invariant: merging disjoint sources yields the union; a duplicate name
 
 ---
 
-## 9. MCP lifecycle ordering — via the fake, observable only
+## 9. MCP client resolution — the `*Def` → client contract
 
-Assert the *contract* (order + idempotency) through the fake's recorded calls.
-Never read `lifecycle._started`.
+We do not own MCP client lifetime (strands connects on first tool load and stops
+when the last consuming agent goes away), so there is no start/stop ordering of
+ours to assert. Test the two things that *are* ours: connection-mode dispatch and
+the exactly-one-mode rule.
 
 ```python
-from strands_compose.mcp.lifecycle import MCPLifecycle
-from tests.fakes.strands import FakeMCPServer
+import pytest
+from pydantic import ValidationError
+from strands.tools.mcp import MCPClient
+
+from strands_compose.config.resolvers.mcp import resolve_mcp_client
+from strands_compose.config.schema import MCPClientDef
 
 
-def test_start_is_idempotent_and_starts_server_once():
-    lc = MCPLifecycle()
-    server = FakeMCPServer()
-    lc.add_server("s", server)
+def test_command_client_resolves_to_strands_mcp_client():
+    client = resolve_mcp_client(MCPClientDef(command=["python", "-m", "srv"]))
+    assert isinstance(client, MCPClient)   # a real strands object, unconnected
 
-    lc.start()
-    lc.start()                      # idempotent
 
-    assert server.calls.count("start") == 1
-    assert "wait_ready" in server.calls   # ready before use — the observable order
+def test_client_requires_exactly_one_connection_mode():
+    with pytest.raises(ValidationError):
+        MCPClientDef()                     # neither url nor command
 ```
 
-For concurrency, spawn real threads calling `start()`, then assert the fake saw
-exactly one `start` — the observable idempotency contract, not a private flag.
+Resolution is cheap and hits no network — no fake needed here. Fake
+`resolve_mcp_client` only when a *higher* layer (agents, pipeline) is under test.
 
 ---
 
@@ -362,8 +340,8 @@ def test_minimal_pipeline_wires_entry_agent(fixture_path):
 
 Every `examples/` config gets loaded once, parametrized by directory, with the
 runtime seams faked (see pattern 2). This is a smoke/wiring guard — assert the
-result is a `ResolvedConfig` with a non-None entry, then `stop()` the lifecycle.
-Do not assert business rules here; those are proven in `resolve/`.
+result is a `ResolvedConfig` with a non-None entry. There is nothing to tear
+down. Do not assert business rules here; those are proven in `resolve/`.
 
 ---
 
@@ -375,6 +353,6 @@ Do not assert business rules here; those are proven in `resolve/`.
 | good vs bad config | `schema/` | nothing | error **type** |
 | a `*Def` → live object | `resolve/` | strands at resolver seam | **type + wiring** |
 | the event stream | `runtime/` | `FakeModel` | emitted `StreamEvent` |
-| MCP start/stop order | `runtime/` | `FakeMCPServer/Client` | recorded call order |
+| an MCP client from a `*Def` | `resolve/` | nothing | `MCPClient` type + error type |
 | the whole flow | `pipeline/` | all runtime seams | `ResolvedConfig` + entry |
 | the public shape | `contract/` | nothing | field names (snapshot) |

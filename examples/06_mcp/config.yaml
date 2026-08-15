@@ -1,13 +1,12 @@
-# 06_mcp — MCP: All Connection Modes in One Example
+# 06_mcp — MCP: Both Connection Modes in One Example
 #
-# Shows all three ways to wire MCP tools to an agent:
+# Shows both ways to wire MCP tools to an agent:
 #
-#   1. mcp_servers: + server:  — launch a local Python server (managed lifecycle)
-#   2. url:                    — connect to a real external MCP server over HTTP
-#   3. command: (commented)    — spawn a stdio subprocess that speaks MCP
+#   1. command:  — spawn a local MCP server as a stdio subprocess
+#   2. url:      — connect to an MCP server running somewhere else over HTTP
 #
-# Both live clients are attached to a single agent, giving it calculator tools
-# from the local server AND AWS documentation tools from the remote server.
+# Both clients are attached to a single agent, giving it calculator tools
+# from the local subprocess AND AWS documentation tools from the remote server.
 #
 # Run:
 #   uv run python examples/06_mcp/main.py
@@ -17,38 +16,22 @@ models:
     provider: bedrock
     model_id: openai.gpt-oss-20b-1:0
 
-# ── Local server (managed lifecycle) ─────────────────────────────────────────
-# strands-compose calls create(**params) -> starts the server before load() returns.
-mcp_servers:
-  calculator:
-    type: ./server.py:create
-    params:
-      port: 9001
-
 # ── Clients ───────────────────────────────────────────────────────────────────
 mcp_clients:
-
-  # Mode 1 — server: reference — connects to an mcp_servers entry above
+  # Mode 1 — command: spawn a local MCP server over stdio.
   calc_client:
-    server: calculator
+    command: ["python", "calculator_server.py"]
     params:
-      prefix: calc                        # tools: calc_add, calc_multiply, calc_percentage
+      prefix: calc
 
-  # Mode 2 — url: — connects to a real external server over Streamable HTTP.
+  # Mode 2 — url: connect to a server you don't run yourself.
   # AWS publicly hosts a Knowledge MCP server; no API key required.
   aws_knowledge:
     url: https://knowledge-mcp.global.api.aws
     transport: streamable-http
     params:
-      prefix: aws                         # tools: aws_search, aws_read_doc, …
+      prefix: aws
       startup_timeout: 30
-
-  # Mode 3 — command: — spawn a local CLI tool that speaks MCP over stdio.
-  # (uncomment to try; requires npx)
-  # fs_tools:
-  #   command: ["npx", "-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
-  #   params:
-  #     prefix: fs
 
 # ── Agent ─────────────────────────────────────────────────────────────────────
 # Both clients are attached — the agent gets calc_* AND aws_* tools.

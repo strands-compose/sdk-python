@@ -80,13 +80,9 @@ def extract_last_message(result: Any) -> Message:
     if isinstance(result, MultiAgentResult):
         last_node_id = _resolve_last_node_id(result)
         if last_node_id and last_node_id in result.results:
-            message = extract_last_message(result.results[last_node_id])
-            if message is not None:
-                return message
-        for node_result in reversed(list(result.results.values())):
-            message = extract_last_message(node_result)
-            if message is not None:
-                return message
+            return extract_last_message(result.results[last_node_id])
+        if result.results:
+            return extract_last_message(list(result.results.values())[-1])
         logger.warning("status=<%s> | no message extracted from MultiAgentResult", result.status)
         return _message_from_text(
             f"[orchestration completed with status {result.status.value} but produced no message output]"

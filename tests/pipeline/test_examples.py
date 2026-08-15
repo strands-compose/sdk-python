@@ -39,4 +39,3 @@ def test_example_config_loads(config_input, fake_runtime):
     resolved = load(config_input)
     assert isinstance(resolved, ResolvedConfig)
     assert resolved.entry is not None
-    resolved.mcp_lifecycle.stop()

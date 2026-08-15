@@ -47,11 +47,11 @@ def test_mcp_client_requires_exactly_one_connection_mode_none_set():
 
 def test_mcp_client_rejects_multiple_connection_modes():
     with pytest.raises(ValidationError):
-        MCPClientDef(server="s", url="http://x")
+        MCPClientDef(url="http://x/mcp", command=["python", "-m", "srv"])
 
 
 def test_mcp_client_accepts_single_connection_mode():
-    assert MCPClientDef(server="s").server == "s"
+    assert MCPClientDef(url="http://x/mcp").url == "http://x/mcp"
 
 
 # ── Orchestration discriminated union ──────────────────────────────────────

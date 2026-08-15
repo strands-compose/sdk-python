@@ -73,7 +73,7 @@ Three hook stages are registered automatically by `just install-hooks`:
 
 ```bash
 uv run just check    # format + lint + type check + security
-uv run just test     # pytest with coverage (≥70%)
+uv run just test     # pytest with coverage (≥80%)
 uv run just format   # auto-format with Ruff
 ```
 

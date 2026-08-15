@@ -41,10 +41,8 @@ def build_agent_from_def(
 ) -> Agent:
     """Build a single Agent from an AgentDef blueprint.
 
-    This is the canonical way to construct an agent from its YAML definition.
-    Used by both :func:`resolve_agents` (to build all declared agents) and
-    by :func:`~strands_compose.config.resolvers.orchestrations.builders.build_delegate`
-    (to fork an agent with delegate tools).
+    The canonical agent constructor — used by :func:`resolve_agents` and by the
+    delegate builder, which forks an agent with extra delegate tools.
 
     Args:
         name: Agent name / agent_id.
@@ -55,7 +53,7 @@ def build_agent_from_def(
             ``AppConfig.session_manager``, used as a fallback when the agent
             declares no ``session_manager:`` of its own and has not explicitly
             opted out (``session_manager: ~``).
-        session_id: Effective session id threaded down from ``load_session``.
+        session_id: Effective session id threaded down from ``load``.
             Passed as ``session_id_override`` to every
             ``resolve_session_manager`` call made in this function.
         extra_tools: Additional tools to append (e.g. delegate tools).
@@ -192,7 +190,7 @@ def resolve_agents(
             ``AppConfig.session_manager``, used as a fallback when an agent
             declares no ``session_manager:`` of its own and has not explicitly
             opted out (``session_manager: ~``).
-        session_id: Effective session id threaded down from ``load_session``.
+        session_id: Effective session id threaded down from ``load``.
             Passed as ``session_id_override`` to every
             ``resolve_session_manager`` call made in this function.
         orchestration_agent_names: Names of agents in swarm or graph orchestrations

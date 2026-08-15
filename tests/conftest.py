@@ -12,7 +12,7 @@ from unittest.mock import patch
 
 import pytest
 
-from tests.fakes import FakeMCPClient, FakeMCPServer, FakeModel
+from tests.fakes import FakeMCPClient, FakeModel
 
 
 def pytest_configure(config: pytest.Config) -> None:
@@ -26,26 +26,20 @@ def pytest_configure(config: pytest.Config) -> None:
 def fake_runtime() -> Iterator[None]:
     """Swap the strands-facing resolver seams for fakes.
 
-    Patches ``resolve_model`` / ``resolve_mcp_server`` / ``resolve_mcp_client``
-    where ``resolve_infra`` uses them, so ``load`` / ``resolve_infra`` build real
-    agents and orchestrations with no network and no MCP subprocess.
+    Patches ``resolve_model`` / ``resolve_mcp_client`` where ``load`` uses
+    them, so ``load`` builds real agents and orchestrations with no network
+    and no MCP subprocess.
     """
     with contextlib.ExitStack() as stack:
         stack.enter_context(
             patch(
-                "strands_compose.config.resolvers.config.resolve_model",
+                "strands_compose.config.loaders.loaders.resolve_model",
                 lambda model_def: FakeModel(),
             )
         )
         stack.enter_context(
             patch(
-                "strands_compose.config.resolvers.config.resolve_mcp_server",
-                lambda *a, **k: FakeMCPServer(),
-            )
-        )
-        stack.enter_context(
-            patch(
-                "strands_compose.config.resolvers.config.resolve_mcp_client",
+                "strands_compose.config.loaders.loaders.resolve_mcp_client",
                 lambda *a, **k: FakeMCPClient(),
             )
         )

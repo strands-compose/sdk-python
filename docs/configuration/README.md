@@ -2,7 +2,7 @@
 
 **Everything you need to know about writing strands-compose YAML configs — from zero to production.**
 
-strands-compose lets you describe entire multi-agent systems in YAML and get back live, fully wired strands objects. This guide walks you through every configuration option, from the simplest one-agent setup to nested multi-orchestration systems with MCP servers, hooks, session persistence, conditional graph pipelines, and multi-file configs.
+strands-compose lets you describe entire multi-agent systems in YAML and get back live, fully wired strands objects. This guide walks you through every configuration option, from the simplest one-agent setup to nested multi-orchestration systems with MCP clients, hooks, session persistence, conditional graph pipelines, and multi-file configs.
 
 No prior YAML expertise required. We start simple and build up.
 

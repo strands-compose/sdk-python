@@ -9,7 +9,7 @@ Each example is a self-contained folder with a `README.md`, `config.yaml`, and `
 | 03 | [03_tools](./03_tools/) | `tools:` list — auto-loading Python functions as agent tools |
 | 04 | [04_session](./04_session/) | `session_manager:` — persistent memory across turns |
 | 05 | [05_hooks](./05_hooks/) | `hooks:` — `MaxToolCallsGuard`, `ToolNameSanitizer`, and custom hooks |
-| 06 | [06_mcp](./06_mcp/) | MCP — all three connection modes: local server (`mcp_servers:`), external URL (`url:`), stdio (`command:`) |
+| 06 | [06_mcp](./06_mcp/) | MCP — both connection modes: stdio subprocess (`command:`) and external URL (`url:`) |
 | 07 | [07_delegate](./07_delegate/) | `mode: delegate` — coordinator routes to specialist agents |
 | 08 | [08_swarm](./08_swarm/) | `mode: swarm` — peer agents hand off autonomously |
 | 09 | [09_graph](./09_graph/) | `mode: graph` — explicit DAG pipeline between agents |

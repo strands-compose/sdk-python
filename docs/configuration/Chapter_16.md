@@ -4,7 +4,7 @@
 
 ---
 
-Names in config (agent names, model names, MCP client/server names, orchestration names) follow strict rules:
+Names in config (agent names, model names, MCP client names, orchestration names) follow strict rules:
 
 ## Valid Names
 
@@ -58,7 +58,7 @@ ValueError: Name collision between agents and orchestrations: ['team'].
 Names must be unique within each section.
 ```
 
-Models, MCP servers, and MCP clients each have their own independent namespaces — a model and an agent can share a name (though it's confusing and not recommended).
+Models and MCP clients each have their own independent namespace — a model and an agent can share a name (though it's confusing and not recommended).
 
 > **Tips & Tricks**
 >

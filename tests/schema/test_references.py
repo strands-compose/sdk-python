@@ -8,7 +8,7 @@ from __future__ import annotations
 import pytest
 
 from strands_compose.config.loaders.validators import validate_references
-from strands_compose.config.schema import AppConfig, MCPClientDef, MCPServerDef
+from strands_compose.config.schema import AppConfig, MCPClientDef
 from strands_compose.exceptions import UnresolvedReferenceError
 from tests.factories import (
     agent_def,
@@ -41,21 +41,10 @@ def test_missing_mcp_client_reference_raises():
         validate_references(config)
 
 
-def test_missing_mcp_server_reference_raises():
+def test_mcp_client_reference_resolves_when_present():
     config = AppConfig(
-        agents={"a": agent_def()},
-        mcp_clients={"c": MCPClientDef(server="phantom")},
-        entry="a",
-    )
-    with pytest.raises(UnresolvedReferenceError, match="phantom"):
-        validate_references(config)
-
-
-def test_mcp_server_reference_resolves_when_present():
-    config = AppConfig(
-        agents={"a": agent_def()},
-        mcp_servers={"srv": MCPServerDef(type="mod:make")},
-        mcp_clients={"c": MCPClientDef(server="srv")},
+        agents={"a": agent_def(mcp=["c"])},
+        mcp_clients={"c": MCPClientDef(url="https://example.com/mcp")},
         entry="a",
     )
     validate_references(config)  # does not raise

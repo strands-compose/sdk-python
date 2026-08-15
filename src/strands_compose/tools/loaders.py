@@ -2,12 +2,6 @@
 
 Provides helpers for loading ``@tool``-decorated functions from files, modules,
 and directories.
-
-Key Features:
-    - Auto-detection of filesystem vs. module-based tool specs
-    - Automatic @tool wrapping for explicit colon-spec lookups
-    - Directory scanning with underscore-prefixed file exclusion
-    - Unified spec resolver supporting files, modules, and directories
 """
 
 from __future__ import annotations

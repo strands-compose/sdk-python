@@ -35,7 +35,7 @@ load it whenever you are unsure where something goes.
 3. **The pipeline flows one way** — text -> dict -> validated schema -> live objects. Never resolve during parsing; never parse during resolution (see The Pipeline).
 4. **Explicit over implicit** — no auto-registration, no global singletons, no hidden state. Every object is wired by hand and passed as an argument.
 5. **Single responsibility** — each module does one thing; one resolver per config concept, one builder per orchestration mode.
-6. **Composition over inheritance** — small functions and focused modules that compose. The only base classes are the strands-facing ones (`MCPServer`, `HookProvider`).
+6. **Composition over inheritance** — small functions and focused modules that compose. The only base classes are the strands-facing ones (e.g. `HookProvider`).
 7. **Smallest reasonable change** — don't refactor unrelated code to land a feature.
 
 ---
@@ -49,32 +49,31 @@ story end to end:
 load(config)
 ├─ load_config(config) ─────────────────────────────► AppConfig   (validated, pure data)
 │   ├─ parse_single_source   read/inline YAML · strip x-* anchors ·
-│   │                        interpolate ${VAR:-default} · rewrite relative paths -> absolute
+│   │                        interpolate ${VAR:-default} · rewrite relative paths -> absolute ·
+│   │                        default stdio mcp cwd to the config dir
 │   ├─ sanitize_collection_keys   names -> [a-zA-Z0-9_-]; update internal refs
 │   ├─ merge_raw_configs          multi-source merge (duplicate names raise)
 │   ├─ normalize                  schema-version migration hook
 │   ├─ AppConfig.model_validate   Pydantic schema validation
 │   └─ validate_references        every model/mcp/node reference must exist
-├─ resolve_infra(config) ───────────────────────────► ResolvedInfra   (COLD — nothing started)
-│      models · mcp servers · mcp clients · cold MCPLifecycle
-├─ infra.mcp_lifecycle.start()   servers must be up before agents (Agent.__init__ auto-starts clients)
-└─ load_session(config, infra) ─────────────────────► ResolvedConfig   (live agents, entry, lifecycle)
-       resolve_agents · resolve_orchestrations · pick entry
+└─ resolve ─────────────────────────────────────────► ResolvedConfig   (live agents, entry)
+       models · mcp clients · resolve_agents · resolve_orchestrations · pick entry
 ```
 
 Two hard boundaries define where code goes:
 
 - **Parse vs resolve.** `load_config` produces pure validated data (`AppConfig`
-  and its `*Def` models). `resolve_infra` / `load_session` turn that data into
-  live strands objects. Dict-munging, YAML, interpolation, and merging belong to
-  the parse side (`config/loaders/`); constructing strands objects belongs to
-  the resolve side (`config/resolvers/`). Never mix them.
-- **Infra vs session.** `resolve_infra` builds process-lifetime, shareable
-  things (models, MCP servers/clients, the lifecycle) with **no session
-  managers** and a cold lifecycle. `load_session` builds per-session things
-  (agents, orchestrations, session managers). This split is what lets one
-  process serve many isolated sessions — one `resolve_infra`, many
-  `load_session` calls. Never store a session manager on `ResolvedInfra`.
+  and its `*Def` models); the second half of `load` turns that data into live
+  strands objects. Dict-munging, YAML, interpolation, and merging belong to
+  the parse side (`config/loaders/helpers.py`, `validators.py`,
+  `config/interpolation.py`); constructing
+  strands objects belongs to the resolve side (`config/resolvers/`). Never mix
+  them.
+- **Config vs session.** An `AppConfig` is data and can be kept for the life of
+  the process. Everything `load` returns is **per session** — agents hold
+  conversation state, so they are never shared. A server calls `load_config`
+  once and `load(app_config, session_id=…)` per session. There is no third
+  phase: never add a shared-infrastructure object between the two.
 
 ---
 
@@ -88,8 +87,8 @@ Pydantic model and returns a live strands object:
    `"swarm"`, …) route to a dedicated factory. Anything else is treated as an
    **import spec** and loaded via `load_object` — this is the single, unified
    entry point for every `module.path:Name` or `./file.py:Name` string in the
-   whole library (agent factories, model classes, hooks, session managers, MCP
-   server factories, graph-edge conditions). Never write your own import logic.
+   whole library (agent factories, model classes, hooks, plugins, session
+   managers, graph-edge conditions). Never write your own import logic.
 2. **Validate the result type.** After constructing a custom object, assert it
    is the expected strands base (`isinstance` / `issubclass`) and raise
    `TypeError` with context if not. A resolver must never return the wrong kind
@@ -106,8 +105,7 @@ Two structural rules layered on top:
 - **Session managers resolve through one uniform leaf chain**
   (`resolve_leaf_session_manager`): per-leaf override -> explicit opt-out
   (`session_manager: ~`) -> global default -> `None`. Agents and orchestrations
-  use it identically; the effective `session_id` is threaded down from
-  `load_session`.
+  use it identically; the effective `session_id` is threaded down from `load`.
 
 ---
 
@@ -145,8 +143,10 @@ foundation, imported freely:  types.py · exceptions.py · wire.py · manifest.p
 ```
 
 - `schema.py` depends on Pydantic only — the floor.
-- `loaders/` do text I/O and dict transforms, import `schema`, and **never
-  import resolvers**. Parsing must not construct live objects.
+- `loaders/helpers.py` and `loaders/validators.py` do text I/O and dict
+  transforms, import `schema`, and **never import resolvers**. Parsing must not
+  construct live objects. `loaders/loaders.py` is the one exception: it is the
+  pipeline entry point, so it drives both sides — parse, then resolve.
 - `resolvers/` import `schema`, strands, and the subsystem builders
   (`models.py`, `mcp/`, `tools/`, `hooks/`, `utils.load_object`). They turn a
   `*Def` into a live object and nothing else.
@@ -170,10 +170,12 @@ foundation, imported freely:  types.py · exceptions.py · wire.py · manifest.p
   `Agent` / `Swarm` / `Graph` / `SessionManager` objects and produces a
   `SessionManifest`. No I/O, no mutation. It is decoupled from the YAML schema
   on purpose — it describes what was *wired*, not what was *configured*.
-- **MCP lifecycle is ordered and idempotent.** Servers start (and become ready)
-  before clients connect; clients stop before servers. `start()` is idempotent
-  because `Agent.__init__` also auto-starts clients — the context manager is
-  still required for graceful shutdown.
+- **MCP lifecycle belongs to strands, not to us.** `resolve_mcp_client` returns
+  an unconnected `MCPClient`; strands reference-counts consumers, connecting on
+  the first tool load and calling `stop()` once the last agent using it is torn
+  down (including the stdio subprocess). Never add a lifecycle manager, a
+  start/stop ordering layer, or a server host — a server is either spawned by
+  the client (`command:`) or already running elsewhere (`url:`).
 - **Optional providers import lazily inside the function** that needs them
   (`bedrock`, `ollama`, `openai`, `gemini`, `agentcore`), each raising a clear
   `ImportError` pointing at the extra (`pip install strands-compose[openai]`).
@@ -198,10 +200,10 @@ foundation, imported freely:  types.py · exceptions.py · wire.py · manifest.p
   When re-raising, chain with `raise … from exc` (or `from None` to suppress a
   noisy upstream trace, as the loaders do for Pydantic/YAML errors).
 - **Never swallow exceptions silently**, no bare `except:`. The sanctioned broad
-  catch is best-effort cleanup/shutdown (e.g. `MCPLifecycle.stop`): catch
-  `Exception`, log with `exc_info=True`, and continue.
+  catch is best-effort cleanup/shutdown: catch `Exception`, log with
+  `exc_info=True`, and continue.
 - **Return copies from properties** exposing mutable state:
-  `return dict(self._servers)`.
+  `return dict(self._clients)`.
 - **Naming:** `PascalCase` classes · `snake_case` functions/methods ·
   `UPPER_SNAKE_CASE` constants · `_prefix` for private. No abbreviations in the
   public API. Booleans read as `is_` / `has_` / `enable_`. Don't shadow builtins.
@@ -223,7 +225,7 @@ Use `%s` interpolation with structured field-value pairs — never f-strings:
 
 ```python
 logger.info("model=<%s>, provider=<%s> | resolved model", name, provider)
-logger.warning("server=<%s> | failed to stop MCP server", name, exc_info=True)
+logger.warning("client=<%s> | failed to resolve MCP client", name, exc_info=True)
 ```
 
 - Field-value pairs first (`key=<value>`, comma-separated), human-readable
@@ -273,12 +275,12 @@ Run from the repository root (use the `check-and-test` skill for detail):
 
 ```bash
 uv run just check    # ruff format-check + ruff lint + ty type-check + bandit
-uv run just test     # pytest with coverage gate (≥ 70%)
+uv run just test     # pytest with coverage gate (≥ 80%)
 ```
 
 `just check` is the gate; it must pass before a change is done. If it fails,
-`uv run just format` first, then re-run. Do **not** start a long-running MCP
-server or the CLI `load` command to "verify" — rely on `check` and `test`.
+`uv run just format` first, then re-run. Do **not** run the CLI `load` command
+to "verify" — it connects to real MCP servers; rely on `check` and `test`.
 
 ---
 
@@ -288,10 +290,14 @@ server or the CLI `load` command to "verify" — rely on `check` and `test`.
   return plain strands objects (no wrappers, no subclasses).
 - Don't construct live objects during parsing, or munge raw dicts during
   resolution — respect the parse/resolve boundary.
-- Don't import a resolver from a loader, or `Agent`/`MCPClient` from
-  `schema.py` — respect the one-way dependency flow; keep the schema pure.
-- Don't store a session manager on `ResolvedInfra`, or blur the infra/session
-  split.
+- Don't import a resolver from `loaders/helpers.py` or `loaders/validators.py`,
+  and don't import `Agent`/`MCPClient` into `schema.py` — respect the one-way
+  dependency flow; keep the schema pure. `loaders/loaders.py` is the only
+  sanctioned exception (see Dependency Direction).
+- Don't add a shared-infrastructure phase or object between `load_config` and
+  `load` — one call builds one session, and that is the whole model.
+- Don't host, start, or stop an MCP server, and don't add an MCP lifecycle
+  manager — strands owns client lifetime, and servers run as their own process.
 - Don't write bespoke import logic — route every `module:Name` / `./file.py:Name`
   spec through `load_object`.
 - Don't mutate an existing agent to build an orchestration — fork a new one from

@@ -12,7 +12,6 @@ from strands.multiagent import Swarm
 from strands.multiagent.graph import Graph
 
 from strands_compose.config import ResolvedConfig, load
-from strands_compose.mcp import MCPLifecycle
 
 pytestmark = pytest.mark.integration
 
@@ -50,9 +49,3 @@ def test_multiple_sources_are_merged(fixture_path):
         [fixture_path("multi_source_base.yaml"), fixture_path("multi_source_extra.yaml")]
     )
     assert {"planner", "helper"} <= set(resolved.agents)
-
-
-def test_resolved_config_carries_a_lifecycle(fixture_path):
-    resolved = load(fixture_path("minimal.yaml"))
-    assert isinstance(resolved.mcp_lifecycle, MCPLifecycle)
-    resolved.mcp_lifecycle.stop()

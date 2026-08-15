@@ -38,172 +38,113 @@ The merged dict is validated against Pydantic models. Invalid fields, missing re
 Cross-references are checked:
 - Agent `model` references → must exist in `models`
 - Agent `mcp` references → must exist in `mcp_clients`
-- MCP client `server` references → must exist in `mcp_servers`
 - Orchestration agent references → must exist in `agents` or `orchestrations`
 
-## Step 8: Resolve Infrastructure
+## Step 8: Resolve Models and MCP Clients
 
-Models, MCP servers, MCP clients, and session managers are created as Python objects. Nothing is started yet.
+Model objects and MCP client objects are created. MCP clients are not connected yet — strands connects one when it is attached to an agent.
 
-## Step 9: Start MCP Lifecycle
-
-MCP servers are started in background threads. The pipeline waits for all servers to be ready (TCP port check). This happens **before** agent creation because `Agent.__init__` auto-starts MCP clients which need running servers.
-
-## Step 10: Create Agents
+## Step 9: Create Agents
 
 Each agent definition is resolved: model looked up, tools loaded, hooks instantiated, MCP clients attached, session manager wired. Each agent is a fresh `strands.Agent` instance.
 
-## Step 11: Wire Orchestrations
+## Step 10: Wire Orchestrations
 
 Orchestrations are topologically sorted and built in dependency order. Inner orchestrations first, outer orchestrations reference the already-built inner ones.
 
-## Step 12: Return ResolvedConfig
+## Step 11: Return ResolvedConfig
 
 The final `ResolvedConfig` has:
 - `agents` — dict of all agents by name
 - `orchestrators` — dict of all built orchestrations by name
 - `entry` — the entry point (Agent, Swarm, or Graph)
-- `mcp_lifecycle` — for managing shutdown
 
-## Advanced Topic: `load()` vs `load_config()` + `resolve_infra()` + `load_session()`
+## Sessions: one `load()` call per session
 
-Most users only need:
+`load()` is the only entry point. Every call builds **fresh** agents, so every
+call is an isolated session:
 
 ```python
 from strands_compose import load
 
 resolved = load("config.yaml")
-```
-
-That one call runs the whole pipeline:
-
-1. Parse YAML
-2. Interpolate variables
-3. Sanitize names
-4. Merge files
-5. Validate schema + references
-6. Resolve infrastructure
-7. Start MCP lifecycle
-8. Create agents and orchestrations
-
-But strands-compose also exposes the lower-level split because **config parsing** and **session creation** are not always the same thing.
-
-### What counts as "config"?
-
-`load_config()` returns a validated `AppConfig` — just structured data.
-
-At this point, nothing is started and no live strands objects exist yet:
-
-- no `Agent` instances
-- no orchestration objects
-- no started MCP servers
-- no connected MCP clients
-
-This step is useful when you want to parse and validate once at process startup, fail fast on bad YAML, and keep the validated config around.
-
-### What counts as "infrastructure"?
-
-`resolve_infra(app_config)` turns the validated config into the shared runtime pieces:
-
-- resolved model objects
-- resolved MCP server objects
-- resolved MCP client objects
-- a cold `mcp_lifecycle`
-
-> **Note:** `resolve_infra()` does **not** build session manager instances. Session managers are
-> created per agent and per orchestration at session time (inside `load_session()`), once a real
-> session ID is known. This avoids creating orphan filesystem folders before a session actually starts.
-
-Important nuance: **resolved** does not mean **started**.
-
-After `resolve_infra()`:
-
-- MCP servers exist as Python objects, but are not running yet
-- MCP clients exist as Python objects, but are not connected yet
-- agents still do not exist
-- orchestrations still do not exist
-
-You then start the shared MCP runtime explicitly:
-
-```python
-from strands_compose.config import load_config, resolve_infra
-
-app_config = load_config("config.yaml")
-infra = resolve_infra(app_config)
-infra.mcp_lifecycle.start()
-```
-
-### What `load_session()` does
-
-`load_session(app_config, infra, session_id=...)` is the final step. It uses the already-started shared infrastructure to create a **fresh** `ResolvedConfig` for one session:
-
-- fresh agents
-- fresh orchestrations
-- fresh entry point
-- the same shared MCP lifecycle
-
-This is the key distinction:
-
-- `resolve_infra()` gives you **shared process-level infrastructure**
-- `load_session()` gives you **session-level agent graph built on top of that infrastructure**
-
-### Why this split matters for multi-tenant deployments
-
-In a multi-tenant server, you usually do **not** want to re-parse YAML, re-resolve models, or restart MCP servers on every request. Those are process-level concerns.
-
-Instead, you want:
-
-- one validated config shared by the process
-- one resolved infrastructure shared by the process
-- one started MCP lifecycle shared by the process
-- one fresh set of agents per tenant/session/request
-
-Typical pattern:
-
-```python
-from strands_compose.config import load_config, load_session, resolve_infra
-
-# Once at process startup
-app_config = load_config("config.yaml")
-infra = resolve_infra(app_config)
-infra.mcp_lifecycle.start()
-
-# Per request / websocket / tenant session
-resolved = load_session(app_config, infra, session_id="tenant-123")
 result = resolved.entry("Hello!")
 ```
 
-This avoids paying the startup cost repeatedly while still keeping per-session agent state isolated.
+Agents hold conversation history, so they cannot be shared between sessions.
+Everything else — models, MCP clients, tools, hooks — is built alongside them.
 
-### Session manager nuance
+### Parse once, resolve per session
 
-Session manager instances are **not** built during `resolve_infra()`. Instead, `load_session()`
-computes a single `effective_session_id` and threads it down to every agent and orchestration leaf:
+A long-running server should not re-read YAML on every request. Parse once with
+`load_config()`, then hand the validated `AppConfig` to `load()` per session:
 
-1. If you pass `session_id="my-id"` to `load_session()`, that value is used as-is.
-2. If you do **not** pass a `session_id` but the config declares a global `session_manager:`,
-   strands-compose looks for a `session_id` in `session_manager.params`. If found, that value is
-   used; otherwise a fresh `uuid.uuid4()` is generated once and shared by all agents in that
-   call — matching the "one folder per CLI run" behaviour.
-3. If neither a `session_id` is provided nor a global `session_manager:` is configured, no session
-   manager instances are created at all. Each individual agent or orchestration with a per-agent
-   `session_manager:` will generate its own ID as usual.
+```python
+from strands_compose import load, load_config
 
-This design guarantees exactly one folder is created per `load_session()` call, never an orphan
-folder from `resolve_infra()`.
+# Once at startup — fail fast on bad YAML
+app_config = load_config("config.yaml")
 
-### Mental model
+# Per session
+resolved = load(app_config, session_id="abc")
+result = resolved.entry("Hello!")
+```
 
-Use this rule of thumb:
+`load_config()` returns pure data: no `Agent` instances, no MCP clients, nothing
+started. That makes it safe to run in CI (`strands-compose check`) and cheap to
+keep around for the life of the process.
 
-- **`load()`** = convenience API for scripts and local apps
-- **`load_config()`** = validate and freeze the declarative config
-- **`resolve_infra()`** = build shared runtime dependencies, but do not start them yet
-- **`load_session()`** = build one session's live agents/orchestrations from shared infra
+### Two scopes, that's all
 
-If you're building a CLI, a notebook, or a one-shot script, use `load()`.
+| Scope | Lasts | Holds |
+|-------|-------|-------|
+| **config** | as long as you keep it | validated `AppConfig` — pure data |
+| **session** | one `load()` result | models, MCP clients, agents, orchestrations, session managers |
 
-If you're building a long-running web server with many user sessions, use `load_config()` + `resolve_infra()` once, then `load_session()` for each session.
+Follow-up turns reuse the same `ResolvedConfig` — that is what carries
+conversation history forward. Call `load()` again only when you want a new
+session.
+
+### Releasing a session
+
+There is normally nothing to tear down: strands stops an MCP client once every
+agent holding it is gone. In a script that is process exit. In a long-running
+process that discards sessions it is garbage collection, which is not immediate
+if an agent sits in a reference cycle — so release those sessions explicitly:
+
+```python
+from strands import Agent
+
+for node in (*resolved.agents.values(), *resolved.orchestrators.values()):
+    if isinstance(node, Agent):
+        node.cleanup()
+```
+
+Include the orchestrators. A `delegate` orchestration is an `Agent` forked from
+its entry agent's blueprint and holds the same MCP clients, but it lives only in
+`orchestrators` — a loop over `agents` alone would leave the client with a live
+consumer and it would never stop. `Swarm` and `Graph` need no separate handling:
+their nodes are the very same agent objects that are already in `agents`.
+
+### Session ID resolution
+
+`load()` computes a single effective session ID and threads it down to every
+agent and orchestration leaf:
+
+1. If you pass `session_id="my-id"`, that value is used as-is.
+2. If you do **not** pass one but the config declares a global `session_manager:`,
+   strands-compose looks for a `session_id` in `session_manager.params`. If found,
+   that value is used; otherwise a fresh `uuid.uuid4()` is generated once and
+   shared by all agents in that call — matching the "one folder per CLI run"
+   behaviour.
+3. If neither a `session_id` is provided nor a global `session_manager:` is
+   configured, each agent or orchestration that declares its own
+   `session_manager:` still gets one, generating its own ID.
+
+When a global `session_manager:` is configured, this means every leaf that falls
+back to it shares one ID — so one `load()` call produces one session folder, not
+one per agent. Per-leaf `session_manager:` blocks with their own `session_id` or
+`storage_dir` are independent of that.
 
 ---
 

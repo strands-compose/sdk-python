@@ -2,12 +2,6 @@
 
 Pure data models — no runtime imports (Agent, MCPClient, etc.).
 Validation catches user errors at parse time with clear messages.
-
-Key Features:
-    - Discriminated union for orchestration modes (delegate, swarm, graph)
-    - Cross-section name collision detection via joint namespaces
-    - Reference field descriptors for automated name sanitization
-    - Inline and named model/hook/session_manager resolution
 """
 
 from __future__ import annotations
@@ -91,24 +85,16 @@ class SessionManagerDef(BaseModel):
     params: dict[str, Any] = Field(default_factory=dict)
 
 
-class MCPServerDef(BaseModel):
-    """MCP server definition."""
-
-    type: str
-    params: dict[str, Any] = Field(default_factory=dict)
-
-
 class MCPClientDef(BaseModel):
     """MCP client connection definition.
 
-    Exactly one of ``server``, ``url``, or ``command`` must be set.
+    Exactly one of ``url`` or ``command`` must be set.
 
     ``params`` are forwarded to strands MCPClient (e.g., startup_timeout,
     tool_filters, prefix). ``transport_options`` are forwarded to the
     transport factory (e.g., headers, auth, timeout, http_client).
     """
 
-    server: str | None = None
     url: str | None = None
     command: list[str] | None = None
     transport: str | None = None
@@ -117,17 +103,12 @@ class MCPClientDef(BaseModel):
 
     @model_validator(mode="after")
     def _exactly_one_connection_mode(self) -> MCPClientDef:
-        """Validate that exactly one of server/url/command is set."""
-        modes = [self.server is not None, self.url is not None, self.command is not None]
-        count = sum(modes)
+        """Validate that exactly one of url/command is set."""
+        count = sum([self.url is not None, self.command is not None])
         if count == 0:
-            raise ValueError(
-                "MCPClientDef requires exactly one of 'server', 'url', or 'command'; got none."
-            )
+            raise ValueError("MCPClientDef requires exactly one of 'url' or 'command'; got none.")
         if count > 1:
-            raise ValueError(
-                "MCPClientDef requires exactly one of 'server', 'url', or 'command'; got multiple."
-            )
+            raise ValueError("MCPClientDef requires exactly one of 'url' or 'command'; got both.")
         return self
 
 
@@ -304,10 +285,10 @@ OrchestrationDef = Annotated[
 
 # Sections that hold named dict collections (merged across config sources).
 # IMPORTANT: these must exactly match the dict field names on AppConfig below.
-COLLECTION_KEYS = ("models", "mcp_servers", "mcp_clients", "agents", "orchestrations")
+COLLECTION_KEYS = ("models", "mcp_clients", "agents", "orchestrations")
 
 # Groups of sections that share a lookup namespace — names must be unique within each group.
-# mcp_servers / mcp_clients are independent namespaces and intentionally excluded.
+# mcp_clients is an independent namespace and intentionally excluded.
 JOINT_NAMESPACES: tuple[tuple[str, ...], ...] = (("agents", "orchestrations"),)
 
 
@@ -325,7 +306,6 @@ class AppConfig(BaseModel):
     version: str = "1"
     """Schema version — omit to use the default ``"1"``."""
     models: dict[str, ModelDef] = Field(default_factory=dict)
-    mcp_servers: dict[str, MCPServerDef] = Field(default_factory=dict)
     mcp_clients: dict[str, MCPClientDef] = Field(default_factory=dict)
     agents: dict[str, AgentDef] = Field(default_factory=dict)
     session_manager: SessionManagerDef | None = None

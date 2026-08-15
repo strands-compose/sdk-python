@@ -46,9 +46,9 @@ def load_object(spec: str, *, target: str = "object") -> Any:
 
     This is the **unified entry point** for resolving any
     ``module.path:ObjectName`` or ``./file.py:ObjectName`` import spec
-    used throughout the config layer (agent factories, MCP server
-    factories, model classes, session manager classes, hook classes,
-    graph-edge conditions, etc.).
+    used throughout the config layer (agent factories, model classes,
+    session manager classes, hook classes, plugin classes, graph-edge
+    conditions, etc.).
 
     The ``target`` kwarg is used **only** in error messages so that
     failures clearly identify what was being loaded.
@@ -58,7 +58,7 @@ def load_object(spec: str, *, target: str = "object") -> Any:
             filesystem path (containing ``/`` or ``\\``) with a colon-
             separated attribute, e.g. ``"/abs/path/file.py:create"``.
         target: Human-readable label for error messages, e.g.
-            ``"agent factory"``, ``"MCP server"``, ``"graph condition"``.
+            ``"agent factory"``, ``"model class"``, ``"graph condition"``.
 
     Returns:
         The imported Python object.
@@ -130,11 +130,8 @@ def load_module_from_file(path: str | Path) -> ModuleType:
         sys.modules.pop(module_name, None)
         raise ImportError(f"Failed to load file {file_path}: {exc}") from exc
 
-    # Remove from sys.modules to avoid polluting the global module namespace.
-    # The returned module object remains usable — only the sys.modules entry is dropped.
-    # This means subsequent ``import <module_name>`` statements won't resolve,
-    # It's intentional: these are user-provided files, not library modules.
-    # For hot-reload, the ``del`` above ensures a fresh exec on every call.
+    # Drop the sys.modules entry so user-provided files don't pollute the global
+    # module namespace. The returned module object stays usable.
     sys.modules.pop(module_name, None)
     return module
 

@@ -8,9 +8,8 @@ pattern from callers and brackets every invocation with a SESSION_START
 event (carrying the session manifest) and a SESSION_END event.
 
 :func:`make_event_queue` attaches :class:`~strands_compose.hooks.EventPublisher`
-hooks to every agent so all per-agent events (TOKEN, REASONING, TOOL_START,
-TOOL_END, INTERRUPT, AGENT_COMPLETE, and — for Swarm/Graph — NODE_START, NODE_STOP,
-HANDOFF, MULTIAGENT_COMPLETE) flow into the shared queue.
+hooks to every agent and orchestrator so all agent and multi-agent events flow
+into one shared queue.
 
 Hooks are wired **once per session**.  Between requests on the same session,
 call :meth:`EventQueue.flush` to discard stale events and reset the

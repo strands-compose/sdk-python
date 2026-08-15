@@ -22,7 +22,7 @@
 
 [Strands](https://github.com/strands-agents/harness-sdk) is a powerful agent SDK. But once you have more than one agent, a few MCP servers, safety hooks, and shared models — you end up writing the same plumbing over and over. **strands-compose kills that boilerplate.**
 
-You describe the shape of your agent system in YAML, and strands-compose resolves, validates, and starts everything — models, MCP servers & clients, hooks, tools, orchestration topology — as a live, fully wired multi-agent system.
+You describe the shape of your agent system in YAML, and strands-compose resolves, validates, and wires everything — models, MCP clients, hooks, tools, orchestration topology — into a live, fully wired multi-agent system.
 
 ```yaml
 models:
@@ -86,7 +86,7 @@ Strands Compose is an ecosystem that includes the following packages:
 
 ## Why this changes everything
 
-Your entire agent network — models, prompts, tools, hooks, MCP servers, orchestration topology — captured in a single YAML file and maybe a few Python files for custom tools or hooks. That's it. That's your agent environment. Here's what that unlocks:
+Your entire agent network — models, prompts, tools, hooks, MCP connections, orchestration topology — captured in a single YAML file and maybe a few Python files for custom tools or hooks. That's it. That's your agent environment. Here's what that unlocks:
 
 ### 🔖 Version it
 
@@ -115,8 +115,7 @@ A bug report comes in. You have the exact YAML config. Load it, replay it, debug
 | **YAML-first config** | Models, agents, tools, hooks, MCP, orchestrations — all in one file |
 | **Full YAML power** | Variables (`${VAR:-default}`), anchors (`&ref` / `*ref`), `x-` scratch pads, multi-file merge |
 | **Multi-model support** | Bedrock, Anthropic, OpenAI, Ollama, Gemini — swap with one line |
-| **MCP servers & clients** | Launch local servers from Python files, connect to remote HTTP endpoints, or spawn stdio subprocesses |
-| **MCP lifecycle management** | Startup ordering, readiness polling, graceful shutdown — servers before clients, always |
+| **MCP clients** | Connect to remote HTTP endpoints or spawn stdio subprocess servers with prefixes and tool filters |
 | **Orchestration modes** | Delegate (agent-as-tool), Swarm (peer handoffs), Graph (DAG pipelines) — arbitrarily nestable |
 | **Event streaming** | Unified async event queue across any orchestration depth — tokens, tool calls, handoffs, completions |
 | **Session persistence** | File, S3, or [Bedrock AgentCore Memory](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/memory.html) — agents remember across restarts |
@@ -141,7 +140,7 @@ uv run python examples/01_minimal/main.py
 | 03 | [Tools](examples/03_tools/) | `tools:` — auto-load `@tool` functions from Python files |
 | 04 | [Session](examples/04_session/) | `session_manager:` — persistent memory across turns and restarts |
 | 05 | [Hooks](examples/05_hooks/) | `hooks:` — `MaxToolCallsGuard`, `ToolNameSanitizer`, and custom hooks |
-| 06 | [MCP](examples/06_mcp/) | All three MCP modes: local server, remote URL, stdio subprocess |
+| 06 | [MCP](examples/06_mcp/) | Both MCP modes: stdio subprocess and remote URL |
 | 07 | [Delegate](examples/07_delegate/) | `mode: delegate` — coordinator routes work to specialist agents |
 | 08 | [Swarm](examples/08_swarm/) | `mode: swarm` — peer agents hand off to each other autonomously |
 | 09 | [Graph](examples/09_graph/) | `mode: graph` — deterministic DAG pipeline between agents |
@@ -184,9 +183,8 @@ from strands_compose import load
 
 resolved = load("config.yaml")
 
-with resolved.mcp_lifecycle:
-    result = resolved.entry("Hello!")
-    print(result)
+result = resolved.entry("Hello!")
+print(result)
 ```
 
 ---

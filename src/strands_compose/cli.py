@@ -7,9 +7,9 @@ Exposes two sub-commands:
     Pure, fast, zero side-effects — safe to run in CI and pre-deploy hooks.
 
 ``load``
-    Full pipeline via :func:`load` followed by an async MCP health check
-    via :func:`validate_mcp`.  Starts MCP server processes; always cleans
-    them up before exiting.
+    Full pipeline via :func:`load` — builds every model, MCP client, tool,
+    hook, agent, and orchestration. Catches what ``check`` cannot: broken
+    import specs, missing provider extras, unloadable tool files.
 
 Usage::
 
@@ -18,13 +18,12 @@ Usage::
     strands-compose load  config.yaml [--json]
     strands-compose load  config.yaml [--quiet]
 
-Exit codes: ``0`` on success, ``1`` on any error or critical health failure.
+Exit codes: ``0`` on success, ``1`` on any error.
 """
 
 from __future__ import annotations
 
 import argparse
-import asyncio
 import json
 import logging
 import sys
@@ -33,13 +32,10 @@ from importlib.metadata import version as pkg_version
 from typing import TYPE_CHECKING
 
 from .config import AppConfig, ConfigInput, load, load_config
-from .startup.report import CheckResult, StartupReport
-from .startup.validator import validate_mcp
 from .utils import cli_errors
 
 if TYPE_CHECKING:
-    from .config.resolvers import ResolvedConfig
-
+    from .config import ResolvedConfig
 
 logger = logging.getLogger(__name__)
 
@@ -48,9 +44,6 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 _GREEN = "\033[32m"
-_RED = "\033[31m"
-_YELLOW = "\033[33m"
-_DIM = "\033[2m"
 _BOLD = "\033[1m"
 _RESET = "\033[0m"
 
@@ -116,7 +109,6 @@ def _render_check_success_ansi(app_config: AppConfig) -> None:
     """
     agent_names = list(app_config.agents)
     orch_names = list(app_config.orchestrations)
-    mcp_server_names = list(app_config.mcp_servers)
     mcp_client_names = list(app_config.mcp_clients)
 
     agent_str = f"{len(agent_names)} agent{'s' if len(agent_names) != 1 else ''}"
@@ -130,14 +122,13 @@ def _render_check_success_ansi(app_config: AppConfig) -> None:
     ]
     if app_config.models:
         rows.append(("models", ", ".join(app_config.models)))
-    if mcp_server_names:
-        rows.append(("mcp servers", ", ".join(mcp_server_names)))
     if mcp_client_names:
         rows.append(("mcp clients", ", ".join(mcp_client_names)))
     if orch_names:
         rows.append(("orchestrations", ", ".join(orch_names)))
     if app_config.session_manager:
-        rows.append(("session", str(app_config.session_manager.type)))
+        session = app_config.session_manager
+        rows.append(("session", session.type or session.provider))
 
     hook_count = _count_hooks(app_config)
     if hook_count:
@@ -157,6 +148,7 @@ def _render_check_success_json(app_config: AppConfig) -> None:
     Args:
         app_config: The validated :class:`AppConfig`.
     """
+    session = app_config.session_manager
     payload = {
         "ok": True,
         "stage": "check",
@@ -165,9 +157,8 @@ def _render_check_success_json(app_config: AppConfig) -> None:
         "agents": list(app_config.agents),
         "models": list(app_config.models),
         "mcp_clients": list(app_config.mcp_clients),
-        "mcp_servers": list(app_config.mcp_servers),
         "orchestrations": list(app_config.orchestrations),
-        "session_manager": app_config.session_manager.type if app_config.session_manager else None,
+        "session_manager": (session.type or session.provider) if session else None,
         "hooks": _count_hooks(app_config),
     }
     print(json.dumps(payload))
@@ -202,130 +193,66 @@ def _cmd_check(configs: list[ConfigInput], *, json_output: bool, quiet: bool) ->
 # ---------------------------------------------------------------------------
 
 
-def _render_check_result_ansi(check: CheckResult) -> str:
-    """Format one :class:`CheckResult` as a coloured ANSI line.
+def _render_load_success_ansi(resolved: ResolvedConfig) -> None:
+    """Print a human-readable summary of what was actually wired.
 
     Args:
-        check: The check result to format.
-
-    Returns:
-        A single (possibly multi-line) string ready for printing.
+        resolved: The :class:`ResolvedConfig` returned by :func:`load`.
     """
-    if check.ok:
-        icon = _colour("✓", _GREEN)
-    elif check.severity == "warning":
-        icon = _colour("⚠", _YELLOW)
-    else:
-        icon = _colour("✗", _RED)
+    rows: list[tuple[str, str]] = [
+        ("entry", type(resolved.entry).__name__),
+        ("agents", ", ".join(resolved.agents) or "(none)"),
+    ]
+    if resolved.orchestrators:
+        rows.append(("orchestrations", ", ".join(resolved.orchestrators)))
 
-    line = f"[{check.category:8s}] {icon} {check.subject}: {check.message}"
-    if not check.ok and check.hint:
-        indent = " " * 14
-        line += f"\n{indent}{_colour('hint:', _DIM)} {check.hint}"
-    return line
+    width = max(len(label) for label, _ in rows)
+    parts = [_colour("✓ Load OK", _GREEN + _BOLD)]
+    for label, value in rows:
+        parts.append(f"  {label.ljust(width)} : {value}")
 
-
-def _render_report_ansi(report: StartupReport) -> None:
-    """Print a human-readable MCP health report to stdout.
-
-    Args:
-        report: The :class:`StartupReport` from :func:`validate_mcp`.
-    """
-    for check in report.checks:
-        print(_render_check_result_ansi(check))
-
-    n_ok = len(report.passed_checks)
-    n_warn = len(report.warnings)
-    n_crit = len(report.critical_checks)
-    total = len(report.checks)
-
-    if total == 0:
-        print(_colour("✓ Load OK", _GREEN + _BOLD) + "  (no MCP servers/clients configured)")
-        return
-
-    summary = f"{n_ok}/{total} passed"
-    if n_warn:
-        summary += f", {n_warn} warning(s)"
-    if n_crit:
-        summary += f", {n_crit} critical"
-
-    if report.ok:
-        print(_colour(f"✓ Load OK  — {summary}", _GREEN + _BOLD))
-    else:
-        print(_colour(f"✗ Load FAILED — {summary}", _RED + _BOLD))
+    print("\n".join(parts))
 
 
-def _render_report_json(report: StartupReport) -> None:
-    """Print a JSON health report to stdout.
+def _render_load_success_json(resolved: ResolvedConfig) -> None:
+    """Print a JSON summary of what was actually wired.
 
     Args:
-        report: The :class:`StartupReport` from :func:`validate_mcp`.
+        resolved: The :class:`ResolvedConfig` returned by :func:`load`.
     """
     payload = {
-        "ok": report.ok,
+        "ok": True,
         "stage": "load",
         "version": _get_version(),
-        "checks": [
-            {
-                "ok": c.ok,
-                "category": c.category,
-                "subject": c.subject,
-                "message": c.message,
-                "severity": c.severity,
-                "hint": c.hint,
-            }
-            for c in report.checks
-        ],
+        "entry": type(resolved.entry).__name__,
+        "agents": list(resolved.agents),
+        "orchestrations": list(resolved.orchestrators),
     }
     print(json.dumps(payload))
-
-
-async def _cmd_load_async(configs: list[ConfigInput], *, json_output: bool, quiet: bool) -> None:
-    """Async body of the ``load`` sub-command.
-
-    Calls :func:`load`, runs :func:`validate_mcp`, prints the health
-    report, and always stops the MCP lifecycle before returning.
-
-    Args:
-        configs: Paths to one or more YAML configuration files.
-        json_output: When ``True``, emit JSON instead of ANSI output.
-        quiet: When ``True``, suppress output on success (exit code only).
-
-    Raises:
-        SystemExit: With code 1 when any critical MCP health check fails.
-    """
-    resolved: ResolvedConfig | None = None
-    try:
-        with cli_errors():
-            config_input = configs[0] if len(configs) == 1 else configs
-            resolved = load(config_input)
-
-        report = await validate_mcp(resolved)
-
-        if not quiet or not report.ok:
-            if json_output:
-                _render_report_json(report)
-            else:
-                _render_report_ansi(report)
-
-        if not report.ok:
-            sys.exit(1)
-    finally:
-        if resolved is not None:
-            resolved.mcp_lifecycle.stop()
 
 
 def _cmd_load(configs: list[ConfigInput], *, json_output: bool, quiet: bool) -> None:
     """Run the ``load`` sub-command.
 
-    Delegates to :func:`_cmd_load_async` via :func:`asyncio.run`.
+    Calls :func:`load` so every live object is constructed, then prints what
+    was wired or exits with code 1 on any error (via :func:`cli_errors`).
 
     Args:
         configs: Paths to one or more YAML configuration files.
         json_output: When ``True``, emit JSON instead of ANSI output.
         quiet: When ``True``, suppress output on success (exit code only).
     """
-    asyncio.run(_cmd_load_async(configs, json_output=json_output, quiet=quiet))
+    with cli_errors():
+        config_input = configs[0] if len(configs) == 1 else configs
+        resolved = load(config_input)
+
+    if quiet:
+        return
+
+    if json_output:
+        _render_load_success_json(resolved)
+    else:
+        _render_load_success_ansi(resolved)
 
 
 # ---------------------------------------------------------------------------
@@ -364,7 +291,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
             Sub-commands:
               check   Validate config (no side-effects, safe for CI)
-              load    Full load + MCP health check
+              load    Build every live object (models, MCP, tools, agents)
             """
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -398,10 +325,10 @@ def _build_parser() -> argparse.ArgumentParser:
     # -- load --
     load_parser = subparsers.add_parser(
         "load",
-        help="Full load pipeline + MCP health check",
-        description="Run the full load() pipeline (starts MCP servers, builds agents) "
-        "then probe MCP connectivity. Always stops MCP servers on exit. "
-        "Exits 0 on success, 1 on any error or critical health failure.",
+        help="Build every live object from the config",
+        description="Run the full load() pipeline — models, MCP clients, tools, "
+        "hooks, agents, orchestrations. Catches broken import specs and missing "
+        "provider extras that 'check' cannot. Exits 0 on success, 1 on any error.",
     )
     load_parser.add_argument(
         "config",

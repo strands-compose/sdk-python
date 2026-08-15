@@ -12,7 +12,6 @@ vars: {}              # Variable definitions (removed after interpolation)
 models: {}            # Named model definitions
 agents: {}            # Named agent definitions (required: at least one)
 orchestrations: {}    # Named orchestration definitions
-mcp_servers: {}       # Named MCP server definitions
 mcp_clients: {}       # Named MCP client connections
 session_manager: {}   # Global session manager
 entry: "name"         # Required: entry point agent or orchestration
@@ -93,23 +92,13 @@ conversation_manager:
   params: {}                       # Constructor kwargs (window_size, etc.)
 ```
 
-## MCPServerDef
-
-```yaml
-mcp_servers:
-  name:
-    type: ./server.py:create       # Factory function: module.path:func or ./file.py:func
-    params: {}                     # Forwarded to factory (port, host, etc.)
-```
-
 ## MCPClientDef
 
 ```yaml
 mcp_clients:
   name:
     # Exactly one of:
-    server: "server_name"          # Reference to mcp_servers entry
-    url: "https://..."             # External MCP server URL
+    url: "https://..."             # MCP server URL
     command: ["cmd", "arg"]        # Stdio subprocess command
 
     transport: null                # Override: "streamable-http" | "sse" | "stdio"

@@ -72,7 +72,7 @@ class OrchestrationBuilder:
                 ``AppConfig.session_manager``, used as a fallback when an
                 orchestration declares no ``session_manager:`` of its own and
                 has not explicitly opted out.
-            session_id: Effective session id threaded down from ``load_session``.
+            session_id: Effective session id threaded down from ``load``.
                 Passed as ``session_id_override`` to every
                 ``resolve_session_manager`` call made by leaf builders.
         """
@@ -208,7 +208,7 @@ def build_delegate(
         global_session_manager_def: Global session manager def from
             ``AppConfig.session_manager``, used as a fallback when neither the
             orchestration nor the entry agent declares a ``session_manager:``.
-        session_id: Effective session id threaded down from ``load_session``.
+        session_id: Effective session id threaded down from ``load``.
             Passed as ``session_id_override`` to ``resolve_session_manager``.
 
     Returns:
@@ -293,7 +293,7 @@ def build_swarm(
         global_session_manager_def: Global session manager def from
             ``AppConfig.session_manager``, used as a fallback when the
             orchestration declares no ``session_manager:`` of its own.
-        session_id: Effective session id threaded down from ``load_session``.
+        session_id: Effective session id threaded down from ``load``.
             Passed as ``session_id_override`` to ``resolve_session_manager``.
 
     Returns:
@@ -366,7 +366,7 @@ def build_graph(
         global_session_manager_def: Global session manager def from
             ``AppConfig.session_manager``, used as a fallback when the
             orchestration declares no ``session_manager:`` of its own.
-        session_id: Effective session id threaded down from ``load_session``.
+        session_id: Effective session id threaded down from ``load``.
             Passed as ``session_id_override`` to ``resolve_session_manager``.
 
     Returns:

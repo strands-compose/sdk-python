@@ -42,7 +42,7 @@ def test_check_json_output_reports_entry_and_agents(tmp_path, monkeypatch, capsy
 
 
 def test_load_minimal_config_exits_zero(tmp_path, monkeypatch):
-    # No MCP servers configured → validate_mcp does no network probing.
+    # No MCP clients configured → nothing connects to a network.
     cfg = write_config(tmp_path, "agents:\n  a:\n    system_prompt: hi\nentry: a")
     _run(["load", str(cfg), "--quiet"], monkeypatch)
 

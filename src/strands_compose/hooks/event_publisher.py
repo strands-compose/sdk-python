@@ -1,11 +1,4 @@
-"""EventPublisher hook for streaming agent activities to external consumers.
-
-Key Features:
-    - Unified single-agent and multi-agent event publishing
-    - Safe callback wrapping that logs instead of propagating exceptions
-    - Longest-prefix tool label resolution for display names
-    - Callback handler factory for TOKEN, REASONING, and HANDOFF events
-"""
+"""EventPublisher hook for streaming agent activities to external consumers."""
 
 from __future__ import annotations
 

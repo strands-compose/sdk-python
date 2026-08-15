@@ -11,11 +11,6 @@ Usage::
     while (event := await queue.get()) is not None:
         renderer.render(event)
     renderer.flush()
-
-Key Features:
-    - Automatic TTY detection with color suppression for piped output
-    - Inline token and reasoning streaming with mode-change separators
-    - Full event type coverage including multi-agent orchestration events
 """
 
 from __future__ import annotations
@@ -208,16 +203,10 @@ class AnsiRenderer(EventRenderer):
         self._break()
         self._mode = None
         self._out.write(self._separator(event.agent_name, "ERROR", color=self._red))
-        msg = event.data.get("message", "unknown error")
+        msg = event.data.get("text", "unknown error")
         exc_type = event.data.get("exception_type")
-        if exc_type and msg.startswith(f"{exc_type}: "):
-            detail = msg[len(exc_type) + 2 :]
-            self._out.write(
-                f"  {self._red}✗  [{event.agent_name}] ERROR: {exc_type}:\n"
-                f"     {detail}{self._reset}\n"
-            )
-        else:
-            self._out.write(f"  {self._red}✗  [{event.agent_name}] ERROR: {msg}{self._reset}\n")
+        prefix = f"{exc_type}: " if exc_type else ""
+        self._out.write(f"  {self._red}✗  [{event.agent_name}] ERROR: {prefix}{msg}{self._reset}\n")
         self._out.flush()
 
     def _handle_node_start(self, event: StreamEvent) -> None:

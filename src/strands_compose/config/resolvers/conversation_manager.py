@@ -21,9 +21,6 @@ def resolve_conversation_manager(cm_def: ConversationManagerDef) -> Conversation
       ``"strands.agent:SlidingWindowConversationManager"``)
     - ``"./path/to/file.py:ClassName"`` -- file-based import
 
-    No short-name aliases are supported.  Use the full import path so that
-    custom and third-party managers work without ambiguity.
-
     Args:
         cm_def: Conversation manager definition from YAML.
 

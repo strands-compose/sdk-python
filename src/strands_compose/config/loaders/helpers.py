@@ -109,13 +109,6 @@ def update_references(raw: dict, rename_map: dict[str, str]) -> None:
             if isinstance(agent_def.get("mcp"), list):
                 agent_def["mcp"] = [_rename(m) for m in agent_def["mcp"]]
 
-    # MCP client server references
-    clients = raw.get("mcp_clients", {})
-    if isinstance(clients, dict):
-        for client_def in clients.values():
-            if isinstance(client_def, dict) and isinstance(client_def.get("server"), str):
-                client_def["server"] = _rename(client_def["server"])
-
     # Orchestration definitions — driven by reference_fields() descriptors
     _ORCH_DEFS = {
         "delegate": DelegateOrchestrationDef,
@@ -230,7 +223,6 @@ def rewrite_relative_paths(raw: dict, config_dir: Path) -> None:
     - ``agents.<name>.hooks[]`` — string import specs and ``HookDef.type``
     - ``agents.<name>.plugins[]`` — string import specs and ``PluginDef.type``
     - ``agents.<name>.type`` — custom agent factory path
-    - ``mcp_servers.<name>.type`` — MCP server factory path
     - ``models.<name>.provider`` — custom model class path
     - ``session_manager.type`` — custom session manager path
 
@@ -238,7 +230,7 @@ def rewrite_relative_paths(raw: dict, config_dir: Path) -> None:
         raw: Parsed raw config dict (mutated in place).
         config_dir: Directory of the config file being parsed.
     """
-    # ── agents ────────────────────────────────────────────────────────────
+    # agents
     agents = raw.get("agents")
     if isinstance(agents, dict):
         for agent_def in agents.values():
@@ -281,26 +273,19 @@ def rewrite_relative_paths(raw: dict, config_dir: Path) -> None:
             if isinstance(agent_def.get("type"), str):
                 agent_def["type"] = make_absolute(agent_def["type"], config_dir)
 
-    # ── mcp_servers ───────────────────────────────────────────────────────
-    mcp_servers = raw.get("mcp_servers")
-    if isinstance(mcp_servers, dict):
-        for server_def in mcp_servers.values():
-            if isinstance(server_def, dict) and isinstance(server_def.get("type"), str):
-                server_def["type"] = make_absolute(server_def["type"], config_dir)
-
-    # ── models (custom provider) ──────────────────────────────────────────
+    # models (custom provider)
     models = raw.get("models")
     if isinstance(models, dict):
         for model_def in models.values():
             if isinstance(model_def, dict) and isinstance(model_def.get("provider"), str):
                 model_def["provider"] = make_absolute(model_def["provider"], config_dir)
 
-    # ── session_manager (root-level or per-agent — agent already handled) ─
+    # session_manager (root-level or per-agent — agent already handled) ─
     sm = raw.get("session_manager")
     if isinstance(sm, dict) and isinstance(sm.get("type"), str):
         sm["type"] = make_absolute(sm["type"], config_dir)
 
-    # ── orchestrations (hooks + edge conditions on swarm/graph) ─────────
+    # orchestrations (hooks + edge conditions on swarm/graph)
     orchestrations = raw.get("orchestrations")
     if isinstance(orchestrations, dict):
         for orch_def in orchestrations.values():
@@ -325,13 +310,41 @@ def rewrite_relative_paths(raw: dict, config_dir: Path) -> None:
                         edge["condition"] = make_absolute(edge["condition"], config_dir)
 
 
+def apply_mcp_stdio_cwd_default(raw: dict, config_dir: Path) -> None:
+    """Default ``mcp_clients.*.transport_options.cwd`` to ``config_dir``.
+
+    Applies only to ``command:`` clients and only when ``cwd`` isn't already
+    set. ``command`` itself is left untouched.
+
+    Args:
+        raw: Parsed raw config dict (mutated in place).
+        config_dir: Directory of the config file being parsed.
+    """
+    clients = raw.get("mcp_clients")
+    if not isinstance(clients, dict):
+        return
+
+    for client_def in clients.values():
+        if not isinstance(client_def, dict):
+            continue
+        if not isinstance(client_def.get("command"), list):
+            continue  # url: clients have no subprocess cwd to default
+
+        transport_options = client_def.setdefault("transport_options", {})
+        if not isinstance(transport_options, dict):
+            continue  # malformed; let schema validation report it
+        transport_options.setdefault("cwd", str(config_dir))
+
+
 def parse_single_source(source: str | Path) -> dict:
     """Parse one config source into a processed raw dict.
 
     Handles file reading (for Path or existing file-path strings),
-    anchor stripping, and per-source variable interpolation.  Relative
-    filesystem tool specs are rewritten to absolute paths anchored to the
-    config file's directory (not the process CWD).
+    anchor stripping, and per-source variable interpolation.
+    Relative filesystem tool specs are rewritten to absolute paths anchored
+    to the config file's directory (not the process CWD), and stdio MCP client
+    subprocesses (``mcp_clients.*.command``) default their ``cwd`` to the
+    same directory unless the config already sets one.
 
     Args:
         source: File path or raw YAML string.
@@ -378,6 +391,7 @@ def parse_single_source(source: str | Path) -> dict:
 
     if config_dir is not None:
         rewrite_relative_paths(raw, config_dir)
+        apply_mcp_stdio_cwd_default(raw, config_dir)
 
     return raw
 

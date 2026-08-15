@@ -39,7 +39,6 @@ Here is the full list of top-level keys you can put in a config file:
 | `models` | dict | No | Named LLM model definitions. |
 | `agents` | dict | **Yes** (at least one somewhere) | Named agent definitions. |
 | `orchestrations` | dict | No | Named multi-agent orchestration definitions. |
-| `mcp_servers` | dict | No | Named MCP server definitions (managed lifecycle). |
 | `mcp_clients` | dict | No | Named MCP client connections. |
 | `session_manager` | dict | No | Global session manager (inherited by all agents). |
 | `entry` | string | **Yes** | Name of the agent or orchestration to use as the entry point. |

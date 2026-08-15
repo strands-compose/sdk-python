@@ -2,6 +2,10 @@
 
 Returns the standard strands MCPClient (which is a ToolProvider).
 No wrapping — full strands functionality is available.
+
+Clients are not started here: strands starts an ``MCPClient`` when it is
+registered as a tool provider on an ``Agent``, and stops it again when the
+last consuming agent is torn down.
 """
 
 from __future__ import annotations
@@ -10,7 +14,6 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
 from .transports import (
-    DEFAULT_TRANSPORT,
     MCP_TRANSPORT,
     sse_transport,
     stdio_transport,
@@ -20,28 +23,25 @@ from .transports import (
 if TYPE_CHECKING:
     from strands.tools.mcp import MCPClient
 
-    from .server import MCPServer
-
 
 def create_mcp_client(
     *,
-    server: MCPServer | None = None,
     url: str | None = None,
     command: list[str] | None = None,
-    transport: MCP_TRANSPORT = DEFAULT_TRANSPORT,
+    transport: MCP_TRANSPORT | None = None,
     transport_options: dict[str, Any] | None = None,
     **kwargs: Any,
 ) -> MCPClient:
     """Create a strands MCPClient from connection configuration.
 
-    Exactly one of server, url, or command must be provided.
+    Exactly one of ``url`` or ``command`` must be provided.
 
     Args:
-        server: A managed MCPServer instance (connects via its URL).
-        url: External MCP server URL (for SSE or streamable-http).
+        url: MCP server URL (for SSE or streamable-http).
         command: Command to start an MCP server subprocess (stdio transport).
         transport: Override transport type ("stdio", "sse", "streamable-http").
-            Auto-detected if not specified.
+            Leave ``None`` to detect it from the URL path — ``/sse`` selects
+            SSE, anything else selects streamable-http.
         transport_options: Extra kwargs forwarded to the transport factory.
             These are transport-specific — see each transport function for
             available options:
@@ -64,20 +64,17 @@ def create_mcp_client(
     Raises:
         ValueError: If connection parameters are ambiguous.
     """
-    modes = sum(x is not None for x in [server, url, command])
+    modes = sum(x is not None for x in [url, command])
     if modes != 1:
         raise ValueError(
-            f"Exactly one of server, url, or command must be provided (got {modes}).\n"
-            "server=MCPServer for managed servers, url=str for external HTTP, "
-            "command=list[str] for subprocess stdio."
+            f"Exactly one of url or command must be provided (got {modes}).\n"
+            "url=str for an HTTP MCP server, command=list[str] for subprocess stdio."
         )
 
     opts = transport_options or {}
 
-    if server is not None:
-        transport_callable = _transport_for_http(server.url, transport, opts, allow_stdio=False)
-    elif url is not None:
-        transport_callable = _transport_for_http(url, transport, opts, allow_stdio=True)
+    if url is not None:
+        transport_callable = _transport_for_http(url, transport, opts)
     else:
         # command is guaranteed non-None by the modes == 1 check above.
         transport_callable = stdio_transport(command, **opts)  # ty: ignore
@@ -101,26 +98,22 @@ def _make_strands_client(**kwargs: Any) -> MCPClient:
 
 def _transport_for_http(
     url: str,
-    transport: str | None,
+    transport: MCP_TRANSPORT | None,
     opts: dict[str, Any] | None = None,
-    *,
-    allow_stdio: bool = True,
 ) -> Any:
     """Build a transport callable for an HTTP-based MCP connection.
 
     Args:
         url: The MCP server URL.
-        transport: Optional transport override. Auto-detected from URL when omitted.
+        transport: Explicit transport override, or ``None`` to detect it from
+            the URL path.
         opts: Transport-specific options forwarded to the transport factory.
-        allow_stdio: When False, raises ValueError if stdio is requested.
-            Set to False for managed servers where stdio makes no sense.
 
     Returns:
         A transport callable for strands MCPClient.
 
     Raises:
-        ValueError: If the transport type is unsupported or stdio is requested
-            when allow_stdio is False.
+        ValueError: If the transport type is unsupported for an HTTP URL.
     """
     opts = opts or {}
     effective = transport or _detect_transport(url)
@@ -128,12 +121,9 @@ def _transport_for_http(
         return streamable_http_transport(url, **opts)
     if effective == "sse":
         return sse_transport(url, **opts)
-    if effective == "stdio" and not allow_stdio:
-        raise ValueError(
-            "stdio transport not supported for managed servers. Use url or command instead."
-        )
     raise ValueError(
-        f"HTTP-based connection requires 'sse' or 'streamable-http' transport, got: {effective}."
+        f"HTTP-based connection requires 'sse' or 'streamable-http' transport, got: {effective}.\n"
+        "Use command=list[str] for a stdio subprocess server."
     )
 
 

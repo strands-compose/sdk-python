@@ -20,17 +20,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 MCP_TRANSPORT = Literal["stdio", "sse", "streamable-http"]
-"""All MCP transport types (client and server)."""
-
-MCP_SERVER_TRANSPORT = Literal["sse", "streamable-http"]
-"""Transport types valid for :class:`~strands_compose.mcp.server.MCPServer`.
-
-``stdio`` is excluded because it is a client-side transport where the
-client spawns the server as a subprocess and communicates over
-stdin/stdout pipes — there is no HTTP server to manage.
-"""
-
-DEFAULT_TRANSPORT: MCP_SERVER_TRANSPORT = "streamable-http"
+"""MCP transport types."""
 
 
 def stdio_transport(

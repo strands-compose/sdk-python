@@ -1,7 +1,7 @@
 # Strands Compose — Documentation
 
 **[YAML Configuration Guide](configuration/README.md)** — the complete reference, from your
-first one-agent config to nested multi-orchestration systems with MCP servers, hooks,
+first one-agent config to nested multi-orchestration systems with MCP clients, hooks,
 plugins, session persistence, and streaming. Read it in order, or jump to a chapter:
 
 | # | Chapter | What it covers |

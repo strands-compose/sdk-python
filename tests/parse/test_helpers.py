@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
 from strands_compose.config.loaders.helpers import (
+    apply_mcp_stdio_cwd_default,
     is_fs_spec,
     make_absolute,
     merge_raw_configs,
@@ -38,15 +39,14 @@ def test_sanitize_collection_keys_renames_and_updates_entry_reference():
 def test_sanitize_collection_keys_updates_model_and_mcp_references():
     raw = {
         "models": {"fast model": {"provider": "bedrock", "model_id": "m"}},
-        "mcp_clients": {"db client": {"server": "db server"}},
-        "mcp_servers": {"db server": {"type": "mod:make"}},
+        "mcp_clients": {"db client": {"url": "https://example.com/mcp"}},
         "agents": {"a": {"model": "fast model", "mcp": ["db client"]}},
         "entry": "a",
     }
     sanitize_collection_keys(raw)
     assert raw["agents"]["a"]["model"] == "fast_model"
     assert raw["agents"]["a"]["mcp"] == ["db_client"]
-    assert raw["mcp_clients"]["db_client"]["server"] == "db_server"
+    assert "db_client" in raw["mcp_clients"]
 
 
 def test_sanitize_collection_keys_updates_orchestration_references():
@@ -147,6 +147,62 @@ def test_parse_single_source_applies_per_source_interpolation(tmp_path, monkeypa
     )
     raw = parse_single_source(path)
     assert raw["agents"]["a"]["system_prompt"] == "injected"
+
+
+# ── MCP stdio cwd default ───────────────────────────────────────────────────
+
+
+def test_apply_mcp_stdio_cwd_default_sets_cwd_for_command_client(tmp_path):
+    raw = cast("dict[str, Any]", {"mcp_clients": {"calc": {"command": ["python", "server.py"]}}})
+    apply_mcp_stdio_cwd_default(raw, tmp_path)
+    assert raw["mcp_clients"]["calc"]["transport_options"]["cwd"] == str(tmp_path)
+
+
+def test_apply_mcp_stdio_cwd_default_does_not_override_explicit_cwd(tmp_path):
+    raw: dict[str, Any] = {
+        "mcp_clients": {
+            "calc": {
+                "command": ["python", "server.py"],
+                "transport_options": {"cwd": "/explicit/dir"},
+            }
+        }
+    }
+    apply_mcp_stdio_cwd_default(raw, tmp_path)
+    assert raw["mcp_clients"]["calc"]["transport_options"]["cwd"] == "/explicit/dir"
+
+
+def test_apply_mcp_stdio_cwd_default_leaves_url_client_untouched(tmp_path):
+    raw: dict[str, Any] = {"mcp_clients": {"remote": {"url": "https://example.com/mcp"}}}
+    apply_mcp_stdio_cwd_default(raw, tmp_path)
+    assert "transport_options" not in raw["mcp_clients"]["remote"]
+
+
+def test_apply_mcp_stdio_cwd_default_does_not_rewrite_command_itself(tmp_path):
+    raw = cast(
+        "dict[str, Any]",
+        {"mcp_clients": {"fs": {"command": ["npx", "-y", "@scope/server", "/tmp"]}}},
+    )
+    apply_mcp_stdio_cwd_default(raw, tmp_path)
+    assert raw["mcp_clients"]["fs"]["command"] == ["npx", "-y", "@scope/server", "/tmp"]
+    assert raw["mcp_clients"]["fs"]["transport_options"]["cwd"] == str(tmp_path)
+
+
+def test_parse_single_source_defaults_mcp_command_cwd_to_config_dir(tmp_path):
+    path = write_config(
+        tmp_path,
+        """
+        mcp_clients:
+          calc:
+            command: ["python", "server.py"]
+        agents:
+          a:
+            system_prompt: hi
+        entry: a
+        """,
+    )
+    raw = parse_single_source(path)
+    cwd = raw["mcp_clients"]["calc"]["transport_options"]["cwd"]
+    assert Path(cwd) == tmp_path.resolve()
 
 
 # ── Multi-source merge ─────────────────────────────────────────────────────

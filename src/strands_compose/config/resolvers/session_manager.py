@@ -19,11 +19,7 @@ if TYPE_CHECKING:
 def _resolve_bedrock_agentcore_session_manager(
     params: dict[str, Any], session_id: str
 ) -> AgentCoreMemorySessionManager:
-    """Helper to resolve an AgentCoreMemorySessionManager with Bedrock-specific config.
-
-    This is used by resolve_session_manager when the provider is "agentcore".
-    It extracts the relevant parameters from the config and constructs the
-    necessary AgentCoreMemoryConfig and AgentCoreMemorySessionManager objects.
+    """Resolve an AgentCoreMemorySessionManager from ``agentcore`` provider params.
 
     Args:
         params: The "params" dict from the SessionManagerDef for an "agentcore" provider.
@@ -169,7 +165,7 @@ def resolve_leaf_session_manager(
         leaf_def: The leaf model's ``session_manager`` value.
         leaf_is_set: ``"session_manager" in leaf_model.model_fields_set``.
         global_def: The global ``AppConfig.session_manager`` def.
-        session_id: Effective session id from ``load_session``.
+        session_id: Effective session id from ``load``.
 
     Returns:
         A new ``SessionManager`` instance or ``None``.

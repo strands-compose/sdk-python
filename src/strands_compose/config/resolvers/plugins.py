@@ -17,9 +17,6 @@ def resolve_plugin(plugin_def: PluginDef) -> Plugin:
       ``"strands:AgentSkills"``)
     - ``"./path/to/plugins.py:ClassName"`` -- file-based import
 
-    No short-name aliases are supported.  Use the full import path so that
-    submodules and third-party plugins work without ambiguity.
-
     Args:
         plugin_def: Plugin definition from YAML.
 

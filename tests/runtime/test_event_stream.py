@@ -11,7 +11,7 @@ import logging
 
 from strands import Agent, tool
 
-from strands_compose.config import load_session, resolve_infra
+from strands_compose.config import load
 from strands_compose.config.schema import AppConfig
 from strands_compose.types import EventType
 from strands_compose.wire import make_event_queue
@@ -109,7 +109,7 @@ async def test_model_error_emits_error_and_suppresses_complete():
 
 async def test_wire_event_queue_emits_session_start_with_manifest():
     config = AppConfig(agents={"a": agent_def()}, entry="a")
-    resolved = load_session(config, resolve_infra(config))
+    resolved = load(config)
 
     eq = resolved.wire_event_queue()
     first = await eq.get()

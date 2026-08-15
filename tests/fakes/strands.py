@@ -15,8 +15,6 @@ from strands import tool
 from strands.models import Model
 from strands.plugins import Plugin
 
-from strands_compose.mcp.server import MCPServer
-
 
 class FakeModel(Model):
     """A strands ``Model`` that streams a fixed text response, no network.
@@ -140,53 +138,6 @@ class BoomModel(Model):
         yield  # pragma: no cover — makes this an async generator
 
 
-class FakeMCPServer(MCPServer):
-    """A real ``MCPServer`` subtype that records lifecycle calls, no uvicorn thread.
-
-    Subclasses the ABC so it is accepted by ``MCPLifecycle.add_server`` while
-    overriding every runtime method to be inert and observable.
-    """
-
-    def __init__(
-        self,
-        *,
-        url: str = "http://localhost:0/mcp",
-        ready: bool = True,
-        record: list[str] | None = None,
-        label: str = "server",
-    ) -> None:
-        """Store the reported URL, readiness result, and optional shared order log."""
-        super().__init__(name=label)
-        self.calls: list[str] = []
-        self._url = url
-        self._will_be_ready: bool = ready
-        self._record = record
-        self._label = label
-
-    def _register_tools(self, mcp: Any) -> None:
-        """No tools to register on the fake."""
-
-    def start(self) -> None:
-        """Record a start."""
-        self.calls.append("start")
-
-    def wait_ready(self, timeout: float = 30) -> bool:
-        """Record a readiness probe and return the configured result."""
-        self.calls.append("wait_ready")
-        return self._will_be_ready
-
-    def stop(self) -> None:
-        """Record a stop (and its order relative to clients, when a log is shared)."""
-        self.calls.append("stop")
-        if self._record is not None:
-            self._record.append(self._label)
-
-    @property
-    def url(self) -> str:
-        """Return the reported URL."""
-        return self._url
-
-
 class FakePlugin(Plugin):
     """Minimal Plugin that contributes one identifiable ``@tool``.
 
@@ -211,13 +162,11 @@ def fake_plugin_factory(*, prefix: str = "") -> FakePlugin:
 
 
 class FakeMCPClient:
-    """Minimal MCP client stand-in for lifecycle ordering tests."""
+    """Minimal MCP client stand-in — contributes no tools, hits no network."""
 
-    def __init__(self, *, record: list[str] | None = None, label: str = "client") -> None:
-        """Initialise an empty call log and optional shared order log."""
+    def __init__(self) -> None:
+        """Initialise an empty call log."""
         self.calls: list[str] = []
-        self._record = record
-        self._label = label
 
     def start(self) -> None:
         """Record a start."""
@@ -226,5 +175,3 @@ class FakeMCPClient:
     def stop(self, exc_type: Any = None, exc_val: Any = None, exc_tb: Any = None) -> None:
         """Record a stop (matches the strands MCPClient stop signature)."""
         self.calls.append("stop")
-        if self._record is not None:
-            self._record.append(self._label)

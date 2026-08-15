@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from strands import Agent
 
-from strands_compose.config import load_session, resolve_infra
+from strands_compose.config import load
 from strands_compose.config.schema import AppConfig
 from strands_compose.manifest import build_manifest
 from tests.factories import agent_def, graph_orchestration
@@ -33,7 +33,7 @@ def test_graph_orchestration_topology_is_described():
         orchestrations={"pipe": graph_orchestration("a", [("a", "b")])},
         entry="pipe",
     )
-    resolved = load_session(config, resolve_infra(config))
+    resolved = load(config)
     manifest = build_manifest(resolved.agents, resolved.orchestrators, resolved.entry)
 
     pipe = next(o for o in manifest.orchestrations if o.name == "pipe")
@@ -67,7 +67,7 @@ def test_delegate_orchestration_agent_is_listed_in_manifest_agents():
         orchestrations={"coord": delegate_orchestration("writer", {"researcher": "d"})},
         entry="coord",
     )
-    resolved = load_session(config, resolve_infra(config))
+    resolved = load(config)
     manifest = build_manifest(resolved.agents, resolved.orchestrators, resolved.entry)
     # The forked delegate agent reports usage under its own name, so it appears in agents.
     assert "coord" in {d.name for d in manifest.agents}
@@ -81,7 +81,7 @@ def test_swarm_topology_reports_nodes_and_entry():
         orchestrations={"team": swarm_orchestration("a", ["a", "b"])},
         entry="team",
     )
-    resolved = load_session(config, resolve_infra(config))
+    resolved = load(config)
     manifest = build_manifest(resolved.agents, resolved.orchestrators, resolved.entry)
     team = next(o for o in manifest.orchestrations if o.name == "team")
     assert team.kind == "swarm"

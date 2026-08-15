@@ -17,7 +17,6 @@ def validate_references(config: AppConfig) -> None:
     Checks:
     - Agent model references exist in config.models
     - Agent MCP client references exist in config.mcp_clients
-    - MCP client server references exist in config.mcp_servers
     - Orchestration node references exist in agents or orchestrations
 
     Args:
@@ -44,14 +43,6 @@ def validate_references(config: AppConfig) -> None:
                     f"which is not defined.\n"
                     f"Available: {list(config.mcp_clients)}"
                 )
-
-    for client_name, client_def in config.mcp_clients.items():
-        if client_def.server and client_def.server not in config.mcp_servers:
-            raise UnresolvedReferenceError(
-                f"MCP client '{client_name}' references server '{client_def.server}' "
-                f"which is not defined.\n"
-                f"Available: {list(config.mcp_servers)}"
-            )
 
     for orch_name, orch_def in config.orchestrations.items():
         validate_orchestration_refs(orch_def, all_node_names, orch_name=orch_name)

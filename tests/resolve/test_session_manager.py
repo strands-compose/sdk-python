@@ -6,7 +6,7 @@ import pytest
 from strands.session import FileSessionManager
 from strands.session.session_manager import SessionManager
 
-from strands_compose.config import load_session, resolve_infra
+from strands_compose.config import load
 from strands_compose.config.resolvers.session_manager import (
     resolve_leaf_session_manager,
     resolve_session_manager,
@@ -80,10 +80,10 @@ def test_no_leaf_no_global_returns_none():
     assert result is None
 
 
-# ── Infra/session split — load-level composition ───────────────────────────
+# ── load-level composition ─────────────────────────────────────────────────
 
 
-def test_global_agentcore_provider_is_rejected_by_resolve_infra():
+def test_global_agentcore_provider_is_rejected():
     # agentcore needs a unique actor_id per agent, so it can't be a global default.
     config = AppConfig(
         agents={"a": agent_def()},
@@ -91,7 +91,7 @@ def test_global_agentcore_provider_is_rejected_by_resolve_infra():
         session_manager=SessionManagerDef(provider="agentcore"),
     )
     with pytest.raises(ValueError, match="agentcore"):
-        resolve_infra(config)
+        load(config)
 
 
 def test_global_session_manager_propagates_to_the_built_entry_agent(tmp_path, fake_runtime):
@@ -101,7 +101,7 @@ def test_global_session_manager_propagates_to_the_built_entry_agent(tmp_path, fa
         entry="a",
         session_manager=SessionManagerDef(provider="file", params={"storage_dir": str(tmp_path)}),
     )
-    resolved = load_session(config, resolve_infra(config), session_id="s1")
+    resolved = load(config, session_id="s1")
 
     # Observe via the manifest (public introspection), not private agent state.
     manifest = build_manifest(resolved.agents, resolved.orchestrators, resolved.entry)
@@ -109,17 +109,16 @@ def test_global_session_manager_propagates_to_the_built_entry_agent(tmp_path, fa
     assert manifest.agents[0].session_manager.provider == "file"
 
 
-def test_two_sessions_over_one_infra_build_isolated_agents(tmp_path, fake_runtime):
-    # The whole point of the split: reuse infra, create fresh agents per session.
+def test_each_load_builds_isolated_agents(tmp_path, fake_runtime):
+    # One parsed config, many sessions — each gets its own agents.
     config = AppConfig(
         models={"m": model_def()},
         agents={"a": agent_def(model="m")},
         entry="a",
         session_manager=SessionManagerDef(provider="file", params={"storage_dir": str(tmp_path)}),
     )
-    infra = resolve_infra(config)
 
-    r1 = load_session(config, infra, session_id="s1")
-    r2 = load_session(config, infra, session_id="s2")
+    r1 = load(config, session_id="s1")
+    r2 = load(config, session_id="s2")
 
     assert r1.agents["a"] is not r2.agents["a"]

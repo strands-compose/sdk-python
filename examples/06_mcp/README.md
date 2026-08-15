@@ -1,42 +1,50 @@
-# 06 — MCP: All Connection Modes
+# 06 — MCP: Both Connection Modes
 
-> One example that covers every way to wire MCP tools to an agent.
+> One example that covers both ways to wire MCP tools to an agent.
 
 ## What this shows
 
 | Mode | Key | What it does |
 |---|---|---|
-| 1 | `server:` | Launch a local Python MCP server; strands-compose owns its full lifecycle |
-| 2 | `url:` | Connect to a real external MCP server over Streamable HTTP — no server setup |
-| 3 | `command:` *(commented)* | Spawn a local CLI tool that speaks MCP over stdio |
+| 1 | `command:` | Spawn an MCP server as a stdio subprocess — the client owns it |
+| 2 | `url:` | Connect to an MCP server running somewhere else over Streamable HTTP |
 
-Both live clients are attached to a **single agent**, which gets calculator tools
-from the local server and AWS documentation tools from the remote server.
+Both clients are attached to a **single agent**, which gets calculator tools from
+the local subprocess and AWS documentation tools from the remote server.
 
 ## How it works
 
-### Mode 1 — local managed server
+### Mode 1 — stdio subprocess
 
 ```yaml
-mcp_servers:
-  calculator:
-    type: ./server.py:create      # factory function -> MCPServer subclass
-    params:
-      port: 9001
-
 mcp_clients:
   calc_client:
-    server: calculator            # auto-connects; transport/URL inferred
+    command: ["python", "calculator_server.py"]
     params:
       prefix: calc                # tools: calc_add, calc_multiply, calc_percentage
 ```
 
-`server.py` subclasses `MCPServer` and uses FastMCP's `@mcp.tool()` decorator.
-The `create()` factory is called by strands-compose with `params` from YAML.
-On `load()`, strands-compose starts the server, connects the client, and on exit
-`mcp_lifecycle.stop()` tears everything down — you never manage threads or sockets.
+`calculator_server.py` is an ordinary `FastMCP` script. The MCP client spawns it
+on first use and tears it down with the agent, so its whole lifetime is handled
+for you.
 
-### Mode 2 — real external HTTP server
+The subprocess's working directory defaults to the config file's own
+directory, so `calculator_server.py` above resolves relative to
+`examples/06_mcp/` regardless of where you launch the process from. Set
+`transport_options.cwd` explicitly to override it.
+
+This also works with any CLI tool that speaks MCP over stdio — for example
+the filesystem server, run on demand via `npx` with no local install:
+
+```yaml
+mcp_clients:
+  fs_tools:
+    command: ["npx", "-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
+    params:
+      prefix: fs                  # tools: fs_read_file, fs_list_directory, …
+```
+
+### Mode 2 — external HTTP server
 
 ```yaml
 mcp_clients:
@@ -49,20 +57,15 @@ mcp_clients:
 ```
 
 AWS publicly hosts a Knowledge MCP server at `https://knowledge-mcp.global.api.aws`.
-No API key is needed. No `mcp_servers:` block — the server is already running.
+No API key is needed.
 
-### Mode 3 — stdio subprocess *(uncomment in config to try)*
+This is the mode to use in production: deploy your MCP server independently
+(container, VM, or behind a gateway) and point agents at its URL. To try it
+locally, run the example server over HTTP and swap `command:` for `url:`:
 
-```yaml
-mcp_clients:
-  fs_tools:
-    command: ["npx", "-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
-    params:
-      prefix: fs
+```bash
+uv run python examples/06_mcp/calculator_server.py --http
 ```
-
-For CLI tools that speak MCP over stdin/stdout. Works with any `npx`, `uvx`,
-or binary that implements the MCP stdio protocol.
 
 ### Attaching both clients to one agent
 
@@ -79,8 +82,12 @@ based on the question.
 
 ## Good to know
 
-**`mcp_servers:` is only needed for locally managed servers.** For `url:` or
-`command:` clients you connect to servers you don't own — no `mcp_servers:` block.
+**strands-compose never runs MCP servers.** It creates clients and connects
+them. For a local server use `command:` (the client spawns the process); for a
+remote one use `url:`.
+
+**No teardown to write.** Strands starts an MCP client when it is attached to an
+agent and stops it when the last agent using it goes away.
 
 **`params.prefix`** namespaces all tool names from a client — avoids collisions
 when two servers expose identically named tools.
@@ -89,9 +96,7 @@ when two servers expose identically named tools.
 for large servers where you only need a few tools.
 
 **Transport auto-detection.** `url:` clients infer the transport from the URL
-scheme and path. Override with `transport:` if needed.
-
-**Paths** in `type:` are relative to the config file, not the working directory.
+path (`/sse` → SSE, otherwise Streamable HTTP). Override with `transport:`.
 
 ## Prerequisites
 

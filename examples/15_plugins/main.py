@@ -50,8 +50,6 @@ def main() -> None:
             print("\n" + 52 * "-" + "\n")
     except KeyboardInterrupt:
         print("\nGoodbye!")
-    finally:
-        resolved.mcp_lifecycle.stop()
 
 
 # ── entry point ───────────────────────────────────────────────────────────────
