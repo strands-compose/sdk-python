@@ -193,6 +193,10 @@ class MCPServer(ABC):
             try:
                 asyncio.run(self._uvicorn_server.serve())  # ty: ignore
             except BaseException as exc:
+                # Captured here and re-raised by wait_ready() on the caller's
+                # thread — logged so it is not silently lost if wait_ready()
+                # is never called.
+                logger.warning("server=<%s> | MCP server thread crashed", self.name, exc_info=True)
                 self._error = exc
                 self._ready.set()
 

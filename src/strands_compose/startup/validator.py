@@ -109,6 +109,7 @@ async def _check_mcp_client(name: str, client: StrandsMCPClient) -> CheckResult:
             return CheckResult.passed("runtime", subject, "Client has tool registry")
         return CheckResult.passed("runtime", subject, "Client is available")
     except Exception as exc:
+        logger.debug("client=<%s> | startup check failed", name, exc_info=True)
         return CheckResult.warn(
             "runtime",
             subject,
@@ -136,7 +137,7 @@ async def probe_http_health(subject: str, url: str) -> CheckResult:
         resp = await asyncio.to_thread(
             urllib.request.urlopen,
             url,
-            timeout=5,  # noqa: S310
+            timeout=5,
         )
         status = resp.status
         if status < 500:
@@ -158,6 +159,7 @@ async def probe_http_health(subject: str, url: str) -> CheckResult:
             hint=f"Service at {url} returned a server error",
         )
     except Exception as exc:
+        logger.debug("subject=<%s>, url=<%s> | startup probe failed", subject, url, exc_info=True)
         return CheckResult.critical(
             "network",
             subject,

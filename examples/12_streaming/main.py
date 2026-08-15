@@ -11,9 +11,12 @@ Usage:
 from __future__ import annotations
 
 import asyncio
+import logging
 from pathlib import Path
 
 from strands_compose import AnsiRenderer, cli_errors, load
+
+logger = logging.getLogger(__name__)
 
 CONFIG = Path(__file__).parent / "config.yaml"
 STARTER = "Analyse the impact of large language models on software engineering."
@@ -28,7 +31,9 @@ async def _stream(prompt: str, entry, queue):
         try:
             result = await entry.invoke_async(prompt)
         except Exception:
-            pass  # nosec B110
+            # Errors surface to the user via the ERROR StreamEvent emitted by
+            # EventPublisher; log here only for local debugging.
+            logger.debug("entry invocation failed", exc_info=True)
         finally:
             await queue.close()
 

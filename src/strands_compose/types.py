@@ -14,7 +14,7 @@ This module is the single canonical home for cross-package types:
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Annotated, Any, Literal
 
@@ -78,7 +78,7 @@ class StreamEvent:
 
     type: str
     agent_name: str
-    timestamp: datetime = field(default_factory=lambda: datetime.now(tz=timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(tz=UTC))
     data: dict[str, Any] = field(default_factory=dict)
 
     def asdict(self) -> dict[str, Any]:
@@ -106,7 +106,7 @@ class StreamEvent:
         elif isinstance(ts_raw, datetime):
             ts = ts_raw
         else:
-            ts = datetime.now(tz=timezone.utc)
+            ts = datetime.now(tz=UTC)
 
         return cls(
             type=data.get("type", ""),

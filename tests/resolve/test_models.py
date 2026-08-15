@@ -20,7 +20,7 @@ def test_custom_provider_import_spec_returns_instance():
 
 
 def test_custom_provider_not_a_model_subclass_raises():
-    with pytest.raises(ValueError, match="Model"):
+    with pytest.raises(TypeError, match="Model"):
         resolve_model(model_def(provider="builtins:dict", model_id="x"))
 
 

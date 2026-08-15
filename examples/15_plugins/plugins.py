@@ -8,7 +8,7 @@ call a plugin class, so the ``config.yaml`` entry looks identical either way.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from strands.vended_plugins.context_injector import ContextInjector
@@ -16,7 +16,7 @@ from strands.vended_plugins.context_injector import ContextInjector
 
 def _render_utc_clock(_context: Any) -> str:
     """Render the current UTC time as an injectable context block."""
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     return f"<current_utc_time>{now}</current_utc_time>"
 
 
