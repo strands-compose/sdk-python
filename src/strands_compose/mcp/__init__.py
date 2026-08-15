@@ -1,4 +1,4 @@
-"""MCP client construction and transports."""
+"""MCP client construction and transports. Clients only — never a server."""
 
 from __future__ import annotations
 

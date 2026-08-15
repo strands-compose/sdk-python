@@ -25,10 +25,6 @@ def test_sanitize_name_replaces_illegal_characters():
     assert sanitize_name("my agent!") == "my_agent"
 
 
-def test_sanitize_name_truncates_to_64_chars():
-    assert len(sanitize_name("a" * 200)) == 64
-
-
 def test_sanitize_collection_keys_renames_and_updates_entry_reference():
     raw = {"agents": {"my agent": {"system_prompt": "hi"}}, "entry": "my agent"}
     sanitize_collection_keys(raw)

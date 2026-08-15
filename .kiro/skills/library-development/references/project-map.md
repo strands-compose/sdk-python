@@ -32,6 +32,7 @@ src/strands_compose/
 │       ├── models.py            # resolve_model — built-in provider or custom import
 │       ├── mcp.py               # resolve_mcp_client / resolve_tools
 │       ├── hooks.py             # resolve_hook / resolve_hook_entry
+│       ├── plugins.py           # resolve_plugin / resolve_plugin_entry
 │       ├── session_manager.py   # resolve_session_manager · resolve_leaf_session_manager (leaf chain)
 │       ├── conversation_manager.py
 │       └── orchestrations/
@@ -109,7 +110,7 @@ for the chapter-by-chapter reference.
 ## Stack notes
 
 - **Python ≥ 3.11** (ruff/ty target 3.13). Runtime deps: `strands-agents`
-  (>=1.48,<2), `pydantic` v2, `pyyaml`, `mcp`. Optional extras:
+  (>=1.52.0,<2), `pydantic` v2, `pyyaml`, `mcp`. Optional extras:
   `agentcore-memory`, `ollama`, `openai`, `gemini`, `anthropic`.
 - **MCP is client-side only.** A server is either spawned by the client as a
   subprocess (`command:`, stdio) or already running elsewhere (`url:`,

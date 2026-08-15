@@ -56,7 +56,7 @@ entry: team
 | `connections` | list | Yes | Sub-agents to wire as tools |
 | `connections[].agent` | string | Yes | Name of the target agent or orchestration |
 | `connections[].description` | string | Yes | Tool description the LLM sees |
-| `connections[].preserve_context` | bool | No | Keep the delegate's history between calls (default `true`). Set `false` for a stateless delegate that starts from its construction-time baseline every call. Rejected for a nested orchestration, or for an agent carrying a session manager |
+| `connections[].preserve_context` | bool | No | Keep the delegate's history between calls (default `true`). `false` restarts it from its construction-time baseline every call — rejected for a Swarm or Graph target, and rejected by strands if the agent has a session manager |
 | `session_manager` | dict | No | Override session manager for the forked agent |
 | `hooks` | list | No | Additional hooks for the forked agent |
 | `agent_kwargs` | dict | No | Override agent kwargs (merged with entry agent's kwargs) |

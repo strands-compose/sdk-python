@@ -1,4 +1,4 @@
-"""Zero-dependency ANSI renderer for :class:`~strands_compose.wire.StreamEvent` objects.
+"""Zero-dependency ANSI renderer for StreamEvent objects.
 
 Colour codes are automatically suppressed when stdout is not a TTY
 (piped / redirected output).
@@ -83,6 +83,7 @@ class AnsiRenderer(EventRenderer):
             EventType.TOOL_START: self._handle_tool_start,
             EventType.TOOL_END: self._handle_tool_end,
             EventType.AGENT_COMPLETE: self._handle_agent_complete,
+            EventType.INTERRUPT: self._handle_interrupt,
             EventType.ERROR: self._handle_error,
             EventType.NODE_START: self._handle_node_start,
             EventType.NODE_STOP: self._handle_node_stop,
@@ -164,7 +165,7 @@ class AnsiRenderer(EventRenderer):
         self._mode = None
         self._active_agent = None
         data = event.data
-        label = data.get("tool_label") or data.get("tool_name", "unknown")
+        label = data.get("tool_name", "unknown")
         tool_input = data.get("tool_input", {})
         preview = str(tool_input)[:80] + ("…" if len(str(tool_input)) > 80 else "")
         self._out.write(self._separator(event.agent_name, "TOOL USE", color=self._magenta))
@@ -196,6 +197,20 @@ class AnsiRenderer(EventRenderer):
         out_tokens = usage.get("output_tokens", 0)
         self._out.write(
             f"  {self._dim}✅  [{event.agent_name}] complete  ({in_tokens} input, {out_tokens} output tokens){self._reset}\n"
+        )
+        self._out.flush()
+
+    def _handle_interrupt(self, event: StreamEvent) -> None:
+        self._break()
+        self._mode = None
+        self._active_agent = None
+        data = event.data
+        name = data.get("name") or "—"
+        reason = data.get("reason") or "no reason given"
+        self._out.write(self._separator(event.agent_name, "INTERRUPT", color=self._yellow))
+        self._out.write(
+            f"  {self._yellow}⏸{self._reset}  [{event.agent_name}] awaiting input for {name!r}: {reason}\n"
+            f"  {self._dim}interrupt_id: {data.get('interrupt_id') or '—'}{self._reset}\n"
         )
         self._out.flush()
 

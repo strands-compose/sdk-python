@@ -17,8 +17,7 @@ if TYPE_CHECKING:
 def resolve_tools(tool_specs: list[str]) -> list[Any]:
     """Resolve tool specification strings to tool objects.
 
-    Delegates to :func:``~strands_compose.tools.resolve_tool_specs``,
-    which understands module paths, file paths, and directory paths.
+    Understands module paths, file paths, and directory paths.
 
     Args:
         tool_specs: List of tool specification strings.
@@ -31,8 +30,6 @@ def resolve_tools(tool_specs: list[str]) -> list[Any]:
 
 def resolve_mcp_client(client_def: MCPClientDef) -> StrandsMCPClient:
     """Resolve an MCPClientDef to a strands MCPClient.
-
-    Uses :func:``~strands_compose.mcp.client.create_mcp_client``.
 
     Args:
         client_def: MCP client definition from YAML.

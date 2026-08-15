@@ -6,7 +6,7 @@
 
 - **`type:`** — point an agent at a custom callable instead of the built-in constructor
 - **`agent_kwargs:`** — pass additional keyword arguments that only your factory understands
-- Factory receives all standard params (`name`, `agent_id`, `model`, `system_prompt`, `tools`, `hooks`, `session_manager`) plus your extras
+- Factory receives all standard params (`name`, `agent_id`, `model`, `system_prompt`, `description`, `tools`, `hooks`, `plugins`, `conversation_manager`, `session_manager`) plus your extras via `**agent_kwargs`
 
 ## How it works
 

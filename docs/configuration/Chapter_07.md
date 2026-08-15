@@ -119,17 +119,17 @@ session_manager:
 
 The class must be a subclass of `strands.session.SessionManager`. When `type` is set, `provider` is ignored.
 
-## Swarm Agents and Sessions
+## Swarm and Graph Agents and Sessions
 
-**Important limitation**: agents that participate in a Swarm orchestration **cannot** have a session manager. This is a strands-agents limitation. If a global session manager is set and an agent is used in a swarm, strands-compose will raise a clear error:
+**Important limitation**: agents that participate in a Swarm or Graph orchestration **cannot** have a session manager. If a global session manager is set and an agent is used in a swarm or graph, strands-compose will raise a clear error:
 
 ```
-ConfigurationError: Agent 'drafter' is in swarm orchestration and cannot
-have a session manager (source: global 'session_manager:' in config).
+ConfigurationError: Agent 'drafter' is in a swarm or graph orchestration and cannot have a session manager (source: global 'session_manager:' in config).
+Strands does not yet support session persistence for Swarm or Graph node agents.
 Fix: Add 'session_manager: ~' to agent 'drafter' to opt out of the global default.
 ```
 
-The fix: add `session_manager: ~` to each swarm agent to opt out.
+The fix: add `session_manager: ~` to each swarm or graph node agent to opt out.
 
 > **Tips & Tricks**
 >

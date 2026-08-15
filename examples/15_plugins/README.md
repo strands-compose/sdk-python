@@ -31,7 +31,7 @@ plugins:
 
   - type: strands.vended_plugins.goal:GoalLoop # retry until the answer is concise
     params:
-      goal: "Answer in at most three sentences, in plain language with no jargon."
+      goal: "Respond concisely and skip filler, hedging, and restating the question."
       max_attempts: 2
 ```
 

@@ -23,9 +23,8 @@ class HookDef(BaseModel):
     """Hook provider reference.
 
     ``type`` must be a ``module.path:ClassName`` import path or a
-    ``./file.py:ClassName`` file-based import path.  The resolver raises
-    ``ValueError`` if there is no colon separator.  ``params`` are forwarded
-    as constructor kwargs.
+    ``./file.py:ClassName`` file-based import path.  A malformed spec raises
+    ``ImportResolutionError``.  ``params`` are forwarded as constructor kwargs.
     """
 
     type: str
@@ -49,9 +48,8 @@ class ConversationManagerDef(BaseModel):
     """Conversation manager configuration.
 
     ``type`` must be a ``module.path:ClassName`` import path or a
-    ``./file.py:ClassName`` file-based import path.  The resolver raises
-    ``ValueError`` if there is no colon separator.  ``params`` are forwarded
-    as constructor kwargs.
+    ``./file.py:ClassName`` file-based import path.  A malformed spec raises
+    ``ConfigurationError``.  ``params`` are forwarded as constructor kwargs.
 
     Built-in strands classes:
 
@@ -161,7 +159,6 @@ class AgentDef(BaseModel):
     hooks: list[HookDef | str] = Field(default_factory=list)
     plugins: list[PluginDef | str] = Field(default_factory=list)
     mcp: list[str] = Field(default_factory=list)
-    tool_labels: dict[str, str] = Field(default_factory=dict)
     conversation_manager: ConversationManagerDef | None = None
     session_manager: SessionManagerDef | None = None
 
@@ -177,8 +174,9 @@ class DelegateConnectionDef(BaseModel):
     preserve_context: bool = True
     """Whether the delegate keeps its history between calls.
 
-    ``False`` resets an agent to its construction-time baseline every call.
-    Incompatible with a session manager, and unsupported for an Swarm and Graph.
+    ``False`` resets the agent to its construction-time baseline every call.
+    Rejected for a Swarm or Graph target (no baseline), and rejected by strands
+    itself if the agent has a session manager.
     """
 
 
@@ -336,6 +334,7 @@ class AppConfig(BaseModel):
                         raise ValueError(
                             f"Name collision between {section_a} and {section_b}: "
                             f"{sorted(overlap)}.\n"
-                            f"Names must be unique within each section."
+                            f"Names must be unique across {' and '.join(namespace)} — "
+                            f"they share one lookup namespace."
                         )
         return self

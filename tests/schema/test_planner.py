@@ -6,7 +6,7 @@ import pytest
 
 from strands_compose.config.resolvers.orchestrations.planner import topological_sort
 from strands_compose.exceptions import CircularDependencyError
-from tests.factories import delegate_orchestration, swarm_orchestration
+from tests.factories import delegate_orchestration, graph_orchestration, swarm_orchestration
 
 
 def test_dependencies_are_ordered_before_dependents():
@@ -39,3 +39,13 @@ def test_self_reference_raises_circular():
     configs = {"loop": swarm_orchestration("loop", ["loop"])}
     with pytest.raises(CircularDependencyError):
         topological_sort(configs)
+
+
+def test_graph_entry_orchestration_is_ordered_first_when_no_edge_names_it():
+    """A graph's entry is a node even when no edge mentions it."""
+    configs = {
+        "pipeline": graph_orchestration("inner", [("reviewer", "editor")]),
+        "inner": delegate_orchestration("writer", {"researcher": "research"}),
+    }
+    order = topological_sort(configs)
+    assert order.index("inner") < order.index("pipeline")

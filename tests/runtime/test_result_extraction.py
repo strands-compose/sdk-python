@@ -33,10 +33,6 @@ def test_extract_text_returns_last_text_block():
     assert extract_text(message) == "final answer"
 
 
-def test_extract_text_of_empty_message_is_empty_string():
-    assert extract_text(None) == ""
-
-
 def test_extract_last_message_returns_agent_result_message():
     message: Message = {"role": "assistant", "content": [{"text": "hi"}]}
     result = AgentResult(

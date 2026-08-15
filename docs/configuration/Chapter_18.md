@@ -42,7 +42,6 @@ agents:
     hooks: []                      # List of HookDef objects or import path strings
     plugins: []                    # List of PluginDef objects or import path strings
     mcp: []                        # List of MCP client names
-    tool_labels: {}                # Tool name -> display label mapping
     conversation_manager: null     # ConversationManagerDef
     session_manager: null          # Per-agent SessionManagerDef (overrides global)
 ```
@@ -116,6 +115,7 @@ orchestrations:
     connections:
       - agent: "target_name"      # Agent or orchestration name
         description: "..."         # Tool description for LLM
+        preserve_context: true     # Keep delegate history between calls (default true)
     session_manager: null          # Override session manager
     hooks: []                      # Additional hooks
     agent_kwargs: {}               # Override agent kwargs (merged)
@@ -158,4 +158,4 @@ orchestrations:
 
 ---
 
-**Bonus**: [Quick Recipes →](Quick_Recipes.md)
+[Next: Chapter 19 — Plugins →](Chapter_19.md)

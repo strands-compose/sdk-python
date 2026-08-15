@@ -8,7 +8,7 @@
   <p>
     <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.11+-blue.svg" alt="Python 3.11+"></a>
     <a href="https://pypi.org/project/strands-compose/"><img src="https://img.shields.io/pypi/v/strands-compose.svg" alt="PyPI version"></a>
-    <a href="https://github.com/strands-agents/harness-sdk"><img src="https://img.shields.io/badge/strands--agents-1.48.0+-green.svg" alt="Strands Agents"></a>
+    <a href="https://github.com/strands-agents/harness-sdk"><img src="https://img.shields.io/badge/strands--agents-1.52.0+-green.svg" alt="Strands Agents"></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" alt="License"></a>
   </p>
 </div>
@@ -149,6 +149,7 @@ uv run python examples/01_minimal/main.py
 | 12 | [Streaming](examples/12_streaming/) | `wire_event_queue()` — stream every token, tool call, and handoff live |
 | 13 | [Graph conditions](examples/13_graph_conditions/) | Conditional edges — `condition:`, `reset_on_revisit`, `max_node_executions` |
 | 14 | [Agent factory](examples/14_agent_factory/) | `type:` + `agent_kwargs:` — custom agent factory instead of `Agent()` |
+| 15 | [Plugins](examples/15_plugins/) | `plugins:` — reusable behaviour packages (skills, context injection, quality loops) |
 
 ---
 
@@ -355,7 +356,7 @@ git clone https://github.com/strands-compose/sdk-python
 cd sdk-python
 uv run just install      # install deps + wire git hooks (run once after clone)
 
-uv run just check        # lint + type check + security scan
+uv run just check        # format + lint + type check + security
 uv run just test         # pytest with coverage
 uv run just format       # auto-format (Ruff)
 ```

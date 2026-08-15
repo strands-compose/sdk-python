@@ -106,7 +106,7 @@ Event streaming is configured in Python, not YAML — it's a runtime concern. Bu
 > - Call `wire_event_queue()` only **once** per `ResolvedConfig` — it mutates agents and orchestrators by adding hooks. Calling it twice would double-attach publishers.
 > - Call `queue.flush()` between requests to clear stale events from a previous invocation. This also resets the `SESSION_START` / `SESSION_END` guards so the next cycle can re-emit them.
 > - The queue has a max size of 10,000. If your agent generates more events than the consumer processes, events are dropped with a warning.
-> - `SESSION_START` is emitted synchronously by `wire_event_queue()` before any agent runs. `SESSION_END` is emitted by `queue.close()` — always call it in a `finally` block.
+> - `SESSION_START` is emitted synchronously by `wire_event_queue()` before any agent runs. `SESSION_END` is emitted by `await queue.close()` — always call it in a `finally` block.
 
 ---
 

@@ -26,7 +26,7 @@ agents:
 |--------|---------------|
 | `./file.py` | All `@tool`-decorated functions from the file |
 | `./file.py:func_name` | One specific function (auto-wrapped with `@tool` if needed) |
-| `./dir/` | All `@tool` functions from all `.py` files in directory (skips `_`-prefixed files) |
+| `./dir/` | All `@tool` functions from all `.py` files in directory tree (skips path segments starting with `_` or `.`) |
 | `module.path` | All `@tool` functions from an installed Python module |
 | `module.path:func_name` | One specific function from a module |
 
@@ -84,14 +84,16 @@ Module-based specs (`module.path:func`) use the standard Python import system �
 
 ## Directory Scanning
 
-The directory spec (`./dir/`) recursively loads all `.py` files in the directory, skipping any file whose name starts with `_`:
+The directory spec (`./dir/`) recursively loads all `.py` files in the directory tree. Any path segment starting with `_` or `.` is skipped — so `_private.py`, `_helpers/`, `__pycache__/`, and `.venv/` are never imported:
 
 ```
 tools/
-├── _helpers.py     # Skipped (underscore prefix)
-├── __init__.py     # Skipped (underscore prefix)
-├── analysis.py     # Loaded — all @tool functions extracted
-└── formatting.py   # Loaded — all @tool functions extracted
+├── _helpers.py          # Skipped (underscore prefix)
+├── __pycache__/         # Skipped (underscore prefix on directory)
+├── .venv/               # Skipped (dot prefix on directory)
+├── analysis.py          # Loaded — all @tool functions extracted
+└── sub/
+    └── extras.py        # Loaded — recursion includes nested dirs
 ```
 
 > **Tips & Tricks**

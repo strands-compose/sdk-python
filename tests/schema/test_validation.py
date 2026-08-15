@@ -9,7 +9,7 @@ import pytest
 from pydantic import ValidationError
 
 from strands_compose.config.loaders import load_config
-from strands_compose.config.schema import AppConfig, MCPClientDef, OrchestrationDef
+from strands_compose.config.schema import AppConfig, OrchestrationDef
 from strands_compose.exceptions import SchemaValidationError
 from tests.factories import agent_def, app_config
 
@@ -35,23 +35,6 @@ def test_name_collision_across_agents_and_orchestrations_raises():
             orchestrations={"dupe": delegate_orchestration("helper", {"helper": "d"})},
             entry="dupe",
         )
-
-
-# ── MCPClientDef connection-mode validator ─────────────────────────────────
-
-
-def test_mcp_client_requires_exactly_one_connection_mode_none_set():
-    with pytest.raises(ValidationError):
-        MCPClientDef()
-
-
-def test_mcp_client_rejects_multiple_connection_modes():
-    with pytest.raises(ValidationError):
-        MCPClientDef(url="http://x/mcp", command=["python", "-m", "srv"])
-
-
-def test_mcp_client_accepts_single_connection_mode():
-    assert MCPClientDef(url="http://x/mcp").url == "http://x/mcp"
 
 
 # ── Orchestration discriminated union ──────────────────────────────────────

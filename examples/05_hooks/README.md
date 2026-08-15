@@ -26,7 +26,8 @@ class FingerprintHook(HookProvider):
         self._tool_calls += 1
 
     def _on_after_invocation(self, event: AfterInvocationEvent) -> None:
-        print(f">>> THIS IS YOUR CUSTOM HOOK: Agent used {self._tool_calls} tools <<<")
+        msg = f"Agent '{event.agent.name}' used {self._tool_calls} tools in this turn."
+        print(f"\n\n\033[32m>>> CUSTOM HOOK: {msg} <<<\033[0m\n")
         self._tool_calls = 0  # reset for the next turn
 ```
 
@@ -65,7 +66,7 @@ uv run python examples/05_hooks/main.py
 ## Try these prompts
 
 At the end you'll see our FingerprintHook log:
-`>>> THIS IS YOUR CUSTOM HOOK: Agent used N tools <<<`
+`>>> CUSTOM HOOK: Agent '<name>' used N tools in this turn. <<<`
 
 - `Research the impact of electric vehicles on city air quality. Be thorough.`
 - `Find facts about Python programming and write a short summary.`

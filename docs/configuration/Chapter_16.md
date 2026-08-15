@@ -55,7 +55,7 @@ orchestrations:
 
 ```
 ValueError: Name collision between agents and orchestrations: ['team'].
-Names must be unique within each section.
+Names must be unique across agents and orchestrations — they share one lookup namespace.
 ```
 
 Models and MCP clients each have their own independent namespace — a model and an agent can share a name (though it's confusing and not recommended).

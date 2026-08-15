@@ -39,8 +39,10 @@ def collect_node_refs(config: OrchestrationDef) -> set[str]:
         for conn in config.connections:
             refs.add(conn.agent)
     elif isinstance(config, SwarmOrchestrationDef):
+        refs.add(config.entry_name)
         refs.update(config.agents)
     elif isinstance(config, GraphOrchestrationDef):
+        refs.add(config.entry_name)
         for edge in config.edges:
             refs.add(edge.from_agent)
             refs.add(edge.to_agent)

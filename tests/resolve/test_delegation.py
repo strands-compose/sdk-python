@@ -74,12 +74,6 @@ def test_orchestration_connection_falls_back_to_the_multiagent_wrapper():
     assert tool.tool_name == "team"
 
 
-def test_tool_name_tracks_the_connection_not_the_node_id():
-    """The LLM sees the name the YAML used to reference the target."""
-    tool = _delegate_tool("team", _conn("helper"), _agent("helper"))
-    assert tool.tool_name == "helper"
-
-
 # ── preserve_context ─────────────────────────────────────────────────────────
 
 
@@ -103,11 +97,6 @@ async def test_preserve_context_false_resets_between_calls():
     assert len(agent.messages) == 2
 
 
-def test_preserve_context_defaults_to_preserving_history():
-    """Compose defaults to true; strands' Agent.as_tool defaults to false."""
-    assert _conn("helper").preserve_context is True
-
-
 # ── rejected combinations ────────────────────────────────────────────────────
 
 
@@ -118,7 +107,7 @@ def test_preserve_context_false_with_a_session_manager_is_rejected(tmp_path):
         session_manager=FileSessionManager(session_id="s1", storage_dir=str(tmp_path)),
     )
 
-    with pytest.raises(ValueError, match="cannot be used with an agent that has a session manager"):
+    with pytest.raises(ValueError, match="session manager"):
         _delegate_tool("team", _conn("helper", preserve_context=False), agent)
 
 

@@ -190,23 +190,18 @@ def make_event_queue(
     agents: dict[str, Agent],
     *,
     orchestrators: dict[str, Node] | None = None,
-    tool_labels: dict[str, str] | None = None,
     entry_name: str | None = None,
     session_id: str | None = None,
 ) -> EventQueue:
-    """Attach :class:`~strands_compose.hooks.EventPublisher` hooks to agents.
+    """Attach EventPublisher hooks to agents.
 
-    Every agent in *agents* receives an :class:`.EventPublisher` hook and a
-    matching ``callback_handler`` so all per-agent event types flow into the
-    returned :class:`EventQueue`.  Orchestrators (Swarm / Graph / delegate
-    Agent) in *orchestrators* also get a publisher for NODE_START, NODE_STOP,
-    HANDOFF, and MULTIAGENT_COMPLETE events.
+    Every agent gets a publisher and a matching ``callback_handler`` so its
+    events flow into the returned queue.  Orchestrators (Swarm / Graph /
+    delegate Agent) additionally emit MULTIAGENT_START, NODE_START, NODE_STOP,
+    HANDOFF and MULTIAGENT_COMPLETE.
 
-    This function does **not** emit SESSION_START.  Callers that own a
-    :class:`~strands_compose.types.SessionManifest` should call
-    :meth:`EventQueue.emit_session_start` themselves; the common
-    :class:`ResolvedConfig` workflow does this for you via
-    :meth:`ResolvedConfig.wire_event_queue`.
+    Does **not** emit SESSION_START — use ``ResolvedConfig.wire_event_queue``
+    for that, or call ``EventQueue.emit_session_start`` yourself.
 
     .. warning::
 
@@ -217,9 +212,6 @@ def make_event_queue(
     Args:
         agents: Agents to wire, keyed by name.
         orchestrators: Built orchestrations keyed by name.
-        tool_labels: Tool name → display label mapping forwarded to each
-            :class:`.EventPublisher`.  Defaults to
-            ``{name: "Delegating work to agent: <Name>"}`` for every agent.
         entry_name: The configured name of the entry node.  Stored on the
             EventQueue and used as ``agent_name`` on SESSION_START /
             SESSION_END events.
@@ -235,13 +227,8 @@ def make_event_queue(
         session_id=session_id,
     )
 
-    labels = {
-        **{name: f"Delegating work to agent: {name.title()}" for name in agents},
-        **(tool_labels or {}),
-    }
-
     for name, agent in agents.items():
-        pub = EventPublisher(callback=event_queue._put, agent_name=name, tool_labels=labels)
+        pub = EventPublisher(callback=event_queue._put, agent_name=name)
         agent.hooks.add_hook(pub)
         agent.callback_handler = pub.as_callback_handler()
         logger.debug("agent=<%s> | wired EventPublisher", name)
@@ -252,7 +239,6 @@ def make_event_queue(
         orch_pub = EventPublisher(
             callback=event_queue._put,
             agent_name=orch_name,
-            tool_labels=labels,
         )
         orch.hooks.add_hook(orch_pub)
         if isinstance(orch, Agent):

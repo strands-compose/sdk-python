@@ -84,7 +84,7 @@ This is handy when only one agent uses a specific model — no need to pollute t
 
 ## Custom Model Providers
 
-If the built-in four providers aren't enough, you can point `provider` to a custom `Model` subclass:
+If the built-in five providers aren't enough, you can point `provider` to a custom `Model` subclass:
 
 ```yaml
 models:

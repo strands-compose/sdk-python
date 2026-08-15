@@ -34,33 +34,22 @@ class ResolvedConfig:
         self,
         *,
         session_id: str | None = None,
-        tool_labels: dict[str, str] | None = None,
     ) -> EventQueue:
-        """Wire all agents and orchestrators for event streaming.
+        """Wire every agent and orchestrator for event streaming.
 
-        This is the recommended way to set up event streaming.  It:
-
-        1. Builds a :class:`~strands_compose.types.SessionManifest` from the
-           resolved runtime objects.
-        2. Wires every agent (and orchestrator) with an
-           :class:`~strands_compose.hooks.EventPublisher` via
-           :func:`~strands_compose.wire.make_event_queue`.
-        3. Emits a SESSION_START event carrying the manifest as the first
-           event on the queue.
+        The returned queue already carries a SESSION_START event describing the
+        session topology.
 
         .. warning::
 
-            This **mutates** the agents and orchestrators stored on this
-            instance by adding hooks and overwriting ``callback_handler``.
-            Call it only once per ``ResolvedConfig`` instance.
+            **Mutates** the agents and orchestrators on this instance by adding
+            hooks and overwriting ``callback_handler``.  Call it only once.
 
         Args:
             session_id: Optional session ID to embed in events.
-            tool_labels: Optional tool name → display label mapping.
 
         Returns:
-            A ready-to-use :class:`~strands_compose.wire.EventQueue` with
-            SESSION_START already on it.
+            A ready-to-use EventQueue.
 
         Raises:
             ValueError: If the entry node cannot be resolved by object identity.
@@ -69,7 +58,6 @@ class ResolvedConfig:
         event_queue = make_event_queue(
             self.agents,
             orchestrators=self.orchestrators,
-            tool_labels=tool_labels,
             entry_name=manifest.entry.name,
             session_id=session_id,
         )

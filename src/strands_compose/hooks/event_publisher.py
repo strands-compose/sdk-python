@@ -58,26 +58,11 @@ def _extract_result_text(result: Any, max_len: int = _MAX_RESULT_LEN) -> str | N
     return raw[:max_len] + "..." if len(raw) > max_len else raw
 
 
-def _resolve_tool_label(
-    tool_name: str,
-    labels: dict[str, str] | None = None,
-) -> str | None:
-    """Resolve a tool name to a display label via exact or longest-prefix match."""
-    if not labels:
-        return None
-    if tool_name in labels:
-        return labels[tool_name]
-    best_match = None
-    best_length = 0
-    for prefix, label in labels.items():
-        if tool_name.startswith(prefix) and len(prefix) > best_length:
-            best_match = label
-            best_length = len(prefix)
-    return best_match
-
-
 def _safe_callback(callback: EventCallback) -> EventCallback:
-    """Wrap *callback* so exceptions are logged instead of propagated."""
+    """Swallow transport failures so a dead consumer cannot kill the agent run.
+
+    Any other exception is re-raised — that means the callback itself is broken.
+    """
 
     def _wrapper(event: StreamEvent) -> None:
         try:
@@ -108,7 +93,6 @@ class EventPublisher(HookProvider):
         callback: EventCallback,
         agent_name: str,
         *,
-        tool_labels: dict[str, str] | None = None,
         max_result_len: int = 600,
     ) -> None:
         """Initialize the EventPublisher.
@@ -123,7 +107,6 @@ class EventPublisher(HookProvider):
         Args:
             callback: Called with each :class:`StreamEvent`.
             agent_name: Identifier for the agent or orchestrator.
-            tool_labels: Optional mapping of tool names to display labels.
             max_result_len: Maximum character length for tool result text
                 in TOOL_END events. Default: 600.
 
@@ -137,7 +120,6 @@ class EventPublisher(HookProvider):
         """
         self._callback = _safe_callback(callback)
         self._agent_name = agent_name
-        self._tool_labels = tool_labels or {}
         self._max_result_len = max_result_len
         self._errored = False
 
@@ -171,7 +153,6 @@ class EventPublisher(HookProvider):
     def _on_tool_start(self, event: BeforeToolCallEvent) -> None:
         """Register a pending tool call and emit a TOOL_START streaming event."""
         raw_name = event.tool_use.get("name", "unknown")
-        tool_label = _resolve_tool_label(raw_name, self._tool_labels) or raw_name
         tool_use_id = event.tool_use.get("toolUseId", "")
 
         self._callback(
@@ -180,7 +161,6 @@ class EventPublisher(HookProvider):
                 agent_name=self._agent_name,
                 data={
                     "tool_name": raw_name,
-                    "tool_label": tool_label,
                     "tool_use_id": tool_use_id,
                     "tool_input": event.tool_use.get("input", {}),
                 },
@@ -190,7 +170,6 @@ class EventPublisher(HookProvider):
     def _on_tool_end(self, event: AfterToolCallEvent) -> None:
         """Complete a pending tool call, accumulate the step, and emit TOOL_END."""
         raw_name = event.tool_use.get("name", "unknown")
-        tool_label = _resolve_tool_label(raw_name, self._tool_labels) or raw_name
         tool_use_id = event.tool_use.get("toolUseId", "")
 
         status = "error" if event.exception else "success"
@@ -201,7 +180,6 @@ class EventPublisher(HookProvider):
                 agent_name=self._agent_name,
                 data={
                     "tool_name": raw_name,
-                    "tool_label": tool_label,
                     "tool_use_id": tool_use_id,
                     "status": status,
                     "error": str(event.exception) if event.exception else None,

@@ -42,7 +42,7 @@ agents:
 entry: assistant
 ```
 
-Any MCP server works. A [FastMCP](https://modelcontextprotocol.io/) script is
+Any MCP server works. A [FastMCP](https://github.com/modelcontextprotocol/python-sdk) script is
 the shortest way to write one:
 
 ```python
@@ -132,8 +132,8 @@ mcp_clients:
 
 Available options vary by transport:
 
-- **stdio**: `env`, `cwd`, `encoding`
-- **sse**: `headers`, `timeout`, `sse_read_timeout`
+- **stdio**: `env`, `cwd`, `encoding`, `encoding_error_handler`
+- **sse**: `headers`, `timeout`, `sse_read_timeout`, `auth`, `httpx_client_factory`
 - **streamable-http**: `headers`, `http_client`, `terminate_on_close`
 
 ## Lifecycle

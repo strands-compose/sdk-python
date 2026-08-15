@@ -46,6 +46,30 @@ def tools_dir(tmp_path):
     """)
     )
     (d / "_ignored.py").write_text("SECRET = 1\n")
+    nested = d / "nested"
+    nested.mkdir()
+    (nested / "deep.py").write_text(
+        textwrap.dedent("""\
+        from strands import tool
+
+        @tool
+        def deep(value: str) -> str:
+            \"\"\"Deep.\"\"\"
+            return value
+    """)
+    )
+    private = d / "_private"
+    private.mkdir()
+    (private / "hidden.py").write_text(
+        textwrap.dedent("""\
+        from strands import tool
+
+        @tool
+        def hidden() -> str:
+            \"\"\"Hidden.\"\"\"
+            return "no"
+    """)
+    )
     return d
 
 
@@ -59,6 +83,35 @@ def test_load_from_directory_collects_across_files_and_skips_underscore(tools_di
     names = {t.tool_name for t in load_tools_from_directory(tools_dir)}
     assert {"greet", "add"} <= names
     assert "SECRET" not in names
+
+
+def test_load_from_directory_recurses_into_subdirectories(tools_dir):
+    names = {t.tool_name for t in load_tools_from_directory(tools_dir)}
+    assert "deep" in names
+
+
+def test_load_from_directory_skips_private_subdirectories(tools_dir):
+    names = {t.tool_name for t in load_tools_from_directory(tools_dir)}
+    assert "hidden" not in names
+
+
+def test_load_from_directory_loads_same_stem_in_two_subdirs(tmp_path):
+    """Recursion must not let two files with the same name shadow each other."""
+    root = tmp_path / "dup"
+    for sub, tool_name in (("a", "alpha"), ("b", "beta")):
+        (root / sub).mkdir(parents=True)
+        (root / sub / "shared.py").write_text(
+            textwrap.dedent(f"""\
+            from strands import tool
+
+            @tool
+            def {tool_name}() -> str:
+                \"\"\"Tool.\"\"\"
+                return "{tool_name}"
+        """)
+        )
+    names = {t.tool_name for t in load_tools_from_directory(root)}
+    assert names == {"alpha", "beta"}
 
 
 def test_load_tool_function_without_colon_raises():

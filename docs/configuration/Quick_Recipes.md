@@ -1,6 +1,6 @@
 # Quick Recipes
 
-[← Back to Table of Contents](README.md) | [← Previous: Full Reference](Chapter_18.md)
+[← Back to Table of Contents](README.md) | [← Previous: Plugins](Chapter_19.md)
 
 ---
 

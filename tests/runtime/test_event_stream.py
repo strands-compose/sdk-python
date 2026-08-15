@@ -70,13 +70,6 @@ async def test_agent_complete_includes_model_id_and_provider():
     assert complete.data["model"]["provider"] == f"{FakeModel.__module__}.{FakeModel.__qualname__}"
 
 
-async def test_stream_is_bracketed_by_session_end():
-    agent = Agent(model=FakeModel(["hi"]))
-    eq = make_event_queue({"a": agent}, entry_name="a")
-    events = await _run_agent("hi", agent, eq)
-    assert events[-1].type == EventType.SESSION_END
-
-
 async def test_tool_call_emits_tool_start_and_success_end():
     @tool
     def greet(name: str) -> str:

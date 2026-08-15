@@ -18,8 +18,6 @@ from tests.fakes import FakeMCPClient, FakeModel
 def pytest_configure(config: pytest.Config) -> None:
     """Register custom markers."""
     config.addinivalue_line("markers", "integration: full-pipeline tests (load over YAML)")
-    config.addinivalue_line("markers", "ollama: requires local Ollama")
-    config.addinivalue_line("markers", "bedrock: requires AWS Bedrock")
 
 
 @pytest.fixture

@@ -125,7 +125,7 @@ open Agent Skills format, not by strands-compose; `examples/15_plugins/` ships a
 
 | Condition | Exception |
 |-----------|-----------|
-| Malformed spec (no `:` separator) / missing file / module / attribute | `ImportResolutionError` (a `ValueError` subclass, from `load_object`) |
+| Malformed spec (no `:` separator) / missing file / module / attribute | `ImportResolutionError` (a `ConfigurationError` subclass — itself a `ValueError` — from `load_object`) |
 | Resolved object is not callable | `TypeError` |
 | Resolved object is callable but does not return a `Plugin` | `TypeError` |
 | Constructor or factory raises | the original exception, unwrapped |
@@ -146,3 +146,5 @@ strands-compose adds no plugin-specific exception types; everything propagates u
 ---
 
 [← Previous: Full Reference](Chapter_18.md) | [Back to Table of Contents](README.md)
+
+**Bonus**: [Quick Recipes →](Quick_Recipes.md)

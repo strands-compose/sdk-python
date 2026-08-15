@@ -13,6 +13,8 @@ strands-compose calls it like::
         description=...,
         tools=...,
         hooks=...,
+        plugins=...,
+        conversation_manager=...,
         session_manager=...,
         **agent_kwargs,
     )
@@ -20,6 +22,7 @@ strands-compose calls it like::
 ⚠️  ``strands.Agent.__init__`` does NOT accept **kwargs — it has
 explicit parameters only.  Your factory MUST consume any custom keys
 from ``agent_kwargs`` before forwarding the rest to ``Agent()``.
+Always keep ``**kwargs`` so that new standard parameters cannot break it.
 """
 
 from __future__ import annotations

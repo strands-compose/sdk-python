@@ -4,6 +4,44 @@ This directory contains Just tasks for automating common project operations. Eac
 
 ## Task Groups
 
+### Check Tasks (`check.just`)
+Tasks for running code quality checks:
+
+- `check`: Run all checks (format + code + type + security)
+  ```bash
+  uv run just check
+  ```
+
+- `check-format`: Check code formatting (import order + ruff format)
+  ```bash
+  uv run just check-format
+  ```
+
+- `check-code`: Run linting checks (ruff check)
+  ```bash
+  uv run just check-code
+  ```
+
+- `check-type`: Run type checking (ty)
+  ```bash
+  uv run just check-type
+  ```
+
+- `check-security`: Run security scan (bandit)
+  ```bash
+  uv run just check-security
+  ```
+
+- `check-test`: Run unit tests (pytest)
+  ```bash
+  uv run just check-test
+  ```
+
+- `check-hooks`: Run all pre-commit hooks on all files
+  ```bash
+  uv run just check-hooks
+  ```
+
 ### Clean Tasks (`clean.just`)
 Tasks for cleaning project files and caches:
 
@@ -12,14 +50,24 @@ Tasks for cleaning project files and caches:
   uv run just clean
   ```
 
-- `clean-python`: Clean Python cache files (in src, tests, notebooks)
+- `clean-build`: Clean build folders (dist, build)
   ```bash
-  uv run just clean-python
+  uv run just clean-build
   ```
 
 - `clean-cache`: Clean .cache directory
   ```bash
   uv run just clean-cache
+  ```
+
+- `clean-constraints`: Clean constraints.txt
+  ```bash
+  uv run just clean-constraints
+  ```
+
+- `clean-coverage`: Clean .coverage files
+  ```bash
+  uv run just clean-coverage
   ```
 
 - `clean-ty`: Clean ty cache
@@ -32,6 +80,16 @@ Tasks for cleaning project files and caches:
   uv run just clean-pytest
   ```
 
+- `clean-python`: Clean Python caches (__pycache__ and .pyc/.pyo files)
+  ```bash
+  uv run just clean-python
+  ```
+
+- `clean-requirements`: Clean requirements.txt
+  ```bash
+  uv run just clean-requirements
+  ```
+
 - `clean-ruff`: Clean ruff cache
   ```bash
   uv run just clean-ruff
@@ -42,40 +100,40 @@ Tasks for cleaning project files and caches:
   uv run just clean-venv
   ```
 
-### Check Tasks (`check.just`)
-Tasks for running code quality checks:
+### Commit Tasks (`commit.just`)
+Tasks for managing commits:
 
-- `check`: Run all checks
+- `commit-bump`: Bump the package version using Commitizen
   ```bash
-  uv run just check
+  uv run just commit-bump
   ```
 
-- `check-lint`: Run linting checks
+- `commit-files`: Create a conventional commit using Commitizen
   ```bash
-  uv run just check-lint
+  uv run just commit-files
   ```
 
-- `check-type`: Run type checking
+- `commit-info`: Retrieve commit information using Commitizen
   ```bash
-  uv run just check-type
-  ```
-
-- `check-test`: Run tests
-  ```bash
-  uv run just check-test
+  uv run just commit-info
   ```
 
 ### Format Tasks (`format.just`)
 Tasks for code formatting:
 
-- `format`: Format all code
+- `format`: Run all format tasks (import + source)
   ```bash
   uv run just format
   ```
 
-- `format-check`: Check if code is formatted correctly
+- `format-import`: Format import order (ruff check --select=I --fix)
   ```bash
-  uv run just format-check
+  uv run just format-import
+  ```
+
+- `format-source`: Format source code (ruff format)
+  ```bash
+  uv run just format-source
   ```
 
 ### Install Tasks (`install.just`)
@@ -96,27 +154,50 @@ Tasks for managing dependencies:
   uv run just install-hooks
   ```
 
-### Commit Tasks (`commit.just`)
-Tasks for managing commits:
+### Release Tasks (`release.just`)
+Tasks for releasing the package:
 
-- **`commit-bump`**: Bump the version of the package using Commitizen.
+- `release-dry`: Preview the next version bump (no changes written)
   ```bash
-  uv run just commit-bump
+  uv run just release-dry
   ```
 
-- **`commit-files`**: Create a conventional commit using Commitizen.
+- `release`: Bump version, update CHANGELOG, and create a git tag
   ```bash
-  uv run just commit-files
+  uv run just release
   ```
 
-- **`commit-info`**: Retrieve commit information using Commitizen.
+- `release-build`: Build distribution artifacts locally
   ```bash
-  uv run just commit-info
+  uv run just release-build
   ```
 
-- **`check-hooks`**: Run all pre-commit hooks to ensure code quality.
+- `release-test-publish`: Publish to TestPyPI (dry-run against the test registry)
   ```bash
-  uv run just check-hooks
+  uv run just release-test-publish
+  ```
+
+- `release-next`: Show the next version that commitizen would pick
+  ```bash
+  uv run just release-next
+  ```
+
+### Test Tasks (`test.just`)
+Tasks for running tests:
+
+- `test`: Run all test tasks (coverage)
+  ```bash
+  uv run just test
+  ```
+
+- `test-coverage`: Run tests with coverage (80% threshold by default)
+  ```bash
+  uv run just test-coverage
+  ```
+
+- `test-mutation`: Run mutation testing on a module (requires mutmut)
+  ```bash
+  uv run just test-mutation
   ```
 
 ## Usage
@@ -149,4 +230,7 @@ Tasks for managing commits:
 
 Some tasks depend on others. For example:
 - `clean` runs all clean tasks
-- `check` runs all check tasks
+- `check` runs all check tasks (check-format, check-code, check-type, check-security)
+- `format` runs all format tasks (format-import, format-source)
+- `test` runs test-coverage
+- `release` depends on check and test
