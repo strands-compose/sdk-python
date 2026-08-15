@@ -15,10 +15,15 @@ from strands.session import FileSessionManager
 from strands.tools.decorator import DecoratedFunctionTool
 from strands.types.tools import AgentTool
 
-from strands_compose.config.resolvers.orchestrations.builders import _delegate_tool
-from strands_compose.config.schema import DelegateConnectionDef
+from strands_compose.config.resolvers.orchestrations.builders import build_delegate
+from strands_compose.config.schema import (
+    AgentDef,
+    DelegateConnectionDef,
+    DelegateOrchestrationDef,
+)
 from strands_compose.exceptions import ConfigurationError
 from strands_compose.tools import multiagent_as_tool
+from strands_compose.types import Node
 from tests.fakes import FakeModel, ToolThenTextModel
 
 
@@ -32,6 +37,25 @@ def _swarm(node_id: str) -> Swarm:
 
 def _conn(agent: str, **kwargs) -> DelegateConnectionDef:
     return DelegateConnectionDef(agent=agent, description="do work", **kwargs)
+
+
+def _build_delegate_tool(orch_name: str, conn: DelegateConnectionDef, node: Node) -> AgentTool:
+    """Build a real delegate orchestration and return the tool wired for *conn*.
+
+    Nothing is faked: ``build_delegate`` runs for real and the tool comes out of
+    the built agent's registry.
+    """
+    coordinator = "coordinator"
+    agent = build_delegate(
+        orch_name,
+        DelegateOrchestrationDef(entry_name=coordinator, connections=[conn]),
+        {coordinator: _agent(coordinator), conn.agent: node},
+        coordinator,
+        {coordinator: AgentDef(system_prompt="coordinate")},
+        {},
+        {},
+    )
+    return agent.tool_registry.registry[conn.agent]
 
 
 async def _call(tool: AgentTool, prompt: str) -> None:
@@ -59,7 +83,7 @@ def test_multiagent_as_tool_accepts_explicit_name():
 
 def test_agent_connection_uses_the_strands_native_adapter():
     """An Agent must go through Agent.as_tool so interrupts can propagate and resume."""
-    tool = _delegate_tool("team", _conn("helper"), _agent("helper"))
+    tool = _build_delegate_tool("team", _conn("helper"), _agent("helper"))
 
     assert tool.tool_type == "agent"
     assert not isinstance(tool, DecoratedFunctionTool)
@@ -68,7 +92,7 @@ def test_agent_connection_uses_the_strands_native_adapter():
 
 def test_orchestration_connection_falls_back_to_the_multiagent_wrapper():
     """A Swarm has no upstream as_tool, so it keeps the hand-rolled wrapper."""
-    tool = _delegate_tool("outer", _conn("team"), _swarm("team"))
+    tool = _build_delegate_tool("outer", _conn("team"), _swarm("team"))
 
     assert isinstance(tool, DecoratedFunctionTool)
     assert tool.tool_name == "team"
@@ -79,7 +103,7 @@ def test_orchestration_connection_falls_back_to_the_multiagent_wrapper():
 
 async def test_preserve_context_true_accumulates_history():
     agent = _agent("helper")
-    tool = _delegate_tool("team", _conn("helper", preserve_context=True), agent)
+    tool = _build_delegate_tool("team", _conn("helper", preserve_context=True), agent)
 
     await _call(tool, "first")
     await _call(tool, "second")
@@ -89,7 +113,7 @@ async def test_preserve_context_true_accumulates_history():
 
 async def test_preserve_context_false_resets_between_calls():
     agent = _agent("helper")
-    tool = _delegate_tool("team", _conn("helper", preserve_context=False), agent)
+    tool = _build_delegate_tool("team", _conn("helper", preserve_context=False), agent)
 
     await _call(tool, "first")
     await _call(tool, "second")
@@ -108,7 +132,7 @@ def test_preserve_context_false_with_a_session_manager_is_rejected(tmp_path):
     )
 
     with pytest.raises(ValueError, match="session manager"):
-        _delegate_tool("team", _conn("helper", preserve_context=False), agent)
+        _build_delegate_tool("team", _conn("helper", preserve_context=False), agent)
 
 
 def test_preserve_context_true_allows_a_session_managed_agent(tmp_path):
@@ -117,7 +141,7 @@ def test_preserve_context_true_allows_a_session_managed_agent(tmp_path):
         session_manager=FileSessionManager(session_id="s2", storage_dir=str(tmp_path)),
     )
 
-    tool = _delegate_tool("team", _conn("helper", preserve_context=True), agent)
+    tool = _build_delegate_tool("team", _conn("helper", preserve_context=True), agent)
 
     assert tool.tool_name == "helper"
 
@@ -125,7 +149,7 @@ def test_preserve_context_true_allows_a_session_managed_agent(tmp_path):
 def test_preserve_context_false_on_an_orchestration_is_rejected():
     """A Swarm cannot be reset to a baseline, so the request must not be ignored."""
     with pytest.raises(ConfigurationError, match="no baseline to reset to"):
-        _delegate_tool("outer", _conn("team", preserve_context=False), _swarm("team"))
+        _build_delegate_tool("outer", _conn("team", preserve_context=False), _swarm("team"))
 
 
 async def test_orchestration_interrupt_becomes_a_tool_error():
@@ -150,7 +174,7 @@ async def test_orchestration_interrupt_becomes_a_tool_error():
     builder.set_entry_point("worker")
     graph = builder.build()
 
-    tool = _delegate_tool("outer", _conn("pipeline"), graph)
+    tool = _build_delegate_tool("outer", _conn("pipeline"), graph)
 
     results = [
         event

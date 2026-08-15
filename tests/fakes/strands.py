@@ -39,7 +39,9 @@ class FakeModel(Model):
         """Return the reported config (used by the manifest model descriptor)."""
         return self._config
 
-    async def structured_output(self, output_model: Any, prompt: Any = None, **kwargs: Any):  # ty: ignore[invalid-method-override]
+    async def structured_output(
+        self, output_model: Any, prompt: Any, system_prompt: Any = None, **kwargs: Any
+    ):
         """Yield a single empty structured-output instance (unused by most tests)."""
         yield {"output": output_model()}
 
@@ -79,7 +81,9 @@ class ToolThenTextModel(Model):
         """Return the reported config."""
         return self._config
 
-    async def structured_output(self, output_model: Any, prompt: Any = None, **kwargs: Any):  # ty: ignore[invalid-method-override]
+    async def structured_output(
+        self, output_model: Any, prompt: Any, system_prompt: Any = None, **kwargs: Any
+    ):
         """Yield a single empty structured-output instance (unused)."""
         yield {"output": output_model()}
 
@@ -125,7 +129,9 @@ class BoomModel(Model):
         """Return a minimal config."""
         return {"model_id": "boom-model"}
 
-    async def structured_output(self, output_model: Any, prompt: Any = None, **kwargs: Any):  # ty: ignore[invalid-method-override]
+    async def structured_output(
+        self, output_model: Any, prompt: Any, system_prompt: Any = None, **kwargs: Any
+    ):
         """Raise on structured output too."""
         raise RuntimeError(self._message)
         yield  # pragma: no cover — makes this an async generator
