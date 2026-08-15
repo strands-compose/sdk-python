@@ -1,8 +1,7 @@
 # https://pre-commit.com
 # https://pre-commit.com/hooks.html
 
-# Use the active venv Python — avoids path issues on Windows where
-# pre-commit looks for python3.12 at ~/.local/bin/python.exe
+# Use the active venv Python
 default_language_version:
   python: python3
 
@@ -29,7 +28,7 @@ repos:
       - id: trailing-whitespace
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: 'v0.15.20'
+    rev: 'v0.16.3'
     hooks:
       - id: ruff          # lint  — commit + push
       - id: ruff-format   # format — commit + push
@@ -42,7 +41,7 @@ repos:
         files: \.(py|yaml|yml|md|toml|json|env)$
 
   - repo: https://github.com/commitizen-tools/commitizen
-    rev: 'v4.16.4'
+    rev: 'v4.17.0'
     hooks:
       - id: commitizen         # validates commit message format
         stages: [commit-msg]   # only on commit-msg event, not push
