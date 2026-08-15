@@ -24,8 +24,7 @@ from .hooks import EventPublisher, MaxToolCallsGuard, StopGuard, ToolNameSanitiz
 from .mcp import MCPLifecycle, create_mcp_client, create_mcp_server
 from .renderers import AnsiRenderer
 from .tools import (
-    node_as_async_tool,
-    node_as_tool,
+    multiagent_as_tool,
     serialize_multiagent_result,
 )
 from .types import EventType, StreamEvent
@@ -59,8 +58,7 @@ __all__ = [
     "load_config",
     "load_session",
     "make_event_queue",
-    "node_as_async_tool",
-    "node_as_tool",
+    "multiagent_as_tool",
     "resolve_infra",
     "serialize_multiagent_result",
 ]

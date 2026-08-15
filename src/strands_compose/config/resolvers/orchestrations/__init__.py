@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ....tools import node_as_async_tool, node_as_tool
+from ....tools import multiagent_as_tool
 from .builders import (
     OrchestrationBuilder,
     build_delegate,
@@ -75,7 +75,6 @@ __all__ = [
     "build_delegate",
     "build_graph",
     "build_swarm",
-    "node_as_async_tool",
-    "node_as_tool",
+    "multiagent_as_tool",
     "resolve_orchestrations",
 ]

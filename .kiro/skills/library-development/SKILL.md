@@ -35,7 +35,7 @@ load it whenever you are unsure where something goes.
 3. **The pipeline flows one way** — text -> dict -> validated schema -> live objects. Never resolve during parsing; never parse during resolution (see The Pipeline).
 4. **Explicit over implicit** — no auto-registration, no global singletons, no hidden state. Every object is wired by hand and passed as an argument.
 5. **Single responsibility** — each module does one thing; one resolver per config concept, one builder per orchestration mode.
-6. **Composition over inheritance** — small functions and focused modules that compose. The only base classes are the strands-facing ones (`MCPServer`, `StreamConverter`, `HookProvider`).
+6. **Composition over inheritance** — small functions and focused modules that compose. The only base classes are the strands-facing ones (`MCPServer`, `HookProvider`).
 7. **Smallest reasonable change** — don't refactor unrelated code to land a feature.
 
 ---

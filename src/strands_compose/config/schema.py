@@ -193,6 +193,12 @@ class DelegateConnectionDef(BaseModel):
 
     agent: str
     description: str
+    preserve_context: bool = True
+    """Whether the delegate keeps its history between calls.
+
+    ``False`` resets an agent to its construction-time baseline every call.
+    Incompatible with a session manager, and unsupported for an Swarm and Graph.
+    """
 
 
 class DelegateOrchestrationDef(BaseModel):

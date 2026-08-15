@@ -43,7 +43,9 @@ orchestrations:
 entry: team
 ```
 
-**How it works**: strands-compose **forks** a new agent from the `entry_name` agent's blueprint (model, system_prompt, hooks, tools) and adds delegate tools for each connection. The original `coordinator` agent is **never mutated**. Each connection becomes an async tool that the coordinator can call.
+**How it works**: strands-compose **forks** a new agent from the `entry_name` agent's blueprint (model, system_prompt, hooks, tools) and adds delegate tools for each connection. The original `coordinator` agent is **never mutated**.
+
+> **Two limits.** A delegate cannot be called twice concurrently — the second call comes back as a tool error, so declare a second agent to fan out. And an interrupt (such as an approval) can be answered and resumed only for an agent connection; raised inside a nested Swarm or Graph it reaches the coordinator as a tool error.
 
 **Fields**:
 
@@ -54,6 +56,7 @@ entry: team
 | `connections` | list | Yes | Sub-agents to wire as tools |
 | `connections[].agent` | string | Yes | Name of the target agent or orchestration |
 | `connections[].description` | string | Yes | Tool description the LLM sees |
+| `connections[].preserve_context` | bool | No | Keep the delegate's history between calls (default `true`). Set `false` for a stateless delegate that starts from its construction-time baseline every call. Rejected for a nested orchestration, or for an agent carrying a session manager |
 | `session_manager` | dict | No | Override session manager for the forked agent |
 | `hooks` | list | No | Additional hooks for the forked agent |
 | `agent_kwargs` | dict | No | Override agent kwargs (merged with entry agent's kwargs) |

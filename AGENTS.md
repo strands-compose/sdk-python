@@ -7,6 +7,33 @@ subclasses.
 
 ---
 
+## Response Style
+
+Answer with a short executive summary. Lead with the answer or decision in the
+first line.
+
+- Direct question -> 1-3 sentences. Yes/no question -> start with yes or no.
+- Expand only when asked for details, code, a full review, or a rationale.
+- Prefer a compact table or 3-5 bullets over prose sections.
+- Report the outcome, not the journey.
+
+### Do not
+
+- No multi-section reports, headers, or background unless requested.
+- No narrating what was searched, read, or what sub-agents found.
+- No restating earlier turns, no recaps of prior decisions.
+- No storytelling, no "what settled it" / "where I was wrong" essays when one line will do.
+- No praise, filler, or hedging.
+
+### Still required
+
+Brevity never overrides correctness. Keep these even when short:
+
+- State uncertainty plainly, and say what was verified vs assumed.
+- Correct a wrong earlier statement if it would change a decision.
+- Flag risk before a destructive or hard-to-reverse action.
+
+
 ## Read the Skill First — MANDATORY
 
 Before touching any code, load the skill for the area you are working in. Skills

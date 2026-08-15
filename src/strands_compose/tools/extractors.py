@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from typing import Any
 
 from strands.agent.agent_result import AgentResult
@@ -17,13 +18,49 @@ def _message_from_text(text: str) -> Message:
     return {"role": "assistant", "content": [{"text": text}]}
 
 
+def extract_block_text(block: Mapping[str, Any]) -> str | None:
+    """Return a content block's text, or ``None`` when it carries none.
+
+    Also reads ``citationsContent``, whose text sits nested in ``content[*].text``,
+    so a plain ``"text" in block`` check silently misses a cited answer.
+
+    Args:
+        block: A single content block from a ``Message``.
+
+    Returns:
+        The block's text, or ``None``.
+    """
+    text = block.get("text")
+    if isinstance(text, str) and text:
+        return text
+
+    citations = block.get("citationsContent")
+    if isinstance(citations, Mapping):
+        items = citations.get("content")
+        if isinstance(items, list):
+            parts = [
+                item["text"]
+                for item in items
+                if isinstance(item, Mapping) and isinstance(item.get("text"), str)
+            ]
+            if parts:
+                # Newline-separated, matching how AgentResult.__str__ separates them.
+                return "\n".join(parts)
+
+    return None
+
+
 def extract_text(message: Message | None) -> str:
-    """Return the last text block from a message, or an empty string."""
+    """Return the last text-carrying block from a message, or an empty string."""
     if not message:
         return ""
     for block in reversed(message.get("content", [])):
-        if isinstance(block, dict) and "text" in block:
-            return block["text"]
+        if not isinstance(block, dict):
+            continue
+        # A trailing empty block must not mask real text earlier in the message.
+        text = extract_block_text(block)
+        if text:
+            return text
     return ""
 
 
@@ -41,7 +78,7 @@ def extract_last_message(result: Any) -> Message:
         return result.message
 
     if isinstance(result, MultiAgentResult):
-        last_node_id = resolve_last_node_id(result)
+        last_node_id = _resolve_last_node_id(result)
         if last_node_id and last_node_id in result.results:
             message = extract_last_message(result.results[last_node_id])
             if message is not None:
@@ -68,26 +105,20 @@ def extract_last_message(result: Any) -> Message:
     return _message_from_text(str(result))
 
 
-def resolve_last_node_id(result: MultiAgentResult) -> str | None:
-    """Determine the id of the last node that executed in a multi-agent result.
+def _resolve_last_node_id(result: MultiAgentResult) -> str | None:
+    """Return the id of the last node that executed, or ``None``.
+
+    Reads ``SwarmResult.node_history`` / ``GraphResult.execution_order``, since
+    ``results`` is keyed by insertion order and cannot answer this.
 
     Args:
         result: A ``MultiAgentResult`` (or subclass).
 
     Returns:
-        The node id string, or ``None`` if it cannot be determined.
+        The node id, or ``None`` if undeterminable.
     """
-    # SwarmResult.node_history — list[SwarmNode], each has .node_id
-    node_history: list[Any] | None = getattr(result, "node_history", None)
-    if node_history:
-        return str(node_history[-1].node_id)
-
-    # GraphResult.execution_order — list[GraphNode], each has .node_id
-    execution_order: list[Any] | None = getattr(result, "execution_order", None)
-    if execution_order:
-        return str(execution_order[-1].node_id)
-
-    return None
+    history = getattr(result, "node_history", None) or getattr(result, "execution_order", None)
+    return str(history[-1].node_id) if history else None
 
 
 def serialize_multiagent_result(result: MultiAgentResult) -> dict[str, Any]:
@@ -113,7 +144,7 @@ def serialize_multiagent_result(result: MultiAgentResult) -> dict[str, Any]:
     """
     data = result.to_dict()
 
-    last_node_id = resolve_last_node_id(result)
+    last_node_id = _resolve_last_node_id(result)
     data["last_node_id"] = last_node_id
 
     final_message = extract_last_message(result)
@@ -129,23 +160,13 @@ def serialize_multiagent_result(result: MultiAgentResult) -> dict[str, Any]:
     # GraphResult extras — execution_order, edges, node counts
     execution_order: list[Any] | None = getattr(result, "execution_order", None)
     if execution_order is not None:
-        edges_raw: list[Any] = getattr(result, "edges", []) or []
-        entry_points_raw: list[Any] = getattr(result, "entry_points", []) or []
-
-        edges: list[list[str]] = []
-        for edge in edges_raw:
-            if isinstance(edge, tuple) and len(edge) == 2:
-                edges.append([str(edge[0].node_id), str(edge[1].node_id)])
-            else:
-                # GraphEdge dataclass with from_node / to_node attributes
-                from_id = str(getattr(getattr(edge, "from_node", None), "node_id", edge))
-                to_id = str(getattr(getattr(edge, "to_node", None), "node_id", edge))
-                edges.append([from_id, to_id])
-
+        # GraphResult.edges is list[tuple[GraphNode, GraphNode]].
+        edges = [[str(a.node_id), str(b.node_id)] for a, b in getattr(result, "edges", None) or []]
+        entry_points = getattr(result, "entry_points", None) or []
         data["graph"] = {
             "execution_order": [str(n.node_id) for n in execution_order],
             "edges": edges,
-            "entry_points": [str(getattr(ep, "node_id", ep)) for ep in entry_points_raw],
+            "entry_points": [str(getattr(ep, "node_id", ep)) for ep in entry_points],
             "completed_nodes": getattr(result, "completed_nodes", 0),
             "failed_nodes": getattr(result, "failed_nodes", 0),
             "interrupted_nodes": getattr(result, "interrupted_nodes", 0),

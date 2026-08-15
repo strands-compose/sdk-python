@@ -9,15 +9,16 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from strands import Agent
 from strands.multiagent import GraphBuilder, Swarm
 
 from ....exceptions import ConfigurationError
-from ....tools import node_as_async_tool
+from ....tools import multiagent_as_tool
 from ....utils import load_object
 from ...schema import (
+    DelegateConnectionDef,
     DelegateOrchestrationDef,
     GraphOrchestrationDef,
     OrchestrationDef,
@@ -32,6 +33,7 @@ if TYPE_CHECKING:
     from strands.models import Model
     from strands.multiagent.graph import Graph
     from strands.tools.mcp import MCPClient as StrandsMCPClient
+    from strands.types.tools import AgentTool
 
     from ....types import Node
     from ...schema import AgentDef, SessionManagerDef
@@ -152,6 +154,30 @@ class OrchestrationBuilder:
         raise ConfigurationError(f"Unknown orchestration config type: {type(cfg).__name__}")
 
 
+def _delegate_tool(orch_name: str, conn: DelegateConnectionDef, node: Node) -> AgentTool:
+    """Wrap one connection's target as a delegate tool.
+
+    ``Agent.as_tool`` is the only path that can resume a sub-agent interrupt, and it
+    validates its own accepted combinations. ``preserve_context`` on an orchestration
+    is ours to reject — strands has no say there.
+    """
+    if not isinstance(node, Agent):
+        if not conn.preserve_context:
+            raise ConfigurationError(
+                f"Orchestration '{orch_name}': connection to '{conn.agent}' sets "
+                f"preserve_context: false, but '{conn.agent}' is a "
+                f"{type(node).__name__} orchestration with no baseline to reset to.\n"
+                f"Fix: drop 'preserve_context: false', or point it at an agent."
+            )
+        return multiagent_as_tool(node, name=conn.agent, description=conn.description)
+
+    return node.as_tool(
+        name=conn.agent,
+        description=conn.description,
+        preserve_context=conn.preserve_context,
+    )
+
+
 def build_delegate(
     name: str,
     config: DelegateOrchestrationDef,
@@ -198,15 +224,10 @@ def build_delegate(
             f"Available agents: {sorted(agent_defs)}"
         )
 
-    # Wrap each connection target as an async delegate tool.
-    delegate_tools: list[Any] = []
+    # Wrap each connection target as a delegate tool.
+    delegate_tools: list[AgentTool] = []
     for conn in config.connections:
-        target_node = nodes[conn.agent]
-        delegate_tool = node_as_async_tool(
-            target_node,
-            description=conn.description,
-        )
-        delegate_tools.append(delegate_tool)
+        delegate_tools.append(_delegate_tool(name, conn, nodes[conn.agent]))
         logger.info("tool=<%s>, orchestration=<%s> | delegate tool prepared", conn.agent, name)
 
     # Resolve orchestration-level hooks.

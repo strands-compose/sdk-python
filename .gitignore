@@ -1,6 +1,7 @@
 .env
 .claude
 .kiro/specs
+.kiro/settings
 .sessions
 .converter
 .hypothesis

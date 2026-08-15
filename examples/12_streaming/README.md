@@ -57,8 +57,8 @@ bracketing all per-agent activity.
 `invoke_async` so both the agent and the queue consumer share the same event loop.
 
 **`AnsiRenderer` is optional.** It's a convenience for terminals. In production you'd
-consume the queue and convert events to SSE chunks (see `OpenAIStreamConverter`) or
-NDJSON (`RawStreamConverter`).
+consume the queue and serialize each event into whatever wire format your transport
+needs — SSE chunks, NDJSON, or your own envelope.
 
 **`queue.flush()`** resets the queue between turns so events from one invocation
 don't leak into the next. It also resets the `session_start` / `session_end` guards.

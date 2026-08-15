@@ -53,7 +53,7 @@ entry: manager
 1. strands-compose collects all orchestration dependencies.
 2. It performs a **topological sort** — inner orchestrations are built before outer ones.
 3. Built orchestrations become nodes in the node pool, available for outer orchestrations to reference.
-4. For delegate mode, inner orchestrations are wrapped as async tools (just like regular agents).
+4. For delegate mode, inner orchestrations become callable tools on the coordinator.
 
 ## Circular Dependencies
 

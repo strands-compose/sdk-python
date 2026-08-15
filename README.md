@@ -80,7 +80,7 @@ Strands Compose is an ecosystem that includes the following packages:
 |-------|---------|-------------|
 | **Define the agents** | [**strands-compose**](https://github.com/strands-compose/sdk-python) | Developers |
 | Run / deploy the agents | [strands-compose-agentcore](https://github.com/strands-compose/bedrock-agentcore) | Developers, operations |
-|*Put the agents in front of people | [strands-compose-chat](https://github.com/strands-compose/chat-ui) | **End users** |
+|Put the agents in front of people | [strands-compose-chat](https://github.com/strands-compose/chat) | **End users** |
 
 ---
 

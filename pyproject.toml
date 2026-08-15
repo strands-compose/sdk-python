@@ -22,7 +22,7 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "strands-agents>=1.48.0,<2.0.0",
+    "strands-agents>=1.52.0,<2.0.0",
     "pydantic>=2.12.5",
     "pyyaml>=6.0.0",
     "mcp>=1.24.0",
@@ -36,16 +36,16 @@ agentcore-memory = [
     "bedrock-agentcore>=1.4.0",
 ]
 ollama = [
-    "strands-agents[ollama]>=1.48.0,<2.0.0",
+    "strands-agents[ollama]>=1.52.0,<2.0.0",
 ]
 openai = [
-    "strands-agents[openai]>=1.48.0,<2.0.0",
+    "strands-agents[openai]>=1.52.0,<2.0.0",
 ]
 gemini = [
-    "strands-agents[gemini]>=1.48.0,<2.0.0",
+    "strands-agents[gemini]>=1.52.0,<2.0.0",
 ]
 anthropic = [
-    "strands-agents[anthropic]>=1.48.0,<2.0.0",
+    "strands-agents[anthropic]>=1.52.0,<2.0.0",
 ]
 
 [project.urls]
@@ -57,16 +57,16 @@ Changelog = "https://github.com/strands-compose/sdk-python/blob/main/CHANGELOG.m
 
 [dependency-groups]
 dev = [
-    "ty>=0.0.29",
+    "ty>=0.0.72",
     "bandit>=1.9.2",
-    "coverage>=7.12.0",
+    "coverage>=7.15.4",
     "pytest-asyncio>=1.2.0",
     "pytest-cov>=7.0.0",
     "pytest-mock>=3.15.1",
     "pytest-xdist>=3.8.0",
-    "pytest>=9.0.2",
-    "ruff>=0.14.8",
-    "rust-just>=1.42.4",
+    "pytest>=9.1.1",
+    "ruff>=0.16.3",
+    "rust-just>=1.58.0",
     "commitizen>=4.8.4",
     "pre-commit>=4.3.0",
     "hypothesis>=6.155.7",

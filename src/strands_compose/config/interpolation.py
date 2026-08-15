@@ -43,14 +43,16 @@ def interpolate(
     resolved_vars = dict(variables or {})
     resolved_env = env if env is not None else dict(os.environ)
 
-    # Pass 1: resolve vars against env only (lenient — keeps ${VAR} if absent)
-    resolved_vars = {k: _walk_lenient(v, {}, resolved_env) for k, v in resolved_vars.items()}
+    # Passes 1 and 2 run non-strict: a var may legitimately reference another var
+    # that is not resolved yet, so unresolved ${...} must survive to be retried.
+    # Pass 1: resolve vars against env only.
+    resolved_vars = {k: _walk(v, {}, resolved_env, strict=False) for k, v in resolved_vars.items()}
 
     # Pass 2: resolve vars sequentially so each resolved var is immediately
     # available to subsequent entries (handles chains like A -> B -> C).
     pass2: dict[str, Any] = {}
     for k, v in resolved_vars.items():
-        pass2[k] = _walk_lenient(v, pass2, resolved_env)
+        pass2[k] = _walk(v, pass2, resolved_env, strict=False)
     resolved_vars = pass2
 
     # Validate: remaining ${...} means circular or undefined reference.
@@ -64,7 +66,8 @@ def interpolate(
                     f"Check for circular references or undefined variables."
                 )
 
-    return _walk(raw, resolved_vars, resolved_env)
+    # The config itself is strict: every reference must resolve here.
+    return _walk(raw, resolved_vars, resolved_env, strict=True)
 
 
 def strip_anchors(raw: dict[str, Any]) -> dict[str, Any]:
@@ -83,14 +86,27 @@ def _walk(
     data: Any,
     variables: dict[str, Any],
     env: dict[str, str],
+    *,
+    strict: bool,
 ) -> Any:
-    """Recursively walk data and interpolate string values."""
+    """Recursively walk data and interpolate string values.
+
+    Args:
+        data: Any parsed YAML value.
+        variables: Resolved ``vars:`` values.
+        env: Environment variables.
+        strict: Raise on an unresolved reference; when ``False`` leave the
+            original ``${expr}`` in place for the caller to validate later.
+
+    Returns:
+        The value with strings interpolated.
+    """
     if isinstance(data, dict):
-        return {k: _walk(v, variables, env) for k, v in data.items()}
+        return {k: _walk(v, variables, env, strict=strict) for k, v in data.items()}
     if isinstance(data, list):
-        return [_walk(item, variables, env) for item in data]
+        return [_walk(item, variables, env, strict=strict) for item in data]
     if isinstance(data, str) and "${" in data:
-        return _interpolate_string(data, variables, env)
+        return _interpolate_string(data, variables, env, strict=strict)
     return data
 
 
@@ -98,19 +114,29 @@ def _interpolate_string(
     value: str,
     variables: dict[str, Any],
     env: dict[str, str],
+    *,
+    strict: bool,
 ) -> Any:
-    """Interpolate all ${...} patterns in a single string value.
+    """Interpolate all ``${...}`` patterns in a single string value.
 
-    If the entire string is a single ``${VAR}`` reference, the resolved value
-    is returned in its original type (e.g. int stays int). Otherwise, all
-    resolved values are cast to str and concatenated.
+    A string that is exactly one ``${VAR}`` keeps the value's original type
+    (an int stays an int); a mixed string concatenates everything as text.
+
+    Args:
+        value: The string to interpolate.
+        variables: Resolved ``vars:`` values.
+        env: Environment variables.
+        strict: Raise on an unresolved reference instead of leaving it in place.
+
+    Returns:
+        The interpolated value, typed when the whole string was one reference.
     """
     match = _VAR_PATTERN.fullmatch(value)
     if match is not None:
-        return _resolve(match.group(1), variables, env)
+        return _resolve(match.group(1), variables, env, strict=strict)
 
     def _replacer(m: re.Match[str]) -> str:
-        return str(_resolve(m.group(1), variables, env))
+        return str(_resolve(m.group(1), variables, env, strict=strict))
 
     return _VAR_PATTERN.sub(_replacer, value)
 
@@ -119,8 +145,24 @@ def _resolve(
     expr: str,
     variables: dict[str, Any],
     env: dict[str, str],
+    *,
+    strict: bool,
 ) -> Any:
-    """Resolve a single variable expression like ``VAR`` or ``VAR:-default``."""
+    """Resolve one expression like ``VAR`` or ``VAR:-default``.
+
+    Args:
+        expr: The text inside ``${...}``.
+        variables: Resolved ``vars:`` values.
+        env: Environment variables.
+        strict: Raise when unresolved; when ``False`` return the original
+            ``${expr}`` so the vars pre-passes can run again over it.
+
+    Returns:
+        The resolved value, or ``${expr}`` unchanged when not strict.
+
+    Raises:
+        ValueError: Strict mode and the variable has no value and no default.
+    """
     var_name, *rest = expr.split(":-", 1)
     default: str | None = rest[0] if rest else None
 
@@ -132,65 +174,12 @@ def _resolve(
 
     if default is not None:
         return default
+
+    if not strict:
+        return f"${{{expr}}}"
 
     raise ValueError(
         f"Variable '${{{var_name}}}' is not set in 'vars:' or environment, "
         f"and no default was provided.\n"
         f"Use ${{{var_name}:-fallback}} to set a fallback value."
     )
-
-
-# ---------------------------------------------------------------------------
-# Lenient variants — used only during the vars pre-resolution passes.
-# They return the original ${expr} pattern unchanged instead of raising, so
-# unresolved references survive to the post-pass validation step.
-# ---------------------------------------------------------------------------
-
-
-def _walk_lenient(
-    data: Any,
-    variables: dict[str, Any],
-    env: dict[str, str],
-) -> Any:
-    """Recursively walk data and interpolate strings; leaves ${VAR} unchanged if unresolved."""
-    if isinstance(data, dict):
-        return {k: _walk_lenient(v, variables, env) for k, v in data.items()}
-    if isinstance(data, list):
-        return [_walk_lenient(item, variables, env) for item in data]
-    if isinstance(data, str) and "${" in data:
-        return _interpolate_string_lenient(data, variables, env)
-    return data
-
-
-def _interpolate_string_lenient(
-    value: str,
-    variables: dict[str, Any],
-    env: dict[str, str],
-) -> Any:
-    """Interpolate ${...} patterns; returns ${expr} unchanged if variable not found."""
-    match = _VAR_PATTERN.fullmatch(value)
-    if match is not None:
-        return _resolve_lenient(match.group(1), variables, env)
-
-    def _replacer(m: re.Match[str]) -> str:
-        return str(_resolve_lenient(m.group(1), variables, env))
-
-    return _VAR_PATTERN.sub(_replacer, value)
-
-
-def _resolve_lenient(
-    expr: str,
-    variables: dict[str, Any],
-    env: dict[str, str],
-) -> Any:
-    """Resolve a single variable expression; returns ${expr} unchanged if not found."""
-    var_name, *rest = expr.split(":-", 1)
-    default: str | None = rest[0] if rest else None
-
-    if var_name in variables:
-        return variables[var_name]
-    if var_name in env:
-        return env[var_name]
-    if default is not None:
-        return default
-    return f"${{{expr}}}"

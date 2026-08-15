@@ -45,13 +45,12 @@ src/strands_compose/
 ├── tools/
 │   ├── loaders.py       # resolve_tool_spec(s) — module/file/dir → AgentTool
 │   ├── extractors.py    # extract_last_message · serialize_multiagent_result
-│   └── wrappers.py      # node_as_tool / node_as_async_tool — wrap a node as a delegate tool
+│   └── wrappers.py      # multiagent_as_tool — wrap a Swarm/Graph as a delegate tool
 ├── hooks/               # reusable HookProvider implementations
 │   ├── event_publisher.py    # EventPublisher — strands hook events → StreamEvent (the key one)
 │   ├── stop_guard.py         # StopGuard / MultiAgentStopGuard — external cancel signal
 │   ├── max_calls_guard.py    # MaxToolCallsGuard — tool-call circuit breaker
 │   └── tool_name_sanitizer.py# ToolNameSanitizer — repair model-mangled tool names
-├── converters/          # StreamEvent → protocol chunks (base ABC · openai · raw)
 ├── renderers/           # terminal output (base ABC · ansi)
 └── startup/             # opt-in health checks (validator.py) + report (report.py)
 ```
