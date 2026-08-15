@@ -13,7 +13,7 @@ Key Features:
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Self
 
 if TYPE_CHECKING:
     from types import TracebackType
@@ -186,7 +186,7 @@ class MCPLifecycle:
 
         self._started = False
 
-    def __enter__(self) -> MCPLifecycle:
+    def __enter__(self) -> Self:
         """Start lifecycle on context entry."""
         self.start()
         return self
@@ -200,7 +200,7 @@ class MCPLifecycle:
         """Stop lifecycle on context exit."""
         self.stop()
 
-    async def __aenter__(self) -> MCPLifecycle:
+    async def __aenter__(self) -> Self:
         """Async context entry — delegates to sync :meth:`start`.
 
         Useful with Starlette / ASGI lifespan::

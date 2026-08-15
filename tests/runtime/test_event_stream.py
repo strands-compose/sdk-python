@@ -7,6 +7,7 @@ EventPublisher's translation without touching its private handlers.
 from __future__ import annotations
 
 import asyncio
+import logging
 
 from strands import Agent, tool
 
@@ -16,6 +17,8 @@ from strands_compose.types import EventType
 from strands_compose.wire import make_event_queue
 from tests.factories import agent_def
 from tests.fakes import BoomModel, FakeModel, ToolThenTextModel
+
+logger = logging.getLogger(__name__)
 
 
 async def _drain(eq) -> list:
@@ -32,8 +35,8 @@ async def _run_agent(prompt: str, agent: Agent, eq) -> list:
     async def _invoke() -> None:
         try:
             await agent.invoke_async(prompt)
-        except Exception:  # noqa: BLE001 — error path is asserted via events
-            pass
+        except Exception:
+            logger.debug("invoke_async raised (expected for BoomModel cases)", exc_info=True)
         finally:
             await eq.close()
 

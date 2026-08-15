@@ -148,7 +148,7 @@ def _render_check_success_ansi(app_config: AppConfig) -> None:
     for label, value in rows:
         parts.append(f"  {label.ljust(width)} : {value}")
 
-    print("\n".join(parts))  # noqa: T201
+    print("\n".join(parts))
 
 
 def _render_check_success_json(app_config: AppConfig) -> None:
@@ -170,7 +170,7 @@ def _render_check_success_json(app_config: AppConfig) -> None:
         "session_manager": app_config.session_manager.type if app_config.session_manager else None,
         "hooks": _count_hooks(app_config),
     }
-    print(json.dumps(payload))  # noqa: T201
+    print(json.dumps(payload))
 
 
 def _cmd_check(configs: list[ConfigInput], *, json_output: bool, quiet: bool) -> None:
@@ -232,7 +232,7 @@ def _render_report_ansi(report: StartupReport) -> None:
         report: The :class:`StartupReport` from :func:`validate_mcp`.
     """
     for check in report.checks:
-        print(_render_check_result_ansi(check))  # noqa: T201
+        print(_render_check_result_ansi(check))
 
     n_ok = len(report.passed_checks)
     n_warn = len(report.warnings)
@@ -240,7 +240,7 @@ def _render_report_ansi(report: StartupReport) -> None:
     total = len(report.checks)
 
     if total == 0:
-        print(_colour("✓ Load OK", _GREEN + _BOLD) + "  (no MCP servers/clients configured)")  # noqa: T201
+        print(_colour("✓ Load OK", _GREEN + _BOLD) + "  (no MCP servers/clients configured)")
         return
 
     summary = f"{n_ok}/{total} passed"
@@ -250,9 +250,9 @@ def _render_report_ansi(report: StartupReport) -> None:
         summary += f", {n_crit} critical"
 
     if report.ok:
-        print(_colour(f"✓ Load OK  — {summary}", _GREEN + _BOLD))  # noqa: T201
+        print(_colour(f"✓ Load OK  — {summary}", _GREEN + _BOLD))
     else:
-        print(_colour(f"✗ Load FAILED — {summary}", _RED + _BOLD))  # noqa: T201
+        print(_colour(f"✗ Load FAILED — {summary}", _RED + _BOLD))
 
 
 def _render_report_json(report: StartupReport) -> None:
@@ -277,7 +277,7 @@ def _render_report_json(report: StartupReport) -> None:
             for c in report.checks
         ],
     }
-    print(json.dumps(payload))  # noqa: T201
+    print(json.dumps(payload))
 
 
 async def _cmd_load_async(configs: list[ConfigInput], *, json_output: bool, quiet: bool) -> None:

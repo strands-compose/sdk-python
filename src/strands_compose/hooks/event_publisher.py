@@ -93,13 +93,9 @@ def _safe_callback(callback: EventCallback) -> EventCallback:
             logger.warning(
                 "hook=<%s> | event callback raised an exception", "EventPublisher", exc_info=True
             )
-        except Exception as e:
-            logger.error(
-                "hook=<%s> | event callback raised an unexpected exception: %s: %s",
-                "EventPublisher",
-                type(e).__name__,
-                e,
-                exc_info=True,
+        except Exception:
+            logger.exception(
+                "hook=<%s> | event callback raised an unexpected exception", "EventPublisher"
             )
             raise
 

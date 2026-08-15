@@ -46,4 +46,4 @@ def test_public_shape_matches_reviewed_baseline():
 
 if __name__ == "__main__":  # regenerate the baseline (reviewed change only)
     BASELINE.write_text(json.dumps(public_shape(), indent=2, sort_keys=True) + "\n")
-    print(f"wrote {BASELINE}")  # noqa: T201
+    print(f"wrote {BASELINE}")

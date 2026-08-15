@@ -150,7 +150,7 @@ class _SuppressTaskExceptions(logging.Filter):
     emitted by EventPublisher, so the raw asyncio traceback is redundant.
     """
 
-    def filter(self, record: logging.LogRecord) -> bool:  # noqa: A003
+    def filter(self, record: logging.LogRecord) -> bool:
         return "exception was never retrieved" not in record.getMessage()
 
 
@@ -198,11 +198,11 @@ def cli_errors(*, exit_code: int = 1) -> Generator[None]:
         yield
     except (KeyboardInterrupt, SystemExit):
         raise
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — CLI boundary must format any error type
         msg = f"\n{_format_exception(exc)}\n"
         if sys.stderr.isatty():
             msg = f"\033[31m{msg}\033[0m"
-        print(msg, file=sys.stderr)  # noqa: T201
+        print(msg, file=sys.stderr)
         if exit_code:
             sys.exit(exit_code)
     finally:

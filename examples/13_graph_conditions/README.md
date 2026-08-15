@@ -21,6 +21,7 @@ def needs_revision(context: dict) -> bool:
     last_output = str(context.get("last_output", ""))
     return "REVISE" in last_output.upper()
 
+
 def is_approved(context: dict) -> bool:
     """Route to publisher if the review says 'APPROVED'."""
     last_output = str(context.get("last_output", ""))

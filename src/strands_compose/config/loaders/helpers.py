@@ -370,7 +370,7 @@ def parse_single_source(source: str | Path) -> dict:
                 raise ConfigurationError(f"Invalid YAML in inline content: {exc}") from None
 
     if not isinstance(raw, dict):
-        raise ValueError(f"Config must contain a YAML mapping, got {type(raw).__name__}")
+        raise ConfigurationError(f"Config must contain a YAML mapping, got {type(raw).__name__}")
 
     vars_block = raw.pop("vars", {})
     raw = strip_anchors(raw)

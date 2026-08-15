@@ -7,7 +7,7 @@ from .openai import OpenAIStreamConverter
 from .raw import RawStreamConverter
 
 __all__ = [
-    "StreamConverter",
     "OpenAIStreamConverter",
     "RawStreamConverter",
+    "StreamConverter",
 ]

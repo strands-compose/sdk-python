@@ -99,12 +99,12 @@ class AnsiRenderer(EventRenderer):
 
     # -- Public API --------------------------------------------------------
 
-    def render(self, event: StreamEvent) -> None:  # noqa: D102
+    def render(self, event: StreamEvent) -> None:
         handler = self._handlers.get(event.type)
         if handler is not None:
             handler(event)
 
-    def flush(self) -> None:  # noqa: D102
+    def flush(self) -> None:
         if self._in_stream:
             self._out.write("\n")
             self._out.flush()

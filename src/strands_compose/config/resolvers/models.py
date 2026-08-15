@@ -33,7 +33,7 @@ def resolve_model(model_def: ModelDef) -> Model:
         A strands-compatible model instance.
 
     Raises:
-        ValueError: If the custom model class is not a Model subclass.
+        TypeError: If the custom model class is not a Model subclass.
         ImportError: If a required optional provider package is not installed.
     """
     if model_def.provider.lower() in {p.lower() for p in PROVIDERS}:
@@ -42,7 +42,7 @@ def resolve_model(model_def: ModelDef) -> Model:
     # Custom provider — load class from import spec
     model_cls = load_object(model_def.provider, target="model class")
     if not issubclass(model_cls, Model):
-        raise ValueError(
+        raise TypeError(
             f"Custom model class '{model_def.provider}' must be a subclass of strands.models.Model."
         )
     return model_cls(model_id=model_def.model_id, **model_def.params)

@@ -232,7 +232,7 @@ def resolve_tool_spec(spec: str) -> list[AgentTool]:
 
         # No colon: file or directory
         candidate = Path(spec)
-        if candidate.is_dir() or spec.endswith("/") or spec.endswith("\\"):
+        if candidate.is_dir() or spec.endswith(("/", "\\")):
             return list(load_tools_from_directory(candidate))
 
         return list(load_tools_from_file(spec))
