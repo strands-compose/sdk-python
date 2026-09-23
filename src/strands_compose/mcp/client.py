@@ -52,7 +52,7 @@ def create_mcp_client(
             ``httpx_client_factory``
 
             **streamable-http**: ``headers``, ``http_client`` (pre-configured
-            ``httpx.AsyncClient``), ``terminate_on_close``
+            ``httpx2.AsyncClient``), ``terminate_on_close``
 
         **kwargs: Additional kwargs forwarded to strands MCPClient
             (startup_timeout, tool_filters, prefix, elicitation_callback,
@@ -62,7 +62,8 @@ def create_mcp_client(
         A strands MCPClient instance.
 
     Raises:
-        ValueError: If connection parameters are ambiguous.
+        ValueError: If connection parameters are ambiguous, or if ``transport``
+            is not an HTTP transport while ``url`` is given.
     """
     modes = sum(x is not None for x in [url, command])
     if modes != 1:
@@ -71,74 +72,31 @@ def create_mcp_client(
             "url=str for an HTTP MCP server, command=list[str] for subprocess stdio."
         )
 
-    opts = transport_options or {}
-
-    if url is not None:
-        transport_callable = _transport_for_http(url, transport, opts)
-    else:
-        # command is guaranteed non-None by the modes == 1 check above.
-        transport_callable = stdio_transport(command, **opts)  # ty: ignore
-
-    return _make_strands_client(transport_callable=transport_callable, **kwargs)
-
-
-def _make_strands_client(**kwargs: Any) -> MCPClient:
-    """Create a strands MCPClient instance.
-
-    Args:
-        **kwargs: Arguments forwarded to strands MCPClient constructor.
-
-    Returns:
-        A strands MCPClient instance.
-    """
     from strands.tools.mcp import MCPClient as _MCPClient
 
-    return _MCPClient(**kwargs)
+    opts = transport_options or {}
+    transport_callable: Any
 
+    if url is None:
+        # command is guaranteed non-None by the modes == 1 check above.
+        transport_callable = stdio_transport(command, **opts)  # ty: ignore
+    else:
+        # Detect from the URL path when not given explicitly: /sse selects SSE,
+        # anything else selects streamable-http (the modern MCP transport).
+        effective = transport
+        if effective is None:
+            path = urlparse(url).path.rstrip("/")
+            effective = "sse" if path.endswith("/sse") else "streamable-http"
 
-def _transport_for_http(
-    url: str,
-    transport: MCP_TRANSPORT | None,
-    opts: dict[str, Any] | None = None,
-) -> Any:
-    """Build a transport callable for an HTTP-based MCP connection.
+        if effective == "streamable-http":
+            transport_callable = streamable_http_transport(url, **opts)
+        elif effective == "sse":
+            transport_callable = sse_transport(url, **opts)
+        else:
+            raise ValueError(
+                f"HTTP-based connection requires 'sse' or 'streamable-http' "
+                f"transport, got: {effective}.\n"
+                "Use command=list[str] for a stdio subprocess server."
+            )
 
-    Args:
-        url: The MCP server URL.
-        transport: Explicit transport override, or ``None`` to detect it from
-            the URL path.
-        opts: Transport-specific options forwarded to the transport factory.
-
-    Returns:
-        A transport callable for strands MCPClient.
-
-    Raises:
-        ValueError: If the transport type is unsupported for an HTTP URL.
-    """
-    opts = opts or {}
-    effective = transport or _detect_transport(url)
-    if effective == "streamable-http":
-        return streamable_http_transport(url, **opts)
-    if effective == "sse":
-        return sse_transport(url, **opts)
-    raise ValueError(
-        f"HTTP-based connection requires 'sse' or 'streamable-http' transport, got: {effective}.\n"
-        "Use command=list[str] for a stdio subprocess server."
-    )
-
-
-def _detect_transport(url: str) -> str:
-    """Auto-detect transport type from URL.
-
-    Default: streamable-http (the modern MCP transport).
-
-    Args:
-        url: The MCP server URL.
-
-    Returns:
-        The detected transport type string.
-    """
-    path = urlparse(url).path.rstrip("/")
-    if path.endswith("/sse") or path == "/sse":
-        return "sse"
-    return "streamable-http"
+    return _MCPClient(transport_callable=transport_callable, **kwargs)
