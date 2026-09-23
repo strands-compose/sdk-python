@@ -25,7 +25,7 @@ dependencies = [
     "strands-agents>=1.52.0,<2.0.0",
     "pydantic>=2.12.5",
     "pyyaml>=6.0.0",
-    "mcp>=1.24.0",
+    "mcp>=2.0.0",
 ]
 
 [project.scripts]

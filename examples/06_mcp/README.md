@@ -24,7 +24,7 @@ mcp_clients:
       prefix: calc                # tools: calc_add, calc_multiply, calc_percentage
 ```
 
-`calculator_server.py` is an ordinary `FastMCP` script. The MCP client spawns it
+`calculator_server.py` is an ordinary `MCPServer` script. The MCP client spawns it
 on first use and tears it down with the agent, so its whole lifetime is handled
 for you.
 
@@ -60,12 +60,7 @@ AWS publicly hosts a Knowledge MCP server at `https://knowledge-mcp.global.api.a
 No API key is needed.
 
 This is the mode to use in production: deploy your MCP server independently
-(container, VM, or behind a gateway) and point agents at its URL. To try it
-locally, run the example server over HTTP and swap `command:` for `url:`:
-
-```bash
-uv run python examples/06_mcp/calculator_server.py --http
-```
+(container, VM, or behind a gateway) and point agents at its URL.
 
 ### Attaching both clients to one agent
 

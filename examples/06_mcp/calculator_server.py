@@ -1,21 +1,15 @@
 """A standalone MCP server for the 06_mcp example.
 
-This is a plain ``FastMCP`` server.
+Compatible with mcp>=2.0 (MCPServer replaces FastMCP).
 The config launches it as a stdio subprocess via ``command:``, so you never
 start it by hand.
-
-To run it directly over HTTP instead (and connect with ``url:``)::
-
-    uv run python examples/06_mcp/calculator_server.py --http
 """
 
 from __future__ import annotations
 
-import sys
+from mcp.server import MCPServer
 
-from mcp.server.fastmcp import FastMCP
-
-mcp = FastMCP("calculator")
+mcp = MCPServer("calculator")
 
 
 @mcp.tool()
@@ -61,6 +55,5 @@ def percentage(value: float, percent: float) -> float:
 
 
 if __name__ == "__main__":
-    # stdio is the default: the MCP client spawns this file as a subprocess.
-    # --http serves over Streamable HTTP for use with a url: client instead.
-    mcp.run(transport="streamable-http" if "--http" in sys.argv else "stdio")
+    # The MCP client spawns this file as a stdio subprocess.
+    mcp.run(transport="stdio")

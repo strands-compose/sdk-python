@@ -133,13 +133,13 @@ def streamable_http_transport(
     """Create a streamable HTTP transport callable.
 
     For full control (auth, timeouts, custom TLS, etc.), pass a pre-configured
-    ``httpx.AsyncClient`` via ``http_client``. When ``http_client`` is provided,
+    ``httpx2.AsyncClient`` via ``http_client``. When ``http_client`` is provided,
     ``headers`` is ignored (configure headers on the client directly).
 
     Args:
         url: HTTP endpoint URL (e.g., "http://localhost:8000/mcp").
         headers: Optional HTTP headers. Ignored when ``http_client`` is provided.
-        http_client: Optional pre-configured ``httpx.AsyncClient``.
+        http_client: Optional pre-configured ``httpx2.AsyncClient``.
         terminate_on_close: Send DELETE to close session (default: True).
 
     Returns:
@@ -165,9 +165,9 @@ def streamable_http_transport(
                 terminate_on_close=captured_terminate_on_close,
             )
         if captured_headers:
-            import httpx
+            import httpx2
 
-            client = httpx.AsyncClient(headers=captured_headers)
+            client = httpx2.AsyncClient(headers=captured_headers)
             return streamable_http_client(
                 url=url,
                 http_client=client,
