@@ -2,6 +2,9 @@
 
 Renders into a StringIO and asserts the renderer surfaces the event's key data
 (agent name, node id, status). Formatting/colour is not pinned.
+
+Agents delegated in the same turn run concurrently and interleave their events,
+so the last tests cover serialising them back into one block per agent.
 """
 
 from __future__ import annotations
@@ -25,6 +28,11 @@ def _render(*events: StreamEvent) -> str:
 
 def _ev(kind, agent="worker", **data) -> StreamEvent:
     return StreamEvent(type=kind, agent_name=agent, data=data)
+
+
+def _headers(out: str, agent: str, label: str) -> int:
+    """Count the separator headers rendered for *agent* / *label*."""
+    return out.count(f" {agent} \u2014 {label} ")
 
 
 def test_token_text_is_written():
@@ -141,3 +149,68 @@ def test_every_event_type_renders_something(kind):
     """No event type may be silently dropped by the renderer."""
     out = _render(StreamEvent(type=kind, agent_name="worker", data=_MINIMAL_DATA[kind]))
     assert out != ""
+
+
+def test_concurrent_agents_get_one_header_and_a_contiguous_block():
+    out = _render(
+        _ev(EventType.TOKEN, agent="researcher", text="aaa"),
+        _ev(EventType.TOKEN, agent="writer", text="xxx"),
+        _ev(EventType.TOKEN, agent="researcher", text="bbb"),
+        _ev(EventType.TOKEN, agent="writer", text="yyy"),
+        _ev(EventType.AGENT_COMPLETE, agent="researcher", usage={}),
+        _ev(EventType.AGENT_COMPLETE, agent="writer", usage={}),
+    )
+    assert "aaabbb" in out and "xxxyyy" in out
+    assert _headers(out, "researcher", "RESPONDING") == 1
+    assert _headers(out, "writer", "RESPONDING") == 1
+
+
+def test_streaming_sub_agent_takes_over_when_the_live_one_finishes():
+    out = _render(
+        _ev(EventType.TOOL_START, agent="main", tool_name="researcher", tool_input={}),
+        _ev(EventType.TOOL_START, agent="main", tool_name="writer", tool_input={}),
+        _ev(EventType.TOKEN, agent="researcher", text="facts"),
+        _ev(EventType.TOKEN, agent="writer", text="draft"),
+        _ev(EventType.AGENT_COMPLETE, agent="researcher", usage={}),
+        _ev(EventType.TOOL_END, agent="main", status="success"),
+        _ev(EventType.TOKEN, agent="writer", text=" continued"),
+        _ev(EventType.AGENT_COMPLETE, agent="writer", usage={}),
+        _ev(EventType.TOOL_END, agent="main", status="success"),
+        _ev(EventType.TOKEN, agent="main", text="synthesis"),
+        _ev(EventType.AGENT_COMPLETE, agent="main", usage={}),
+    )
+    assert "draft continued" in out
+    assert out.index("facts") < out.index("draft") < out.index("synthesis")
+
+
+def test_delegator_waiting_on_tools_does_not_take_the_terminal():
+    out = _render(
+        _ev(EventType.TOOL_START, agent="main", tool_name="researcher", tool_input={}),
+        _ev(EventType.TOOL_START, agent="main", tool_name="writer", tool_input={}),
+        _ev(EventType.TOKEN, agent="researcher", text="facts"),
+        _ev(EventType.AGENT_COMPLETE, agent="researcher", usage={}),
+        _ev(EventType.TOOL_END, agent="main", status="success"),
+        _ev(EventType.TOKEN, agent="writer", text="draft"),
+        _ev(EventType.AGENT_COMPLETE, agent="writer", usage={}),
+        _ev(EventType.TOOL_END, agent="main", status="success"),
+        _ev(EventType.TOKEN, agent="main", text="synthesis"),
+        _ev(EventType.AGENT_COMPLETE, agent="main", usage={}),
+    )
+    assert out.index("facts") < out.index("draft") < out.index("synthesis")
+
+
+def test_buffered_output_survives_a_missing_terminal_event():
+    out = _render(
+        _ev(EventType.TOKEN, agent="researcher", text="aaa"),
+        _ev(EventType.TOKEN, agent="writer", text="xxx"),
+    )
+    assert "xxx" in out
+
+
+def test_flush_resets_state_between_turns():
+    buf = io.StringIO()
+    renderer = AnsiRenderer(file=buf, separator_width=40)
+    for _ in range(2):
+        renderer.render(_ev(EventType.TOKEN, agent="main", text="hi"))
+        renderer.flush()
+    assert _headers(buf.getvalue(), "main", "RESPONDING") == 2
