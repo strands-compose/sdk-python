@@ -96,11 +96,25 @@ tools/
     └── extras.py        # Loaded — recursion includes nested dirs
 ```
 
+## Python Packages
+
+A filesystem package (a directory with `__init__.py`) keeps its package context, so tools can use relative imports:
+
+```
+toolkit/
+├── __init__.py
+├── helpers.py
+└── search.py       # from .helpers import build_url
+```
+
+Both `./toolkit` and `./toolkit/search.py:search` work. Nested regular packages can also use parent-relative imports such as `from ..helpers import build_url`.
+
+Filesystem package specs support regular packages and relative imports. For PEP 420 namespace packages or code that imports its own package by absolute name, make the package importable and use a dotted spec such as `my_package.tools`.
+
 > **Tips & Tricks**
 >
 > - Organize tools in a directory when you have many of them. One file per domain: `tools/math.py`, `tools/text.py`, `tools/database.py`.
 > - The `strands_tools` package has built-in tools like `http_request`, `file_read`, `shell` — use them with `strands_tools.http_request`.
-> - Each agent gets its own copy of tools. Two agents referencing the same file get independent tool instances.
 > - Tool function docstrings are sent to the LLM as the tool description. Write good docstrings — they directly affect how well the model uses your tools.
 > - Type hints on tool parameters become the JSON schema the LLM sees. Use `str`, `int`, `float`, `bool`, `list[str]`, etc. The more specific your types, the better the LLM calls your tools.
 

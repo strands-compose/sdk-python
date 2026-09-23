@@ -73,6 +73,56 @@ def tools_dir(tmp_path):
     return d
 
 
+@pytest.fixture
+def tool_package(tmp_path):
+    """A regular package whose tool modules use relative imports."""
+    pkg = tmp_path / "relpkg"
+    (pkg / "sub").mkdir(parents=True)
+    (pkg / "__init__.py").write_text("")
+    (pkg / "helper.py").write_text("PREFIX = 'Hi'\n")
+    (pkg / "greet.py").write_text(
+        textwrap.dedent("""\
+        from strands import tool
+
+        from .helper import PREFIX
+
+        @tool
+        def greet(name: str) -> str:
+            \"\"\"Greet.\"\"\"
+            return f"{PREFIX} {name}"
+    """)
+    )
+    (pkg / "sub" / "__init__.py").write_text("")
+    (pkg / "sub" / "deep.py").write_text(
+        textwrap.dedent("""\
+        from strands import tool
+
+        from ..helper import PREFIX
+
+        @tool
+        def deep(value: str) -> str:
+            \"\"\"Deep.\"\"\"
+            return f"{PREFIX}:{value}"
+    """)
+    )
+    return pkg
+
+
+def test_package_file_resolves_relative_imports(tool_package):
+    tools = resolve_tool_spec(str(tool_package / "greet.py"))
+    assert {tool.tool_name for tool in tools} == {"greet"}
+
+
+def test_nested_package_file_resolves_parent_relative_imports(tool_package):
+    tools = resolve_tool_spec(str(tool_package / "sub" / "deep.py"))
+    assert {tool.tool_name for tool in tools} == {"deep"}
+
+
+def test_package_directory_discovers_tools_recursively(tool_package):
+    names = {tool.tool_name for tool in resolve_tool_spec(str(tool_package))}
+    assert names == {"greet", "deep"}
+
+
 def test_load_from_file_collects_only_decorated_tools(tools_dir):
     tools = load_tools_from_file(tools_dir / "greet.py")
     names = {t.tool_name for t in tools}

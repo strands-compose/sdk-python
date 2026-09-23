@@ -8,6 +8,7 @@ import importlib
 import importlib.util
 import logging
 import sys
+import threading
 from collections.abc import Generator
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -16,6 +17,8 @@ from .exceptions import ImportResolutionError
 
 if TYPE_CHECKING:
     from types import ModuleType
+
+_MODULE_LOAD_LOCK = threading.RLock()
 
 
 def import_from_path(import_path: str) -> Any:
@@ -93,10 +96,11 @@ def load_object(spec: str, *, target: str = "object") -> Any:
 
 
 def load_module_from_file(path: str | Path) -> ModuleType:
-    """Load a Python file as a module.
+    """Load a Python file, preserving regular-package relative imports.
 
-    Uses a deterministic module name based on the file's absolute path
-    so repeated loads of the same file reuse the same name.
+    Files below contiguous ``__init__.py`` directories are loaded in a
+    path-qualified package namespace. This avoids changing ``sys.path`` and
+    prevents same-named packages in different directories from colliding.
 
     Args:
         path: Path to a ``.py`` file.
@@ -112,28 +116,63 @@ def load_module_from_file(path: str | Path) -> ModuleType:
     if not file_path.exists():
         raise FileNotFoundError(f"File not found: {file_path}")
 
-    path_hash = hashlib.md5(str(file_path).encode(), usedforsecurity=False).hexdigest()[:12]
-    module_name = f"_strands_compose_{file_path.stem}_{path_hash}"
+    package_root = file_path.parent
+    if not (package_root / "__init__.py").is_file():
+        path_hash = hashlib.md5(str(file_path).encode(), usedforsecurity=False).hexdigest()[:12]
+        module_name = f"_strands_compose_{file_path.stem}_{path_hash}"
+        spec = importlib.util.spec_from_file_location(module_name, file_path)
+        if spec is None or spec.loader is None:
+            raise ImportError(f"Cannot create module spec for: {file_path}")
 
-    spec = importlib.util.spec_from_file_location(module_name, file_path)
-    if spec is None or spec.loader is None:
-        raise ImportError(f"Cannot create module spec for: {file_path}")
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = module
+        try:
+            spec.loader.exec_module(module)
+        except Exception as exc:
+            raise ImportError(f"Failed to load file {file_path}: {exc}") from exc
+        finally:
+            sys.modules.pop(module_name, None)
+        return module
 
-    if module_name in sys.modules:
-        del sys.modules[module_name]
+    while (package_root.parent / "__init__.py").is_file():
+        package_root = package_root.parent
 
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[module_name] = module
-    try:
-        spec.loader.exec_module(module)
-    except Exception as exc:
-        sys.modules.pop(module_name, None)
-        raise ImportError(f"Failed to load file {file_path}: {exc}") from exc
+    package_hash = hashlib.md5(str(package_root).encode(), usedforsecurity=False).hexdigest()[:12]
+    root_name = f"_strands_compose_pkg_{package_hash}"
+    relative = file_path.relative_to(package_root).with_suffix("")
+    module_parts = list(relative.parts)
+    if module_parts[-1] == "__init__":
+        module_parts.pop()
+    module_name = ".".join([root_name, *module_parts])
 
-    # Drop the sys.modules entry so user-provided files don't pollute the global
-    # module namespace. The returned module object stays usable.
-    sys.modules.pop(module_name, None)
-    return module
+    module_prefix = f"{root_name}."
+    importlib.invalidate_caches()
+
+    # Root package setup is manual, so protect it from concurrent config loads.
+    with _MODULE_LOAD_LOCK:
+        root_was_loaded = root_name in sys.modules
+        try:
+            if not root_was_loaded:
+                init_path = package_root / "__init__.py"
+                package_spec = importlib.util.spec_from_file_location(
+                    root_name,
+                    init_path,
+                    submodule_search_locations=[str(package_root)],
+                )
+                if package_spec is None or package_spec.loader is None:
+                    raise ImportError(f"Cannot create package spec for: {init_path}")
+
+                package = importlib.util.module_from_spec(package_spec)
+                sys.modules[root_name] = package
+                package_spec.loader.exec_module(package)
+
+            return importlib.import_module(module_name)
+        except Exception as exc:
+            if not root_was_loaded:
+                for name in list(sys.modules):
+                    if name == root_name or name.startswith(module_prefix):
+                        sys.modules.pop(name, None)
+            raise ImportError(f"Failed to load package file {file_path}: {exc}") from exc
 
 
 # ── CLI error formatting ──────────────────────────────────────────────────────
