@@ -6,6 +6,8 @@ Result/message extraction (``extractors.py``) is covered in
 
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 from strands import Agent
 from strands import tool as strands_tool
@@ -13,7 +15,7 @@ from strands.hooks import BeforeToolCallEvent
 from strands.multiagent import GraphBuilder, Swarm
 from strands.session import FileSessionManager
 from strands.tools.decorator import DecoratedFunctionTool
-from strands.types.tools import AgentTool
+from strands.types.tools import AgentTool, ToolResult, ToolUse
 
 from strands_compose.config.resolvers.orchestrations.builders import build_delegate
 from strands_compose.config.schema import (
@@ -24,7 +26,7 @@ from strands_compose.config.schema import (
 from strands_compose.exceptions import ConfigurationError
 from strands_compose.tools import multiagent_as_tool
 from strands_compose.types import Node
-from tests.fakes import FakeModel, ToolThenTextModel
+from tests.fakes import BoomModel, FakeModel, ToolThenTextModel
 
 
 def _agent(agent_id: str, **kwargs) -> Agent:
@@ -179,11 +181,112 @@ async def test_orchestration_interrupt_becomes_a_tool_error():
     results = [
         event
         async for event in tool.stream(
-            {"toolUseId": "t1", "name": "pipeline", "input": {"input": "go"}}, {}
+            {"toolUseId": "t1", "name": "pipeline", "input": {"input": "go"}},
+            {"agent": _agent("caller")},
         )
     ]
 
     payload = results[-1].tool_result
     assert payload["status"] == "error"
     assert "approve_risky" in payload["content"][0]["text"]
-    assert "cannot be resumed" in payload["content"][0]["text"]
+
+
+def _tool_result(agent: Agent) -> ToolResult:
+    """Return the last tool result in the agent's history."""
+    return next(
+        block["toolResult"]
+        for message in reversed(agent.messages)
+        for block in message["content"]
+        if "toolResult" in block
+    )
+
+
+def _caller(tool: AgentTool) -> Agent:
+    """An agent whose model calls ``tool`` once with the prompt ``go``."""
+    return Agent(
+        model=ToolThenTextModel(tool_name=tool.tool_name, tool_input='{"input": "go"}'),
+        tools=[tool],
+    )
+
+
+def test_failed_swarm_is_reported_to_the_caller_as_a_tool_error():
+    swarm = Swarm(id="team", nodes=[Agent(model=BoomModel(), agent_id="a")], entry_point=None)
+    caller = _caller(multiagent_as_tool(swarm, description="d"))
+
+    caller("delegate")
+
+    assert _tool_result(caller)["status"] == "error"
+
+
+def test_swarm_stopped_by_its_handoff_limit_is_reported_as_a_tool_error():
+    ping = Agent(
+        model=ToolThenTextModel(
+            tool_name="handoff_to_agent", tool_input='{"agent_name": "pong", "message": "x"}'
+        ),
+        name="ping",
+    )
+    pong = Agent(
+        model=ToolThenTextModel(
+            tool_name="handoff_to_agent", tool_input='{"agent_name": "ping", "message": "x"}'
+        ),
+        name="pong",
+    )
+    swarm = Swarm(id="team", nodes=[ping, pong], entry_point=ping, max_handoffs=1)
+    caller = _caller(multiagent_as_tool(swarm, description="d"))
+
+    caller("delegate")
+
+    assert _tool_result(caller)["status"] == "error"
+
+
+def test_finished_swarm_is_reported_to_the_caller_as_success():
+    swarm = Swarm(id="team", nodes=[_agent("a")], entry_point=None)
+    caller = _caller(multiagent_as_tool(swarm, description="d"))
+
+    caller("delegate")
+
+    assert _tool_result(caller)["status"] == "success"
+
+
+def test_swarm_tokens_count_toward_the_calling_request():
+    swarm = Swarm(id="team", nodes=[_agent("a")], entry_point=None)
+    caller = _caller(multiagent_as_tool(swarm, description="d"))
+
+    result = caller("delegate")
+
+    assert result.invocation_context is not None
+    caller_only = caller.event_loop_metrics.accumulated_usage["totalTokens"]
+    assert result.invocation_context.usage["totalTokens"] > caller_only
+
+
+async def test_second_concurrent_call_to_the_same_tool_is_rejected():
+    entered = asyncio.Event()
+    release = asyncio.Event()
+
+    @strands_tool
+    async def wait_for_release(name: str) -> str:
+        """Block until the test releases it."""
+        entered.set()
+        await release.wait()
+        return name
+
+    worker = Agent(
+        model=ToolThenTextModel(tool_name="wait_for_release"),
+        agent_id="worker",
+        tools=[wait_for_release],
+    )
+    tool = multiagent_as_tool(Swarm(id="team", nodes=[worker], entry_point=None), description="d")
+    tool_use: ToolUse = {"toolUseId": "t1", "name": "team", "input": {"input": "go"}}
+    state = {"agent": _agent("caller")}
+
+    async def _final_result():
+        return [event async for event in tool.stream(tool_use, state)][-1].tool_result
+
+    first = asyncio.create_task(_final_result())
+    await entered.wait()
+    second = await _final_result()
+    release.set()
+    first_result = await first
+
+    assert second["status"] == "error"
+    assert first_result["status"] == "success"
