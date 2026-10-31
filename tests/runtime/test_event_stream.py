@@ -9,7 +9,8 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from strands import Agent, tool
+from strands import Agent, ModelRetryStrategy, tool
+from strands.hooks import BeforeToolCallEvent
 from strands.middleware import InvokeModelStage
 from strands.multiagent import GraphBuilder, Swarm
 
@@ -19,7 +20,7 @@ from strands_compose.hooks import EventPublisher
 from strands_compose.types import EventType, Node
 from strands_compose.wire import make_event_queue
 from tests.factories import agent_def
-from tests.fakes import BoomModel, FakeModel, ToolThenTextModel
+from tests.fakes import BoomModel, FakeModel, FlakyOnceModel, ToolThenTextModel
 
 logger = logging.getLogger(__name__)
 
@@ -157,6 +158,26 @@ async def test_tool_call_emits_tool_start_and_success_end():
     assert tool_ends[0].data["status"] == "success"
 
 
+async def test_tool_cancelled_by_a_hook_reports_error_status():
+    @tool
+    def greet(name: str) -> str:
+        """Greet."""
+        return f"Hi {name}"
+
+    agent = Agent(model=ToolThenTextModel(tool_name="greet"), tools=[greet])
+
+    def deny(event: BeforeToolCallEvent) -> None:
+        event.cancel_tool = "not allowed"
+
+    agent.add_hook(deny, BeforeToolCallEvent)
+    eq = make_event_queue({"a": agent}, entry_name="a")
+
+    events = await _run_agent("hi", agent, eq)
+    tool_end = next(e for e in events if e.type == EventType.TOOL_END)
+
+    assert tool_end.data["status"] == "error"
+
+
 async def test_agent_complete_reports_cache_tokens_and_stop_reason():
     usage = {
         "inputTokens": 10,
@@ -269,6 +290,20 @@ async def test_model_error_emits_error_and_suppresses_complete():
     assert EventType.AGENT_COMPLETE not in kinds
     error = next(e for e in events if e.type == EventType.ERROR)
     assert "credentials expired" in error.data["text"]
+
+
+async def test_model_call_recovered_by_retry_emits_complete_and_no_error():
+    agent = Agent(
+        model=FlakyOnceModel(["Hello"]),
+        retry_strategy=ModelRetryStrategy(max_attempts=2, initial_delay=0, max_delay=0),
+    )
+    eq = make_event_queue({"a": agent}, entry_name="a")
+
+    events = await _run_agent("hi", agent, eq)
+    kinds = [e.type for e in events]
+
+    assert EventType.AGENT_COMPLETE in kinds
+    assert EventType.ERROR not in kinds
 
 
 async def test_wire_event_queue_emits_session_start_with_manifest():

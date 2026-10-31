@@ -8,7 +8,7 @@ import sys
 from collections.abc import AsyncGenerator, Callable
 from typing import Any
 
-from strands.hooks import HookProvider, HookRegistry
+from strands.hooks import HookOrder, HookProvider, HookRegistry
 from strands.middleware import InvokeModelContext, MiddlewareNext, TypedEvent
 from strands.multiagent.graph import Graph
 from strands.multiagent.swarm import Swarm
@@ -152,7 +152,8 @@ class EventPublisher(HookProvider):
         """Register hook callbacks for agent and multiagent events."""
         # Agent-level
         registry.add_callback(BeforeInvocationEvent, self._on_agent_start)
-        registry.add_callback(AfterModelCallEvent, self._on_model_error)
+        # Run after the retry strategy and model router so ``event.retry`` is final.
+        registry.add_callback(AfterModelCallEvent, self._on_model_error, order=HookOrder.SDK_LAST)
         registry.add_callback(BeforeToolCallEvent, self._on_tool_start)
         registry.add_callback(AfterToolCallEvent, self._on_tool_end)
         registry.add_callback(AfterInvocationEvent, self._on_complete)
@@ -196,7 +197,9 @@ class EventPublisher(HookProvider):
         raw_name = event.tool_use.get("name", "unknown")
         tool_use_id = event.tool_use.get("toolUseId", "")
 
-        status = "error" if event.exception else "success"
+        # A cancelled tool (guard, intervention) has no exception but an error result.
+        is_error = event.exception is not None or event.result.get("status") == "error"
+        status = "error" if is_error else "success"
 
         self._callback(
             StreamEvent(
@@ -270,13 +273,15 @@ class EventPublisher(HookProvider):
     # -- Model error hook ----------------------------------------------------
 
     def _on_model_error(self, event: AfterModelCallEvent) -> None:
-        """Emit ERROR when a model call fails.
+        """Emit ERROR when a model call fails and is not retried.
 
         Fires for provider-level exceptions such as expired credentials,
-        throttling, network errors, or any other model API failure.
+        throttling, network errors, or any other model API failure. A call
+        that strands retries or fails over is not an error: the invocation
+        may still complete.
         Sets ``_errored`` to suppress the subsequent misleading AGENT_COMPLETE.
         """
-        if event.exception is None:
+        if event.exception is None or event.retry:
             return
 
         self._errored = True

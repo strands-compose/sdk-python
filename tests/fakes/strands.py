@@ -14,6 +14,7 @@ from typing import Any
 from strands import tool
 from strands.models import Model
 from strands.plugins import Plugin
+from strands.types.exceptions import ModelThrottledException
 
 
 class FakeModel(Model):
@@ -149,6 +150,28 @@ class BoomModel(Model):
         """Raise a provider-style error mid-call."""
         raise RuntimeError(self._message)
         yield  # pragma: no cover — makes this an async generator
+
+
+class FlakyOnceModel(FakeModel):
+    """Throttles on the first ``stream`` call, then behaves like :class:`FakeModel`.
+
+    Drives strands' model retry path: a retry strategy recovers the invocation.
+    """
+
+    def __init__(self, text_chunks: list[str] | None = None) -> None:
+        """Store the text to stream once the throttled first call is retried."""
+        super().__init__(text_chunks, model_id="flaky-model")
+        self._failed_once = False
+
+    async def stream(
+        self, messages: Any, tool_specs: Any = None, system_prompt: Any = None, **kwargs: Any
+    ):
+        """Raise ``ModelThrottledException`` once, then stream normally."""
+        if not self._failed_once:
+            self._failed_once = True
+            raise ModelThrottledException("throttled")
+        async for chunk in super().stream(messages, tool_specs, system_prompt, **kwargs):
+            yield chunk
 
 
 class FakePlugin(Plugin):

@@ -7,6 +7,7 @@ from .strands import (
     FakeMCPClient,
     FakeModel,
     FakePlugin,
+    FlakyOnceModel,
     ToolThenTextModel,
     fake_plugin_factory,
 )
@@ -16,6 +17,7 @@ __all__ = [
     "FakeMCPClient",
     "FakeModel",
     "FakePlugin",
+    "FlakyOnceModel",
     "ToolThenTextModel",
     "fake_plugin_factory",
 ]
