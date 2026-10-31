@@ -2,6 +2,7 @@
 .claude
 .kiro/specs
 .kiro/settings
+.agents
 .sessions
 .converter
 .hypothesis
