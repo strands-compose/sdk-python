@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## v0.12.0 (2026-10-31)
+
+### Feat
+
+- **agents**: add structured output to agent definitions
+- **session**: add file and S3 snapshot session managers
+- **models**: add prompt caching to model definitions
+- **events**: stream tokens through model middleware and report more run details
+
+### Fix
+
+- **examples**: read the graph state in graph edge conditions
+- **config**: reject extra agent arguments that compose already sets
+- **config**: read inline YAML reliably and anchor every relative path to the config
+- **mcp**: keep header-authenticated streamable HTTP servers connected
+- **tools**: report unfinished delegate orchestrations as tool errors
+- **hooks**: end guard-stopped runs through agent cancellation
+- **events**: report cancelled tools and retried model calls correctly
+- **mcp**: work with mcp 2.x as resolved through strands-agents (#86)
+
 ## v0.11.2 (2026-09-24)
 
 ### Fix
