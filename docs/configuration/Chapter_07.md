@@ -12,7 +12,7 @@ Define a session manager at the root level and **every agent** inherits it:
 
 ```yaml
 session_manager:
-  provider: file
+  provider: file-snapshot
   params:
     storage_dir: ./.sessions
     session_id: my-session-001
@@ -29,9 +29,77 @@ entry: assistant
 
 | Provider | Backend | Required Package |
 |----------|---------|------------------|
-| `file` | Local filesystem | *(included)* |
-| `s3` | Amazon S3 bucket | *(included, needs AWS creds)* |
+| `file-snapshot` (recommended) | Local folder, one snapshot per agent | *(included)* |
+| `s3-snapshot` (recommended) | Amazon S3 bucket, one snapshot per agent | *(included, needs AWS creds)* |
+| `file` | Local filesystem, one file per message | *(included)* |
+| `s3` | Amazon S3 bucket, one object per message | *(included, needs AWS creds)* |
 | `agentcore` | Bedrock AgentCore Memory | `pip install strands-compose[agentcore-memory]` |
+
+### Snapshot Providers (recommended)
+
+`file-snapshot` and `s3-snapshot` use strands' `SnapshotSessionManager`. Each agent's whole
+state (messages, agent state, system prompt) is saved as one snapshot and restored on the next
+`load()`. Use them for new configs:
+
+- They work with `agent_kwargs.context_manager`. `file`, `s3` and `agentcore` cannot be
+  combined with it on strands-agents 1.63+.
+- A restore brings back the conversation as it was last saved, including summaries and
+  trimmed tool results.
+- They also work as the session manager of a Swarm or Graph orchestration.
+
+```yaml
+session_manager:
+  provider: file-snapshot
+  params:
+    storage_dir: ./.sessions      # default: ./.strands, relative to the working directory
+```
+
+```yaml
+session_manager:
+  provider: s3-snapshot
+  params:
+    bucket: my-agent-sessions     # required
+    prefix: prod/                 # optional
+    region_name: eu-central-1     # optional
+```
+
+| Param | Provider | Required | Default | Accepted values / meaning |
+|-------|----------|----------|---------|---------------------------|
+| `bucket` | `s3-snapshot` | yes | none | Non-empty S3 bucket name. |
+| `storage_dir` | `file-snapshot` | no | `./.strands/` | Non-empty folder path. `null` also means the default folder. |
+| `prefix` | `s3-snapshot` | no | `""` | Key prefix inside the bucket. `null` also means no prefix. |
+| `region_name` | `s3-snapshot` | no | AWS environment | AWS region name. |
+| `session_id` | both | no | runtime id, then random UUID | As for every provider. |
+| `save_latest_on` | both | no | `invocation` | `invocation`: save after each turn. `message`: also save after every message; this rewrites the whole snapshot each time. |
+| `multi_agent_save_latest_on` | both | no | `node` | Swarm or Graph: `node` or `invocation`. |
+
+Unknown params and invalid values are rejected when the config is loaded, so
+`strands-compose check` catches them.
+
+The same layout is used in the folder and in the bucket (after the prefix):
+
+```
+session/<session_id>/scopes/agent/<agent_name>/snapshots/snapshot_latest.json
+session/<session_id>/scopes/multiAgent/<orchestration_name>/snapshots/snapshot_latest.json
+context/<session_id>/scopes/agent/<agent_name>/...   # tool results a context manager set aside
+```
+
+The agent gets the same storage, so tool results a context manager sets aside are stored once,
+next to the session.
+
+> **Switching an existing deployment:** snapshot providers do not read sessions written by
+> `file` or `s3`, and strands has no migration. Agents start fresh for old session ids. Keep
+> the old provider while those sessions still matter.
+
+> **Config changes after a save:** a snapshot includes the system prompt and agent state.
+> Restoring an old session restores those saved values. Use a new session id when a changed
+> prompt or initial state must take effect.
+
+> **MinIO or LocalStack:** `s3-snapshot` has no `endpoint_url`. Set the `AWS_ENDPOINT_URL_S3`
+> environment variable instead.
+
+> **One writer per scope:** two processes writing the same session id and the same agent or
+> orchestration id overwrite the same latest snapshot. The last save wins.
 
 ### File Provider
 
@@ -45,17 +113,21 @@ session_manager:
 
 Sessions are stored as files in `storage_dir`. Delete the directory to start fresh.
 
+Cannot be combined with `agent_kwargs.context_manager` (strands-agents 1.63+). Use `file-snapshot`.
+
 ### S3 Provider
 
 ```yaml
 session_manager:
   provider: s3
   params:
-    bucket_name: my-agent-sessions
+    bucket: my-agent-sessions
     session_id: prod-session-001
 ```
 
 Requires AWS credentials in the environment.
+
+Cannot be combined with `agent_kwargs.context_manager` (strands-agents 1.63+). Use `s3-snapshot`.
 
 ### AgentCore Provider
 
@@ -133,7 +205,7 @@ The fix: add `session_manager: ~` to each swarm or graph node agent to opt out.
 
 > **Tips & Tricks**
 >
-> - For development, `file` provider with a fixed `session_id` is great — restart your script and the agent remembers your conversation.
+> - For development, `file-snapshot` provider with a fixed `session_id` is great — restart your script and the agent remembers your conversation.
 > - For server/API deployments, use `load()` with a per-session `session_id`. strands-compose
 >   computes a single `effective_session_id` from your value and threads it to every agent and
 >   orchestration, so all agents in one request share the same session folder. See

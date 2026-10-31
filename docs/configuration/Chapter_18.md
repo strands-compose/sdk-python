@@ -25,7 +25,8 @@ models:
   name:
     provider: bedrock | anthropic | openai | ollama | gemini | module.path:CustomModel
     model_id: "model-identifier"
-    params: {}        # Provider-specific kwargs
+    cache: null       # Prompt caching: true, or a CacheConfig mapping ({strategy: auto, ttl: 1h})
+    params: {}        # Provider-specific kwargs (not cache_config — use cache)
 ```
 
 ## AgentDef
@@ -44,6 +45,7 @@ agents:
     mcp: []                        # List of MCP client names
     conversation_manager: null     # ConversationManagerDef
     session_manager: null          # Per-agent SessionManagerDef (overrides global)
+    structured_output: null        # StructuredOutputDef — typed result of every call
 ```
 
 ## HookDef
@@ -74,11 +76,23 @@ plugins:
   - module.path:ClassName
 ```
 
+## StructuredOutputDef
+
+The pydantic model an agent fills on every call, returned as `result.structured_output`. See
+[Chapter 20 — Structured Output](Chapter_20.md) for the full reference.
+
+```yaml
+structured_output:
+  model: ./schemas.py:Review       # Required. Pydantic model class: module.path:Name or ./file.py:Name
+  prompt: null                     # Prompt used when the model must be asked to fill the schema
+```
+
 ## SessionManagerDef
 
 ```yaml
 session_manager:
-  provider: file | s3 | agentcore  # Built-in provider name
+  provider: file | s3 | agentcore | file-snapshot | s3-snapshot  # Built-in provider name
+                                    # Snapshot providers accept only the params in Chapter 7
   type: null                        # Custom class: module.path:ClassName (overrides provider)
   params: {}                        # Constructor kwargs (session_id, storage_dir, etc.)
 ```

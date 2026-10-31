@@ -8,7 +8,7 @@ When you call `load("config.yaml")`, here's exactly what happens:
 
 ## Step 1: Parse Sources
 
-Each config source (file path or raw YAML string) is parsed with `yaml.safe_load()`. `Path` objects are always treated as files. Strings are files if the path exists on disk, otherwise parsed as inline YAML.
+Each config source (file path or raw YAML string) is parsed with `yaml.safe_load()`. `Path` objects are always treated as files. A multi-line string is always inline YAML. A single-line string is read as a file when that file exists. If it does not exist but contains a path separator or ends in `.yaml` / `.yml`, `FileNotFoundError` is raised; any other single-line string is inline YAML.
 
 ## Step 2: Strip Anchors and Interpolate Variables
 

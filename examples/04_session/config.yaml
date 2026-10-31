@@ -1,6 +1,6 @@
 # 04_session — Persistent Memory
 #
-# The session_manager persists conversation history to disk.
+# The session_manager saves each agent's whole conversation to disk as one snapshot.
 # The agent remembers everything you said across turns — and across restarts.
 #
 # Run:
@@ -12,10 +12,10 @@
 models:
   default:
     provider: bedrock
-    model_id: openai.gpt-oss-20b-1:0
+    model_id: global.anthropic.claude-haiku-5-5
 
 session_manager:
-  provider: file
+  provider: file-snapshot
   params:
     storage_dir: ./.sessions
     session_id: example-04

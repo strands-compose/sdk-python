@@ -106,6 +106,9 @@ Two structural rules layered on top:
   (`resolve_leaf_session_manager`): per-leaf override -> explicit opt-out
   (`session_manager: ~`) -> global default -> `None`. Agents and orchestrations
   use it identically; the effective `session_id` is threaded down from `load`.
+  `select_session_manager_def` picks the def. For a snapshot provider, agents also
+  build its storage once (`resolve_snapshot_storage`) and pass the same object to
+  the manager and to `Agent(storage=)`.
 
 ---
 

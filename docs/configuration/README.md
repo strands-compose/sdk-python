@@ -15,7 +15,7 @@ No prior YAML expertise required. We start simple and build up.
 3. [Variables — Environment-Driven Config](Chapter_03.md)
 4. [YAML Anchors — DRY Config Blocks](Chapter_04.md)
 5. [Tools — Giving Agents Superpowers](Chapter_05.md)
-6. [Hooks — Middleware for Agents](Chapter_06.md)
+6. [Hooks — Lifecycle Callbacks for Agents](Chapter_06.md)
 7. [Session Persistence — Memory That Survives Restarts](Chapter_07.md)
 8. [Conversation Managers — Controlling Context Windows](Chapter_08.md)
 9. [MCP — External Tool Servers](Chapter_09.md)
@@ -29,6 +29,7 @@ No prior YAML expertise required. We start simple and build up.
 17. [The Loading Pipeline — What Happens Under the Hood](Chapter_17.md)
 18. [Full Reference — Every Field at a Glance](Chapter_18.md)
 19. [Plugins — Reusable Agent Behaviors](Chapter_19.md)
+20. [Structured Output — Typed Agent Results](Chapter_20.md)
 
 **Bonus**: [Quick Recipes](Quick_Recipes.md) — Copy-paste-ready configs for common patterns.
 

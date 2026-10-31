@@ -64,7 +64,7 @@ the full body loads when the agent activates the skill. Skills that ship resourc
 this instruction-only skill needs none.
 
 For the SKILL.md anatomy, the frontmatter fields, and the resource-directory layout,
-see the authoring guide in [Chapter 19 — Plugins](../../docs/configuration/Chapter_19.md#authoring-a-skill-skillmd).
+see the reading list in [Chapter 19 — Plugins](../../docs/configuration/Chapter_19.md#further-reading).
 Agent Skills is an open, cross-vendor format — the authoritative sources are the
 [strands skills docs](https://strandsagents.com/docs/user-guide/concepts/plugins/skills/)
 and the [Agent Skills specification](https://agentskills.io/specification).

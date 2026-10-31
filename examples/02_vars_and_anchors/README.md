@@ -21,7 +21,7 @@ YAML handles the expansion.
 
 ```yaml
 vars:
-  MODEL: ${MODEL:-openai.gpt-oss-20b-1:0}    # env var -> falls back to default
+  MODEL: ${MODEL:-global.anthropic.claude-haiku-5-5}    # env var -> falls back to default
   TONE:  ${TONE:-friendly}
 
 x-base_prompt: &base_prompt |                 # define once
@@ -87,10 +87,11 @@ $env:MODEL="us.anthropic.claude-sonnet-4-6-v1:0"; uv run python examples/02_vars
 - `What year was Python first released?`
 - `Explain what a Docker image is.`
 
-## Advanced topic — suppress default callback logging
+## Advanced topic — console output
 
-Strands agents log actions to the console through their default `callback_handler`.
-If you want cleaner example output, set the handler to `null` in `agent_kwargs` for any agent:
+Strands agents print their answer and tool calls through the default `callback_handler`.
+This example's `main.py` prints nothing itself, so that output is all you see.
+Set the handler to `null` in `agent_kwargs` to silence one agent:
 
 ```yaml
 agents:
@@ -98,3 +99,6 @@ agents:
     agent_kwargs:
       callback_handler: null # or ~
 ```
+
+Only silence helper agents in a multi-agent setup. On the agent that gives the final
+answer, you would see no answer at all.

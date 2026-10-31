@@ -121,6 +121,33 @@ open Agent Skills format, not by strands-compose; `examples/15_plugins/` ships a
 
 ---
 
+## Middleware
+
+strands middleware wraps the model and tool stages of an agent. A plugin can register it
+from `init_agent`, which makes it reachable from `plugins:` without any new config key:
+
+```python
+from strands.middleware import InvokeModelStage
+from strands.plugins import Plugin
+
+
+class ModelTiming(Plugin):
+    name = "model-timing"
+
+    def init_agent(self, agent) -> None:
+        async def timing(context, next_fn):
+            async for event in next_fn(context):
+                yield event
+
+        agent.add_middleware(InvokeModelStage, timing)
+```
+
+Plugins register at construction, so their middleware is the outer layer. When a queue is
+wired, the `TOKEN` / `REASONING` middleware of [Chapter 15](Chapter_15.md) is registered
+later and sits inside it, so streamed events carry the model's own output.
+
+---
+
 ## Error Reference
 
 | Condition | Exception |
@@ -130,7 +157,7 @@ open Agent Skills format, not by strands-compose; `examples/15_plugins/` ships a
 | Resolved object is callable but does not return a `Plugin` | `TypeError` |
 | Constructor or factory raises | the original exception, unwrapped |
 | Two plugins on one agent share a `name` | `ValueError`, from the strands plugin registry |
-| `plugins` also passed via `agent_kwargs` | `TypeError` (duplicate keyword), from `Agent()` |
+| `plugins` also passed via `agent_kwargs` | `SchemaValidationError`, when the config is parsed |
 
 strands-compose adds no plugin-specific exception types; everything propagates unwrapped.
 
@@ -145,6 +172,4 @@ strands-compose adds no plugin-specific exception types; everything propagates u
 
 ---
 
-[← Previous: Full Reference](Chapter_18.md) | [Back to Table of Contents](README.md)
-
-**Bonus**: [Quick Recipes →](Quick_Recipes.md)
+[Next: Chapter 20 — Structured Output →](Chapter_20.md)

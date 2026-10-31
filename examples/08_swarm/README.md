@@ -20,8 +20,13 @@ drafter ──handoff──▶ reviewer ──handoff──▶ drafter  (if revi
                                   └──handoff──▶ tech_lead  (when approved)
 ```
 
-strands injects a `handoff_to_agent(agent_name, context)` tool into every swarm agent.
-When an agent calls it, execution transfers to the named peer with full context.
+strands injects a `handoff_to_agent(agent_name, message, context)` tool into every swarm
+agent. When an agent calls it, execution transfers to the named peer.
+
+The next agent starts fresh. It sees the handoff `message`, the original request, the
+names of the agents before it, and any `context` they shared. It does **not** see their
+replies, and a revisited agent does not remember its own earlier turn. That is why every
+prompt in `config.yaml` says to put the complete code in the handoff message.
 
 ```yaml
 orchestrations:
@@ -37,6 +42,9 @@ orchestrations:
 **Swarm vs Delegate.** Use swarm when agents need to collaborate back-and-forth (e.g.
 drafting + reviewing cycles). Use delegate when there's a clear hierarchy and fixed
 flow.
+
+**Pass the work in the handoff.** If an agent writes code in its reply but hands off
+without it, the next agent has nothing to review. It ends up asking you to paste the code.
 
 **`max_handoffs` prevents infinite loops.** If agents keep handing off without
 converging, the swarm stops after `max_handoffs` transfers.
@@ -62,10 +70,11 @@ uv run python examples/08_swarm/main.py
 - `Create and review a function that merges two sorted lists.`
 - `Write a utility that parses a simple key=value config file.`
 
-## Advanced topic — suppress default callback logging
+## Advanced topic — console output
 
-Strands agents log actions to the console through their default `callback_handler`.
-If you want cleaner example output, set the handler to `null` in `agent_kwargs` for any agent:
+Strands agents print their answer and tool calls through the default `callback_handler`.
+This example's `main.py` prints nothing itself, so that output is all you see.
+Set the handler to `null` in `agent_kwargs` to silence one agent:
 
 ```yaml
 agents:
@@ -73,3 +82,6 @@ agents:
     agent_kwargs:
       callback_handler: null # or ~
 ```
+
+Only silence helper agents in a multi-agent setup. On the agent that gives the final
+answer, you would see no answer at all.

@@ -1,6 +1,6 @@
 # 05 — Hooks
 
-> Attach middleware to every agent invocation — custom or built-in.
+> Attach lifecycle callbacks to every agent invocation — custom or built-in.
 
 ## What this shows
 
@@ -48,7 +48,7 @@ The spec format for hooks is always `module_or_file:ClassName` — the class nam
 
 - `BeforeToolCallEvent` and `AfterToolCallEvent` are the most common hook points. See strands docs for the full list.
 - Multiple hooks on the same agent compose in declaration order. Each fires independently.
-- `MaxToolCallsGuard` uses a two-phase approach: the first over-limit call cancels the tool and instructs the LLM to write a final answer (the loop continues so it gets one more turn). If the LLM ignores that and requests another tool, the event loop is hard-stopped. A `WARNING` is logged on both phases.
+- `MaxToolCallsGuard` uses a two-phase approach: the first over-limit call cancels the tool and instructs the LLM to write a final answer (the loop continues so it gets one more turn). If the LLM ignores that and requests another tool, the invocation is ended with `stop_reason` `cancelled`. A `WARNING` is logged on both phases.
 - `ToolNameSanitizer` is often necessary — some models append extra tokens to tool names (e.g. `search<|x|>` instead of `search`), causing strands to silently fail the tool lookup. The hook strips the artifacts before strands resolves the name.
 - The tools in `custom_tools.py` are mock stubs that return deterministic fake data so the example works without external APIs.
 
@@ -72,10 +72,11 @@ At the end you'll see our FingerprintHook log:
 - `Find facts about Python programming and write a short summary.`
 - `What do we know about climate change and renewable energy?`
 
-## Advanced topic — suppress default callback logging
+## Advanced topic — console output
 
-Strands agents log actions to the console through their default `callback_handler`.
-If you want cleaner example output, set the handler to `null` in `agent_kwargs` for any agent:
+Strands agents print their answer and tool calls through the default `callback_handler`.
+This example's `main.py` prints nothing itself, so that output is all you see.
+Set the handler to `null` in `agent_kwargs` to silence one agent:
 
 ```yaml
 agents:
@@ -83,3 +84,6 @@ agents:
     agent_kwargs:
       callback_handler: null # or ~
 ```
+
+Only silence helper agents in a multi-agent setup. On the agent that gives the final
+answer, you would see no answer at all.

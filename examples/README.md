@@ -19,6 +19,7 @@ Each example is a self-contained folder with a `README.md`, `config.yaml`, and `
 | 13 | [13_graph_conditions](./13_graph_conditions/) | Conditional graph edges — `condition:`, `reset_on_revisit`, `max_node_executions` |
 | 14 | [14_agent_factory](./14_agent_factory/) | `type:` + `agent_kwargs:` — custom agent factory instead of default `Agent()` |
 | 15 | [15_plugins](./15_plugins/) | `plugins:` — vended `AgentSkills`, `ContextInjector` (via factory), and `GoalLoop` |
+| 16 | [16_structured_output](./16_structured_output/) | `structured_output:` — the agent returns a typed pydantic object instead of text |
 
 ## Prerequisites
 
@@ -28,7 +29,9 @@ uv sync
 
 Set `AWS_REGION` and valid Bedrock credentials before running.
 
-The default model is `openai.gpt-oss-20b-1:0`; override per-directory with `MODEL=<model-id>`.
+Every example uses Claude Haiku 5.5 through the global inference profile
+`global.anthropic.claude-haiku-5-5`. To try another model, change `model_id` in that
+example's config.
 
 ## Running an example
 

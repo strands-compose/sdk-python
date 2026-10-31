@@ -112,6 +112,43 @@ models:
       top_p: 0.9
 ```
 
+## Prompt Caching
+
+Set `cache` on a model, next to `provider` and `model_id`. It becomes strands' `CacheConfig` and is passed to the model as `cache_config`:
+
+```yaml
+models:
+  fast:
+    provider: bedrock
+    model_id: us.anthropic.claude-sonnet-4-6-v1:0
+    cache: true                          # automatic caching
+  long_context:
+    provider: bedrock
+    model_id: us.anthropic.claude-sonnet-4-6-v1:0
+    cache: {strategy: auto, ttl: 1h}     # any CacheConfig field
+```
+
+| `cache` | Result |
+|---------|--------|
+| absent or `false` | caching off (the default) |
+| `true` | `CacheConfig(strategy="auto")` |
+| mapping | `CacheConfig(**mapping)` |
+
+The mapping keys are `strategy` (`auto` or `anthropic`), `ttl`, `system_prompt_ttl`, `tools_ttl` and `cache_key`; an unknown key fails at load time. Caching is configured only through `cache`: `params.cache_config` is rejected.
+
+Each provider applies the fields it supports:
+
+| Provider | Effect |
+|----------|--------|
+| `bedrock` | Adds cache points for models that support them (Claude). Other models are skipped with a log line; GPT models on Bedrock cache automatically without it. |
+| `anthropic` | Adds cache points. |
+| `openai` | Uses `cache_key` to route requests to the provider's automatic cache. |
+| `ollama` | Ignored. |
+| `gemini` | Not passed: strands' Gemini model has no `cache_config`. |
+| custom | Receives `cache_config` as a constructor argument. |
+
+On Claude the first call writes the cache (billed above the normal input price) and later calls with the same prefix read it (billed far below it), so caching pays off for agents that reuse a long system prompt or tool list. Cache reads and writes show up in `AGENT_COMPLETE` as `cache_read_input_tokens` and `cache_write_input_tokens` ([Chapter 15](Chapter_15.md)).
+
 > **Tips & Tricks**
 >
 > - When combined with `vars`, you can swap models at runtime: `MODEL=gpt-5.5 python main.py`. See [Chapter 3](Chapter_03.md).

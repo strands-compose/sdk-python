@@ -20,7 +20,7 @@ the YAML — you can call it directly like a function.
 models:
   default:
     provider: bedrock
-    model_id: openai.gpt-oss-20b-1:0
+    model_id: global.anthropic.claude-haiku-5-5
 
 agents:
   assistant:
@@ -54,10 +54,11 @@ uv run python examples/01_minimal/main.py
 - `Explain what a Python generator is in one sentence.`
 - `Write a haiku about software engineering.`
 
-## Advanced topic — suppress default callback logging
+## Advanced topic — console output
 
-Strands agents log actions to the console through their default `callback_handler`.
-If you want cleaner example output, set the handler to `null` in `agent_kwargs` for any agent:
+Strands agents print their answer and tool calls through the default `callback_handler`.
+This example's `main.py` prints nothing itself, so that output is all you see.
+Set the handler to `null` in `agent_kwargs` to silence one agent:
 
 ```yaml
 agents:
@@ -65,3 +66,6 @@ agents:
     agent_kwargs:
       callback_handler: null # or ~
 ```
+
+Only silence helper agents in a multi-agent setup. On the agent that gives the final
+answer, you would see no answer at all.

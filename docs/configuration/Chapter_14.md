@@ -63,6 +63,8 @@ agents:
 
 When `type` is **not** set (standard agent construction), `agent_kwargs` is passed directly to `strands.Agent()`. Any invalid key will raise `TypeError` at construction time.
 
+Keys that strands-compose passes itself are rejected when the config is parsed: `name`, `agent_id`, `model`, `system_prompt`, `description`, `tools`, `hooks`, `plugins`, `conversation_manager`, `session_manager`, `structured_output_model`, `structured_output_prompt` and `load_tools_from_directory`. `name` and `agent_id` come from the agent's key; set the others as fields on the agent (`structured_output_model` and `structured_output_prompt` come from `structured_output`, see [Chapter 20](Chapter_20.md)).
+
 ## Delegate `agent_kwargs` Override
 
 Delegate orchestrations can also specify `agent_kwargs`, which get **merged** over the entry agent's kwargs (orchestration values win on conflict):
@@ -85,6 +87,8 @@ orchestrations:
       - agent: worker
         description: "Do the work."
 ```
+
+The orchestration's `agent_kwargs` follow the same parse-time rules as an agent's own: reserved keys are rejected.
 
 > **Tips & Tricks**
 >

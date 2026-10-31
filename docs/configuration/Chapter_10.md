@@ -45,7 +45,7 @@ entry: team
 
 **How it works**: strands-compose **forks** a new agent from the `entry_name` agent's blueprint (model, system_prompt, hooks, tools) and adds delegate tools for each connection. The original `coordinator` agent is **never mutated**.
 
-> **Two limits.** A delegate cannot be called twice concurrently — the second call comes back as a tool error, so declare a second agent to fan out. And an interrupt (such as an approval) can be answered and resumed only for an agent connection; raised inside a nested Swarm or Graph it reaches the coordinator as a tool error.
+> **Two limits.** A delegate cannot be called twice concurrently — the second call comes back as a tool error, so declare a second agent to fan out. And an interrupt (such as an approval) can be answered and resumed only for an agent connection; raised inside a nested Swarm or Graph it reaches the coordinator as a tool error. A nested Swarm or Graph that fails, or that stops at a limit such as `max_handoffs`, is also reported to the coordinator as a tool error, and its token usage counts toward the coordinator's request.
 
 **Fields**:
 
@@ -108,7 +108,7 @@ entry: review_team
 | `session_manager` | dict | No | | Swarm-level session manager |
 | `hooks` | list | No | | Swarm-level hooks |
 
-**Limitation**: All swarm nodes must be plain agents — no nested orchestrations. Node agents cannot have session managers (see [Chapter 7](Chapter_07.md#swarm-agents-and-sessions)).
+**Limitation**: All swarm nodes must be plain agents — no nested orchestrations. Node agents cannot have session managers (see [Chapter 7](Chapter_07.md#swarm-and-graph-agents-and-sessions)).
 
 ## Mode: Graph
 

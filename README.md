@@ -8,7 +8,7 @@
   <p>
     <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.11+-blue.svg" alt="Python 3.11+"></a>
     <a href="https://pypi.org/project/strands-compose/"><img src="https://img.shields.io/pypi/v/strands-compose.svg" alt="PyPI version"></a>
-    <a href="https://github.com/strands-agents/harness-sdk"><img src="https://img.shields.io/badge/strands--agents-1.52.0+-green.svg" alt="Strands Agents"></a>
+    <a href="https://github.com/strands-agents/harness-sdk"><img src="https://img.shields.io/badge/strands--agents-1.63.0+-green.svg" alt="Strands Agents"></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" alt="License"></a>
   </p>
 </div>
@@ -115,10 +115,12 @@ A bug report comes in. You have the exact YAML config. Load it, replay it, debug
 | **YAML-first config** | Models, agents, tools, hooks, MCP, orchestrations — all in one file |
 | **Full YAML power** | Variables (`${VAR:-default}`), anchors (`&ref` / `*ref`), `x-` scratch pads, multi-file merge |
 | **Multi-model support** | Bedrock, Anthropic, OpenAI, Ollama, Gemini — swap with one line |
+| **Prompt caching** | `cache: true` on a model turns on strands' prompt caching |
+| **Structured output** | Point an agent at a pydantic model and get typed results back |
 | **MCP clients** | Connect to remote HTTP endpoints or spawn stdio subprocess servers with prefixes and tool filters |
 | **Orchestration modes** | Delegate (agent-as-tool), Swarm (peer handoffs), Graph (DAG pipelines) — arbitrarily nestable |
 | **Event streaming** | Unified async event queue across any orchestration depth — tokens, tool calls, handoffs, completions |
-| **Session persistence** | File, S3, or [Bedrock AgentCore Memory](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/memory.html) — agents remember across restarts |
+| **Session persistence** | Snapshots in a local folder or S3, plus file, S3, or [Bedrock AgentCore Memory](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/memory.html) — agents remember across restarts |
 | **Custom agent factories** | Plug your own `Agent` subclass or factory via `type:` |
 | **Deployment-agnostic** | Pure core library — no HTTP server, no deployment opinions baked in |
 
@@ -150,6 +152,7 @@ uv run python examples/01_minimal/main.py
 | 13 | [Graph conditions](examples/13_graph_conditions/) | Conditional edges — `condition:`, `reset_on_revisit`, `max_node_executions` |
 | 14 | [Agent factory](examples/14_agent_factory/) | `type:` + `agent_kwargs:` — custom agent factory instead of `Agent()` |
 | 15 | [Plugins](examples/15_plugins/) | `plugins:` — reusable behaviour packages (skills, context injection, quality loops) |
+| 16 | [Structured output](examples/16_structured_output/) | `structured_output:` — the agent returns a typed pydantic object instead of text |
 
 ---
 

@@ -43,6 +43,37 @@ def is_approved(state: GraphState) -> bool:
 
 The condition spec format is the same as tools and hooks: `./file.py:function_name` or `module.path:function_name`.
 
+## Routing on Structured Output
+
+An agent with `structured_output` ([Chapter 20](Chapter_20.md)) returns a typed object instead of free text, so a condition can branch on a field rather than on keywords:
+
+```yaml
+agents:
+  reviewer:
+    model: default
+    system_prompt: "Review the draft."
+    structured_output:
+      model: ./schemas.py:Review                 # pydantic BaseModel subclass
+```
+
+```python
+# schemas.py
+from pydantic import BaseModel
+
+class Review(BaseModel):
+    approved: bool
+    notes: str
+```
+
+```python
+# conditions.py
+from strands.multiagent.graph import GraphState
+
+def is_approved(state: GraphState) -> bool:
+    review = state.results["reviewer"].result.structured_output
+    return review.approved
+```
+
 ## Loops and Revisits
 
 When an edge condition creates a loop (reviewer → writer → reviewer), you need two settings:

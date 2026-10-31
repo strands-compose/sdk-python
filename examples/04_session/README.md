@@ -10,12 +10,13 @@
 
 ## How it works
 
-Add a `session_manager` block to your config. With `provider: file`, strands-compose saves
-every turn to `.sessions/` on disk and restores it on the next `load()`.
+Add a `session_manager` block to your config. With `provider: file-snapshot`, strands-compose
+saves the whole conversation as one snapshot under `.sessions/` after each turn and restores it
+on the next `load()`. Use `provider: s3-snapshot` with a `bucket` to store it in Amazon S3.
 
 ```yaml
 session_manager:
-  provider: file
+  provider: file-snapshot
   params:
     storage_dir: ./.sessions
     session_id: example-04
@@ -23,6 +24,8 @@ session_manager:
 
 That's it — no code changes needed. `load()` sees the session manager config, wires it into
 the agent, and handles save/restore transparently.
+
+The older `provider: file` still works, but can't be combined with `agent_kwargs.context_manager`.
 
 ### Global vs inline session manager
 
@@ -32,7 +35,7 @@ agent** that doesn't override it:
 ```yaml
 # Global — all agents get this by default
 session_manager:
-  provider: file
+  provider: file-snapshot
   params:
     storage_dir: ./.sessions
 
@@ -40,12 +43,12 @@ agents:
   assistant:
     model: default
     system_prompt: You are helpful.
-    # ← gets the global file session manager automatically
+    # ← gets the global session manager automatically
 
   analyst:
     model: default
     system_prompt: You analyze data.
-    # ← also gets the global file session manager
+    # ← also gets the global session manager
 
   stateless_worker:
     model: default
@@ -57,7 +60,7 @@ An **inline** `session_manager` on a specific agent overrides the global one:
 
 ```yaml
 session_manager:
-  provider: file
+  provider: file-snapshot
   params:
     storage_dir: ./.sessions
 
@@ -65,13 +68,13 @@ agents:
   assistant:
     model: default
     system_prompt: You are helpful.
-    # ← inherits global (file)
+    # ← inherits global (file-snapshot)
 
   special_agent:
     model: default
     system_prompt: You have your own memory.
     session_manager:                            # ← inline override
-      provider: file
+      provider: file-snapshot
       params:
         storage_dir: ./.special_sessions
 ```
@@ -131,10 +134,11 @@ Run the example and type in order:
 2. `What do you know about me so far?`
 3. Exit and run again — the agent should still remember your name.
 
-## Advanced topic — suppress default callback logging
+## Advanced topic — console output
 
-Strands agents log actions to the console through their default `callback_handler`.
-If you want cleaner example output, set the handler to `null` in `agent_kwargs` for any agent:
+Strands agents print their answer and tool calls through the default `callback_handler`.
+This example's `main.py` prints nothing itself, so that output is all you see.
+Set the handler to `null` in `agent_kwargs` to silence one agent:
 
 ```yaml
 agents:
@@ -142,3 +146,6 @@ agents:
     agent_kwargs:
       callback_handler: null # or ~
 ```
+
+Only silence helper agents in a multi-agent setup. On the agent that gives the final
+answer, you would see no answer at all.

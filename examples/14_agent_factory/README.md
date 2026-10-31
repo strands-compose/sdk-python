@@ -30,9 +30,9 @@ Your factory must return a `strands.Agent` instance.
 > **⚠️ `agent_kwargs` is an expert feature.**
 >
 > `strands.Agent.__init__()` does **not** accept `**kwargs` — it has a fixed set
-> of explicit parameters.  strands-compose does **not** validate `agent_kwargs`
-> at the schema level.  If invalid keys reach `Agent()`, you get a `TypeError`
-> at runtime.
+> of explicit parameters.  strands-compose only rejects the keys it passes itself
+> (such as `system_prompt`) when the config is parsed.  If other invalid keys
+> reach `Agent()`, you get a `TypeError` at runtime.
 >
 > **Your factory is responsible for:**
 > 1. Consuming any custom keys (like `greeting`, `personality`) before forwarding.
@@ -62,10 +62,11 @@ uv run python examples/14_agent_factory/main.py
 | `What is the meaning of life?` | Response starts with "Ahoy, captain!" in pirate style |
 | `Tell me about Python.` | Pirate personality persists across messages |
 
-## Advanced topic — suppress default callback logging
+## Advanced topic — console output
 
-Strands agents log actions to the console through their default `callback_handler`.
-If you want cleaner example output, set the handler to `null` in `agent_kwargs` for any agent:
+Strands agents print their answer and tool calls through the default `callback_handler`.
+This example's `main.py` prints nothing itself, so that output is all you see.
+Set the handler to `null` in `agent_kwargs` to silence one agent:
 
 ```yaml
 agents:
@@ -73,3 +74,6 @@ agents:
     agent_kwargs:
       callback_handler: null # or ~
 ```
+
+Only silence helper agents in a multi-agent setup. On the agent that gives the final
+answer, you would see no answer at all.

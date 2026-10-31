@@ -10,7 +10,7 @@
 
 vars:
   # Read MODEL from env; fall back to a default when not set.
-  MODEL:     ${MODEL:-openai.gpt-oss-20b-1:0}
+  MODEL:     ${MODEL:-global.anthropic.claude-haiku-5-5}
 
   # Read TONE from env; controls the assistant's personality.
   TONE:      ${TONE:-friendly}

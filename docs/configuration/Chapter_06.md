@@ -1,10 +1,10 @@
-# Chapter 6: Hooks — Middleware for Agents
+# Chapter 6: Hooks — Lifecycle Callbacks for Agents
 
 [← Back to Table of Contents](README.md) | [← Previous: Tools](Chapter_05.md)
 
 ---
 
-Hooks are lifecycle callbacks that fire at specific points during agent execution — before/after invocations, before/after tool calls, before/after model calls. They're perfect for guardrails, logging, metrics, and custom behavior.
+Hooks are lifecycle callbacks that fire at specific points during agent execution (not to be confused with strands middleware, which wraps the model and tool stages; see [Chapter 19](Chapter_19.md)) — before/after invocations, before/after tool calls, before/after model calls. They're perfect for guardrails, logging, metrics, and custom behavior.
 
 ```yaml
 agents:
@@ -54,7 +54,7 @@ strands-compose ships with three hooks:
 Limits how many tool calls an agent can make in a single invocation. Two-phase behavior:
 
 1. **First violation** — injects a system message telling the LLM to stop and write a final answer.
-2. **Second violation** — if the LLM ignores the warning and calls another tool, the loop is terminated.
+2. **Second violation** — if the LLM ignores the warning and calls another tool, the invocation ends with `stop_reason` `cancelled` and the stop message as its text. The count is kept per agent, so nodes of a Graph or Swarm do not share it.
 
 ```yaml
 hooks:
@@ -76,7 +76,7 @@ No params needed — just add it.
 
 ### `StopGuard`
 
-A cooperative stop mechanism — set a flag on the guard and the agent stops cleanly at the next opportunity. Useful for external cancellation (e.g., user disconnects from a web socket).
+An external abort — set a flag on the guard and the invocation is cancelled at the next tool call (`stop_reason` `cancelled`, the stop message as text). Useful for external cancellation (e.g., user disconnects from a web socket). Inside a Graph the node fails and the graph stops. Behind a delegate tool, an agent connection or a Graph returns an error to the orchestrator, while a Swarm completes and returns the stop message as a normal result. An agent that answers without calling a tool is not stopped.
 
 `StopGuard` needs a Python callable for `stop_check`, so it's usually wired from Python rather than pure YAML:
 
@@ -88,6 +88,8 @@ guard, stop = stop_guard_from_event()
 # add `guard` to an agent's hooks, then later:
 stop.set()
 ```
+
+For an invocation your own code starts, prefer strands' `agent(prompt, cancel_signal=event)`: it also stops mid-stream and is forwarded to `as_tool` sub-agents. `StopGuard` is for agents that compose runs inside a Swarm or Graph.
 
 ## Writing Custom Hooks
 

@@ -45,6 +45,8 @@ These two events bracket every invocation. They are produced by the queue layer,
 
 The `SESSION_START` payload wraps the full wired topology snapshot together with the effective session id. Use the `manifest` key to restore conversation history, render an architecture diagram, or audit which models are in use — before any agent has run.
 
+The snapshot providers (`file-snapshot`, `s3-snapshot`) are reported as `{"provider": "snapshot", "session_id": "..."}` with no storage location, because strands keeps the storage private. Read the folder or bucket from your config instead.
+
 ### Per-agent events
 
 | Event Type | Description |
@@ -53,18 +55,20 @@ The `SESSION_START` payload wraps the full wired topology snapshot together with
 | `TOKEN` | Individual token streamed from LLM |
 | `REASONING` | Reasoning/thinking content from LLM |
 | `TOOL_START` | Tool execution begins |
-| `TOOL_END` | Tool execution completes |
+| `TOOL_END` | Tool execution completes — `data.status` is `error` when the tool raised, was cancelled (by a guard or hook), or returned an error result |
 | `INTERRUPT` | Agent pauses for human input |
-| `AGENT_COMPLETE` | Agent finishes — `data` carries `usage` metrics, `model` (`model_id`, `provider`), `text` (final output string), and `message` (raw message dict) |
-| `ERROR` | Model or execution error |
+| `AGENT_COMPLETE` | Agent finishes — `data` carries `usage`, `stop_reason`, `model` (`model_id`, `provider`), `text` (final output string), and `message` (raw message dict) |
+| `ERROR` | A model call failed and was not recovered by a retry or failover |
+
+`AGENT_COMPLETE.data.usage` has the keys `input_tokens`, `output_tokens`, `total_tokens`, `cache_read_input_tokens` and `cache_write_input_tokens` (each defaults to 0), counted for this agent's own model calls in the invocation. Values are passed through as the provider reports them. On Bedrock and Anthropic, `input_tokens` excludes the cache counts. `stop_reason` is strands' stop reason, for example `end_turn`, `max_tokens`, or `cancelled` when a guard stopped the run.
 
 ### Multi-agent events
 
 | Event Type | Description |
 |------------|-------------|
 | `NODE_START` | Graph/swarm node begins |
-| `NODE_STOP` | Graph/swarm node completes |
-| `HANDOFF` | Swarm agent hands off to another |
+| `NODE_STOP` | Graph/swarm node completes — `data` carries `node_id`, `multiagent_type`, `status` (`completed`, `failed`, ...), `execution_time_ms` and `usage` (same keys as `AGENT_COMPLETE.usage`). The usage is the node's total and overlaps the node agent's own `AGENT_COMPLETE`; do not sum both |
+| `HANDOFF` | Swarm only — an agent hands off to another. `data` carries `from_node_ids`, `to_node_ids` and `message`; emitted right after the handing-off node's `NODE_STOP` |
 | `MULTIAGENT_START` | Multi-agent orchestration begins |
 | `MULTIAGENT_COMPLETE` | Multi-agent orchestration completes |
 
@@ -100,6 +104,18 @@ while (event := await queue.get()) is not None:
 ## Configuring the Queue in YAML
 
 Event streaming is configured in Python, not YAML — it's a runtime concern. But the **hooks** it installs (`EventPublisher`) listen to the same lifecycle events as your YAML-defined hooks. They coexist peacefully.
+
+`TOKEN` and `REASONING` events have no hook, so `EventPublisher` also registers a model-stream middleware (`InvokeModelStage`) on each agent. It forwards every event unchanged. The first middleware registered is the outermost, so `TOKEN` and `REASONING` include rewrites by middleware added after the queue is wired, but not by middleware added at construction (for example by plugins, see [Chapter 19](Chapter_19.md#middleware)). `callback_handler` is left alone: a custom handler keeps working next to the queue, and only strands' default printing handler is replaced by a silent one so queue-wired agents do not print to stdout. `callback_handler: null` in `agent_kwargs` is untouched.
+
+To attach a publisher to an agent you build yourself:
+
+```python
+publisher = EventPublisher(callback=on_event, agent_name="analyzer")
+agent = Agent(hooks=[publisher])
+agent.add_middleware(InvokeModelStage, publisher.observe_model_stream)
+```
+
+`make_event_queue` does this for every agent and for delegate-mode orchestrator agents. Swarm and Graph orchestrators get hooks only; their nodes are agents and stream their own tokens.
 
 > **Tips & Tricks**
 >

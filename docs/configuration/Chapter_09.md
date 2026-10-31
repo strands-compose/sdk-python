@@ -116,6 +116,7 @@ The `params` dict on an MCP client is forwarded to strands' `MCPClient` construc
 | `prefix` | string | Prefix all tool names from this server (e.g., `calc_add`) |
 | `startup_timeout` | number | Seconds to wait for the server to respond |
 | `tool_filters` | list | Filter which tools to expose |
+| `auth` | mapping | OAuth client credentials for a `streamable-http` `url:` client: `client_id`, `client_secret`, optional `scopes` |
 
 ## Client `transport_options`
 
@@ -135,6 +136,32 @@ Available options vary by transport:
 - **stdio**: `env`, `cwd`, `encoding`, `encoding_error_handler`
 - **sse**: `headers`, `timeout`, `sse_read_timeout`, `auth`, `httpx_client_factory`
 - **streamable-http**: `headers`, `http_client`, `terminate_on_close`
+
+A `streamable-http` client that sets at most `headers` is built by strands itself
+(`MCPClient(url=, headers=)`), with the MCP library's default timeouts (30 s to
+connect, 300 s to read). `headers` can then be set in `transport_options` or in
+`params`, not in both. `http_client` and `terminate_on_close` use compose's
+transport factory instead, which cannot be combined with `auth`: configure
+authentication on your own `http_client` in that case.
+
+### OAuth client credentials
+
+For servers that use the OAuth client-credentials grant, pass the credentials
+through `params`. Read secrets from the environment and never inline them:
+
+```yaml
+mcp_clients:
+  crm:
+    url: https://crm.example.com/mcp
+    params:
+      auth:
+        client_id: "${CRM_CLIENT_ID}"
+        client_secret: "${CRM_CLIENT_SECRET}"
+        scopes: [read]
+```
+
+The `sse` transport takes an `httpx2.Auth` instance as `auth`, which YAML cannot
+express; use `auth` on a `streamable-http` client instead.
 
 ## Lifecycle
 

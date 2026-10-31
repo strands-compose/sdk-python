@@ -26,7 +26,7 @@ models:
     model_id: ${MODEL}
 
 session_manager:
-  provider: file
+  provider: file-snapshot
   params:
     storage_dir: ./.sessions
     session_id: ${SESSION_ID:-default}

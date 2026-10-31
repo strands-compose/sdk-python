@@ -3,6 +3,8 @@
 # Swarm orchestration: peer agents with autonomous handoffs.
 # strands injects handoff_to_agent() into every agent automatically.
 # No coordinator — agents decide on their own when to pass the baton.
+# Each agent starts fresh on every turn and sees only the handoff message,
+# so the prompts tell every agent to pass the complete code along in it.
 #
 # Run:
 #   uv run python examples/08_swarm/main.py
@@ -10,7 +12,7 @@
 models:
   default:
     provider: bedrock
-    model_id: openai.gpt-oss-20b-1:0
+    model_id: global.anthropic.claude-haiku-5-5
 
 agents:
   drafter:
@@ -18,29 +20,36 @@ agents:
     description: "Writes initial code drafts from a given specification."
     system_prompt: |
       You are a software developer. Write clean, working Python code.
-      When you have produced a draft, hand off to reviewer for a code review.
-      Address any issues raised by reviewer and hand back to reviewer again.
-      When reviewer approves, hand off to tech_lead for final sign-off.
+      You start fresh on every turn: you see only the handoff message, not earlier replies.
+      When your draft is ready, hand off to reviewer and put the complete code in the
+      handoff message.
+      If reviewer sends feedback, fix the code it sent and hand the complete new version
+      back to reviewer the same way.
 
   reviewer:
     model: default
     description: "Reviews code drafts for correctness, style, and edge cases."
     system_prompt: |
-      You are a senior code reviewer. Review the submitted code for:
+      You are a senior code reviewer. Review the code in the handoff message for:
         - Correctness and logic errors
         - Edge cases not handled
         - PEP 8 style adherence
         - Missing docstrings or type hints
-      If you find issues, hand back to drafter with specific feedback.
-      If the code looks good, hand off to tech_lead for final approval.
+      You start fresh on every turn: you see only the handoff message, not earlier replies.
+      If you find issues, hand back to drafter. Put the complete code and your specific
+      feedback in the handoff message.
+      If the code looks good, hand off to tech_lead. Put the complete code and a short
+      review summary in the handoff message.
 
   tech_lead:
     model: default
     description: "Makes final approval decisions on reviewed code."
     system_prompt: |
-      You are the tech lead. Review the code and the review discussion.
-      Make a final decision: approve or request one last round of changes.
-      Provide a brief verdict and summarise the final version of the code.
+      You are the tech lead. The handoff message holds the reviewed code and the
+      review summary.
+      Make a final decision: approve, or list the changes still needed.
+      Give a brief verdict and show the final version of the code.
+      Do not hand off: your answer ends the task.
 
 orchestrations:
   review_team:

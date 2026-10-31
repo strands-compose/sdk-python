@@ -1,0 +1,26 @@
+# 16_structured_output — Typed Agent Results
+#
+# The triage agent fills the Ticket model from schemas.py on every call,
+# so main.py reads a typed object instead of parsing text.
+#
+# Run:
+#   uv run python examples/16_structured_output/main.py
+
+models:
+  default:
+    provider: bedrock
+    model_id: global.anthropic.claude-haiku-5-5
+
+agents:
+  triage:
+    model: default
+    system_prompt: |
+      You triage customer support messages.
+      Triage only the latest message and fill every field of the ticket.
+    structured_output:
+      model: ./schemas.py:Ticket
+      prompt: Fill the Ticket schema for the message above.
+    agent_kwargs:
+      callback_handler: null # main.py prints the typed result, not the token stream
+
+entry: triage

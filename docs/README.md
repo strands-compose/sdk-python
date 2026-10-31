@@ -11,7 +11,7 @@ plugins, session persistence, and streaming. Read it in order, or jump to a chap
 | 3 | [Variables](configuration/Chapter_03.md) | Environment-driven config |
 | 4 | [YAML Anchors](configuration/Chapter_04.md) | DRY config blocks |
 | 5 | [Tools](configuration/Chapter_05.md) | Giving agents superpowers |
-| 6 | [Hooks](configuration/Chapter_06.md) | Middleware for agents |
+| 6 | [Hooks](configuration/Chapter_06.md) | Lifecycle callbacks for agents |
 | 7 | [Session Persistence](configuration/Chapter_07.md) | Memory that survives restarts |
 | 8 | [Conversation Managers](configuration/Chapter_08.md) | Controlling context windows |
 | 9 | [MCP](configuration/Chapter_09.md) | External tool servers |
@@ -25,6 +25,7 @@ plugins, session persistence, and streaming. Read it in order, or jump to a chap
 | 17 | [The Loading Pipeline](configuration/Chapter_17.md) | What happens under the hood |
 | 18 | [Full Reference](configuration/Chapter_18.md) | Every field at a glance |
 | 19 | [Plugins](configuration/Chapter_19.md) | Reusable agent behaviors |
+| 20 | [Structured Output](configuration/Chapter_20.md) | Typed agent results |
 
 **[Quick Recipes](configuration/Quick_Recipes.md)** — copy-paste-ready configs for common patterns.
 
