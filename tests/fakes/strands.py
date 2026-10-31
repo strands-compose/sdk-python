@@ -32,10 +32,13 @@ class FakeModel(Model):
         model_id: str = "fake-model",
         usage: dict[str, int] | None = None,
         reasoning_chunks: list[str] | None = None,
+        cache_config: Any = None,
     ) -> None:
-        """Store the chunks to stream, a model id and the usage to report."""
+        """Store the chunks to stream, a model id, the usage to report and any cache config."""
         self._text_chunks = text_chunks if text_chunks is not None else ["Hello", " world"]
         self._config: dict[str, Any] = {"model_id": model_id}
+        if cache_config is not None:
+            self._config["cache_config"] = cache_config
         self._usage = usage or {"inputTokens": 5, "outputTokens": 3, "totalTokens": 8}
         self._reasoning_chunks = reasoning_chunks or []
 

@@ -78,6 +78,44 @@ def test_load_config_wraps_schema_failure_as_schema_validation_error():
         load_config("agents: [not, a, mapping]\nentry: a")
 
 
+# ── models: cache ───────────────────────────────────────────────────────────
+
+_CACHE_CONFIG = """
+models:
+  m:
+    provider: bedrock
+    model_id: x
+{model_lines}
+agents:
+  a: {{model: m, system_prompt: hi}}
+entry: a
+"""
+
+
+@pytest.mark.parametrize(
+    "model_lines",
+    ["    cache: true", "    cache: {strategy: auto, ttl: 1h}", "    cache: false"],
+)
+def test_model_cache_bool_or_mapping_validates(model_lines):
+    config = load_config(_CACHE_CONFIG.format(model_lines=model_lines))
+    assert "m" in config.models
+
+
+@pytest.mark.parametrize(
+    "model_lines",
+    [
+        "    cache: 1",
+        "    cache: 'yes'",
+        "    cache: {bogus: 1}",
+        "    cache: {strategy: nope}",
+        "    params: {cache_config: {strategy: auto}}",
+    ],
+)
+def test_model_cache_wrong_type_or_params_cache_config_raises(model_lines):
+    with pytest.raises(SchemaValidationError):
+        load_config(_CACHE_CONFIG.format(model_lines=model_lines))
+
+
 # ── agent_kwargs must not carry keys that compose passes itself ────────────
 
 

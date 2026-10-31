@@ -8,7 +8,28 @@ from __future__ import annotations
 
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictBool,
+    model_validator,
+)
+
+
+class CacheDef(BaseModel):
+    """Prompt caching settings, mirroring strands' ``CacheConfig`` fields.
+
+    Only the keys written in YAML are passed on, so strands keeps its own defaults.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    strategy: Literal["auto", "anthropic"] = "auto"
+    ttl: str | None = None
+    system_prompt_ttl: StrictBool | str = True
+    cache_key: str | Literal[False] | None = None
+    tools_ttl: StrictBool | str | None = None
 
 
 class ModelDef(BaseModel):
@@ -16,7 +37,24 @@ class ModelDef(BaseModel):
 
     provider: str
     model_id: str
+    cache: CacheDef | StrictBool | None = None
+    """Prompt caching, off when absent or ``false``.
+
+    ``true`` enables strands' automatic caching (``CacheConfig(strategy="auto")``);
+    a mapping sets ``CacheConfig`` fields (see :class:`CacheDef`). Unknown keys are
+    rejected at parse time. Providers apply only the fields they support.
+    """
     params: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _cache_set_once(self) -> ModelDef:
+        """Reject ``params.cache_config``: caching is configured through ``cache``."""
+        if "cache_config" in self.params:
+            raise ValueError(
+                "params.cache_config is not supported; set caching on the model instead, "
+                "e.g. 'cache: true' or 'cache: {strategy: auto, ttl: 1h}'."
+            )
+        return self
 
 
 class HookDef(BaseModel):
