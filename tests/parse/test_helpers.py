@@ -103,6 +103,25 @@ def test_parse_single_source_missing_file_raises_file_not_found():
         parse_single_source("does/not/exist.yaml")
 
 
+@pytest.mark.parametrize(
+    "inline",
+    [
+        "agents:\n  a:\n    system_prompt: see http://example.com/docs\nentry: a",
+        "agents:\n  a:\n    tools: [./tools.py]\nentry: a",
+        "agents:\n  a:\n    system_prompt: " + "x" * 400 + "\nentry: a",
+    ],
+    ids=["url", "relative-import-spec", "over-255-characters"],
+)
+def test_parse_single_source_reads_multiline_inline_yaml_with_slash_or_long_text(inline):
+    raw = parse_single_source(inline)
+    assert raw["entry"] == "a"
+
+
+def test_parse_single_source_overlong_single_line_text_is_parsed_inline():
+    raw = parse_single_source("entry: " + "x" * 300)
+    assert raw["entry"] == "x" * 300
+
+
 def test_parse_single_source_non_mapping_raises_value_error():
     with pytest.raises(ValueError):
         parse_single_source("- just\n- a\n- list")
@@ -126,6 +145,99 @@ def test_parse_single_source_rewrites_relative_tool_path_to_absolute(tmp_path):
     path_part, sep, _attr = tool_spec.rpartition(":")
     assert sep == ":"
     assert Path(path_part).is_absolute()
+
+
+@pytest.mark.parametrize(
+    ("body", "location", "file_name"),
+    [
+        (
+            """
+            agents:
+              a:
+                system_prompt: hi
+                session_manager:
+                  type: ./sm.py:SM
+            entry: a
+            """,
+            lambda raw: raw["agents"]["a"]["session_manager"],
+            "sm.py",
+        ),
+        (
+            """
+            agents:
+              a:
+                system_prompt: hi
+                conversation_manager:
+                  type: ./cm.py:CM
+            entry: a
+            """,
+            lambda raw: raw["agents"]["a"]["conversation_manager"],
+            "cm.py",
+        ),
+        (
+            """
+            agents:
+              a:
+                system_prompt: hi
+            orchestrations:
+              g:
+                mode: swarm
+                entry_name: a
+                session_manager:
+                  type: ./sm.py:SM
+            entry: g
+            """,
+            lambda raw: raw["orchestrations"]["g"]["session_manager"],
+            "sm.py",
+        ),
+    ],
+    ids=["agent-session-manager", "agent-conversation-manager", "orchestration-session-manager"],
+)
+def test_parse_single_source_anchors_manager_spec_to_config_dir(
+    tmp_path, body, location, file_name
+):
+    path = write_config(tmp_path, body)
+    raw = parse_single_source(path)
+    path_part, sep, _attr = location(raw)["type"].rpartition(":")
+    assert sep == ":"
+    assert Path(path_part) == (tmp_path / file_name).resolve()
+
+
+def test_parse_single_source_anchors_inline_model_provider_to_config_dir(tmp_path):
+    path = write_config(
+        tmp_path,
+        """
+        agents:
+          a:
+            system_prompt: hi
+            model:
+              provider: ./my_model.py:MyModel
+              model_id: x
+        entry: a
+        """,
+    )
+    raw = parse_single_source(path)
+    path_part, sep, name = raw["agents"]["a"]["model"]["provider"].rpartition(":")
+    assert (sep, name) == (":", "MyModel")
+    assert Path(path_part) == (tmp_path / "my_model.py").resolve()
+
+
+def test_parse_single_source_leaves_module_manager_spec_unchanged(tmp_path):
+    path = write_config(
+        tmp_path,
+        """
+        agents:
+          a:
+            system_prompt: hi
+            conversation_manager:
+              type: strands.agent:SlidingWindowConversationManager
+        entry: a
+        """,
+    )
+    raw = parse_single_source(path)
+    assert raw["agents"]["a"]["conversation_manager"]["type"] == (
+        "strands.agent:SlidingWindowConversationManager"
+    )
 
 
 def test_parse_single_source_applies_per_source_interpolation(tmp_path, monkeypatch):

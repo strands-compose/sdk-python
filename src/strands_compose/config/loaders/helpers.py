@@ -7,7 +7,7 @@ import os
 import re
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 import yaml
 
@@ -122,6 +122,8 @@ def update_references(raw: dict, rename_map: dict[str, str]) -> None:
             if not isinstance(orch_def, dict):
                 continue
             mode = orch_def.get("mode")
+            if not isinstance(mode, str):
+                continue
             def_cls = _ORCH_DEFS.get(mode)
             if def_cls is None:
                 continue
@@ -209,6 +211,36 @@ def make_absolute(spec: str, config_dir: Path) -> str:
     return f"{abs_path}{sep}{rest}" if sep else abs_path
 
 
+def _rewrite_spec_field(value: object, config_dir: Path, key: str = "type") -> None:
+    """Anchor the import spec at ``value[key]`` to ``config_dir`` (in place).
+
+    Args:
+        value: A raw config value. Anything other than a dict with a string
+            at ``key`` is left alone.
+        config_dir: Directory of the config file being parsed.
+        key: The dict key that holds the spec.
+    """
+    if isinstance(value, dict) and isinstance(value.get(key), str):
+        value[key] = make_absolute(value[key], config_dir)
+
+
+def _rewrite_spec_entries(entries: object, config_dir: Path) -> None:
+    """Anchor every entry of a ``hooks`` or ``plugins`` list to ``config_dir`` (in place).
+
+    Args:
+        entries: A raw config value. A list entry is either an import spec
+            string or a ``{type: ...}`` dict; anything else is left alone.
+        config_dir: Directory of the config file being parsed.
+    """
+    if not isinstance(entries, list):
+        return
+    for i, entry in enumerate(entries):
+        if isinstance(entry, str):
+            entries[i] = make_absolute(entry, config_dir)
+        else:
+            _rewrite_spec_field(entry, config_dir)
+
+
 def rewrite_relative_paths(raw: dict, config_dir: Path) -> None:
     """Rewrite all relative filesystem specs to absolute paths (in place).
 
@@ -223,8 +255,14 @@ def rewrite_relative_paths(raw: dict, config_dir: Path) -> None:
     - ``agents.<name>.hooks[]`` — string import specs and ``HookDef.type``
     - ``agents.<name>.plugins[]`` — string import specs and ``PluginDef.type``
     - ``agents.<name>.type`` — custom agent factory path
+    - ``agents.<name>.model.provider`` — custom model class path of an inline model
+    - ``agents.<name>.session_manager.type`` and
+      ``agents.<name>.conversation_manager.type`` — manager class paths
     - ``models.<name>.provider`` — custom model class path
     - ``session_manager.type`` — custom session manager path
+    - ``orchestrations.<name>.session_manager.type`` — manager class path
+    - ``orchestrations.<name>.hooks[]`` — string import specs and ``HookDef.type``
+    - ``orchestrations.<name>.edges[].condition`` — graph edge condition path
 
     Args:
         raw: Parsed raw config dict (mutated in place).
@@ -244,70 +282,38 @@ def rewrite_relative_paths(raw: dict, config_dir: Path) -> None:
                     make_absolute(s, config_dir) if isinstance(s, str) else s for s in tools
                 ]
 
-            # hooks
-            hooks = agent_def.get("hooks")
-            if isinstance(hooks, list):
-                for i, hook in enumerate(hooks):
-                    if isinstance(hook, str):
-                        hooks[i] = make_absolute(hook, config_dir)
-                    elif isinstance(hook, dict):
-                        hook_d = cast(dict[str, Any], hook)
-                        hook_type = hook_d.get("type")
-                        if isinstance(hook_type, str):
-                            hook_d["type"] = make_absolute(hook_type, config_dir)
+            # hooks and plugins. Plugin params are opaque kwargs, so any paths
+            # inside them are left as written.
+            _rewrite_spec_entries(agent_def.get("hooks"), config_dir)
+            _rewrite_spec_entries(agent_def.get("plugins"), config_dir)
 
-            # plugins — same shape as hooks. params are opaque kwargs, so any
-            # paths inside them are left as written.
-            plugins = agent_def.get("plugins")
-            if isinstance(plugins, list):
-                for i, plugin in enumerate(plugins):
-                    if isinstance(plugin, str):
-                        plugins[i] = make_absolute(plugin, config_dir)
-                    elif isinstance(plugin, dict):
-                        plugin_d = cast(dict[str, Any], plugin)
-                        plugin_type = plugin_d.get("type")
-                        if isinstance(plugin_type, str):
-                            plugin_d["type"] = make_absolute(plugin_type, config_dir)
-
-            # type
-            if isinstance(agent_def.get("type"), str):
-                agent_def["type"] = make_absolute(agent_def["type"], config_dir)
+            # custom agent factory, inline model and managers
+            _rewrite_spec_field(agent_def, config_dir)
+            _rewrite_spec_field(agent_def.get("model"), config_dir, key="provider")
+            _rewrite_spec_field(agent_def.get("session_manager"), config_dir)
+            _rewrite_spec_field(agent_def.get("conversation_manager"), config_dir)
 
     # models (custom provider)
     models = raw.get("models")
     if isinstance(models, dict):
         for model_def in models.values():
-            if isinstance(model_def, dict) and isinstance(model_def.get("provider"), str):
-                model_def["provider"] = make_absolute(model_def["provider"], config_dir)
+            _rewrite_spec_field(model_def, config_dir, key="provider")
 
-    # session_manager (root-level or per-agent — agent already handled) ─
-    sm = raw.get("session_manager")
-    if isinstance(sm, dict) and isinstance(sm.get("type"), str):
-        sm["type"] = make_absolute(sm["type"], config_dir)
+    # session_manager (root-level)
+    _rewrite_spec_field(raw.get("session_manager"), config_dir)
 
-    # orchestrations (hooks + edge conditions on swarm/graph)
+    # orchestrations (session manager, hooks, graph edge conditions)
     orchestrations = raw.get("orchestrations")
     if isinstance(orchestrations, dict):
         for orch_def in orchestrations.values():
             if not isinstance(orch_def, dict):
                 continue
-            orch_hooks = orch_def.get("hooks")
-            if isinstance(orch_hooks, list):
-                for i, hook in enumerate(orch_hooks):
-                    if isinstance(hook, str):
-                        orch_hooks[i] = make_absolute(hook, config_dir)
-                    elif isinstance(hook, dict):
-                        hook_d = cast(dict[str, Any], hook)
-                        hook_type = hook_d.get("type")
-                        if isinstance(hook_type, str):
-                            hook_d["type"] = make_absolute(hook_type, config_dir)
-
-            # edge conditions — rewrite relative file paths
+            _rewrite_spec_field(orch_def.get("session_manager"), config_dir)
+            _rewrite_spec_entries(orch_def.get("hooks"), config_dir)
             edges = orch_def.get("edges")
             if isinstance(edges, list):
                 for edge in edges:
-                    if isinstance(edge, dict) and isinstance(edge.get("condition"), str):
-                        edge["condition"] = make_absolute(edge["condition"], config_dir)
+                    _rewrite_spec_field(edge, config_dir, key="condition")
 
 
 def apply_mcp_stdio_cwd_default(raw: dict, config_dir: Path) -> None:
@@ -336,6 +342,41 @@ def apply_mcp_stdio_cwd_default(raw: dict, config_dir: Path) -> None:
         transport_options.setdefault("cwd", str(config_dir))
 
 
+def _is_existing_file(source: str) -> bool:
+    """Return True if ``source`` names an existing file.
+
+    Multi-line text is YAML, never a path. The OS rejects overlong names with
+    ``OSError``, which means the text cannot be a file either.
+
+    Args:
+        source: Candidate path or inline YAML text.
+
+    Returns:
+        True when ``source`` is a single-line path to an existing file.
+    """
+    if "\n" in source:
+        return False
+    try:
+        return Path(source).is_file()
+    except (OSError, ValueError):
+        return False
+
+
+def _looks_like_path(source: str) -> bool:
+    """Return True if single-line ``source`` is meant as a path that is missing.
+
+    Args:
+        source: Candidate path or inline YAML text.
+
+    Returns:
+        True for a single-line string with a ``.yaml``/``.yml`` suffix or a
+        path separator.
+    """
+    if "\n" in source:
+        return False
+    return Path(source).suffix in (".yaml", ".yml") or "/" in source or os.sep in source
+
+
 def parse_single_source(source: str | Path) -> dict:
     """Parse one config source into a processed raw dict.
 
@@ -345,6 +386,12 @@ def parse_single_source(source: str | Path) -> dict:
     to the config file's directory (not the process CWD), and stdio MCP client
     subprocesses (``mcp_clients.*.command``) default their ``cwd`` to the
     same directory unless the config already sets one.
+
+    A string is read as a file when it names an existing single-line path.
+    Multi-line strings are always inline YAML. A single-line string that
+    contains ``/`` or ends in ``.yaml``/``.yml`` but names no file raises
+    ``FileNotFoundError``; a one-line inline mapping containing ``/`` is
+    therefore read as a path, so use a multi-line string for it.
 
     Args:
         source: File path or raw YAML string.
@@ -366,21 +413,20 @@ def parse_single_source(source: str | Path) -> dict:
         except yaml.YAMLError as exc:
             raise ConfigurationError(f"Invalid YAML in {source}: {exc}") from None
         config_dir = source.resolve().parent
-    else:
+    elif _is_existing_file(source):
         path = Path(source)
-        if path.is_file():
-            try:
-                raw = yaml.safe_load(path.read_text(encoding="utf-8"))
-            except yaml.YAMLError as exc:
-                raise ConfigurationError(f"Invalid YAML in {path}: {exc}") from None
-            config_dir = path.resolve().parent
-        elif path.suffix in (".yaml", ".yml") or os.sep in source or "/" in source:
-            raise FileNotFoundError(f"Config file not found: {source}")
-        else:
-            try:
-                raw = yaml.safe_load(source)
-            except yaml.YAMLError as exc:
-                raise ConfigurationError(f"Invalid YAML in inline content: {exc}") from None
+        try:
+            raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+        except yaml.YAMLError as exc:
+            raise ConfigurationError(f"Invalid YAML in {path}: {exc}") from None
+        config_dir = path.resolve().parent
+    elif _looks_like_path(source):
+        raise FileNotFoundError(f"Config file not found: {source}")
+    else:
+        try:
+            raw = yaml.safe_load(source)
+        except yaml.YAMLError as exc:
+            raise ConfigurationError(f"Invalid YAML in inline content: {exc}") from None
 
     if not isinstance(raw, dict):
         raise ConfigurationError(f"Config must contain a YAML mapping, got {type(raw).__name__}")

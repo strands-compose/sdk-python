@@ -92,8 +92,9 @@ def load(
     """Load config and resolve it to live strands objects.
 
     Pass a file path, a raw YAML string, a list of either, or an
-    already-validated :class:`AppConfig`.  File paths are detected by checking
-    if the path exists on disk; anything else is parsed as inline YAML.
+    already-validated :class:`AppConfig`.  A string is read as a file when it
+    names an existing single-line path; multi-line strings are always inline
+    YAML.  See :func:`load_config` for the single-line rules.
 
     Every call builds **fresh** agents and MCP clients, so each call is an
     isolated session — N sessions against a ``command:`` client means N stdio
@@ -182,8 +183,10 @@ def load_config(config: ConfigInput | list[ConfigInput]) -> AppConfig:
     Accepts a single source or a list. Each source is auto-detected:
 
     - ``Path`` objects are always treated as file paths.
-    - ``str`` values are treated as file paths if the file exists on disk;
-      otherwise they are parsed as inline YAML content.
+    - ``str`` values are read as files when they name an existing single-line
+      path. Multi-line strings are inline YAML. A single-line string that
+      ends in ``.yaml``/``.yml`` or contains a path separator but names no
+      file raises ``FileNotFoundError``; anything else is inline YAML.
 
     When multiple sources are provided, their collection sections
     (``agents``, ``models``, ``mcp_clients``, ``orchestrations``) are
