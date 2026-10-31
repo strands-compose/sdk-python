@@ -232,6 +232,8 @@ RESERVED_AGENT_KWARGS = (
     "plugins",
     "conversation_manager",
     "session_manager",
+    "structured_output_model",
+    "structured_output_prompt",
     "load_tools_from_directory",
 )
 
@@ -254,6 +256,15 @@ def _reject_reserved_agent_kwargs(agent_kwargs: dict[str, Any], owner: str) -> N
             f"matching agent fields.\n"
             f"Reserved: {sorted(RESERVED_AGENT_KWARGS)}"
         )
+
+
+class StructuredOutputDef(BaseModel):
+    """Structured output configuration: the pydantic model an agent must fill."""
+
+    model: str
+    """Import spec of a pydantic ``BaseModel`` subclass (``module.path:Name`` or ``./file.py:Name``)."""
+    prompt: str | None = None
+    """Prompt sent when the model must be asked again to fill ``model``."""
 
 
 class AgentDef(BaseModel):
@@ -306,6 +317,8 @@ class AgentDef(BaseModel):
     mcp: list[str] = Field(default_factory=list)
     conversation_manager: ConversationManagerDef | None = None
     session_manager: SessionManagerDef | None = None
+    structured_output: StructuredOutputDef | None = None
+    """Typed result of every call, returned as ``result.structured_output``."""
 
     @model_validator(mode="after")
     def _agent_kwargs_avoid_reserved_keys(self) -> AgentDef:

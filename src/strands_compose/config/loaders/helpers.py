@@ -256,6 +256,7 @@ def rewrite_relative_paths(raw: dict, config_dir: Path) -> None:
     - ``agents.<name>.plugins[]`` — string import specs and ``PluginDef.type``
     - ``agents.<name>.type`` — custom agent factory path
     - ``agents.<name>.model.provider`` — custom model class path of an inline model
+    - ``agents.<name>.structured_output.model`` — pydantic model class path
     - ``agents.<name>.session_manager.type`` and
       ``agents.<name>.conversation_manager.type`` — manager class paths
     - ``models.<name>.provider`` — custom model class path
@@ -287,9 +288,10 @@ def rewrite_relative_paths(raw: dict, config_dir: Path) -> None:
             _rewrite_spec_entries(agent_def.get("hooks"), config_dir)
             _rewrite_spec_entries(agent_def.get("plugins"), config_dir)
 
-            # custom agent factory, inline model and managers
+            # custom agent factory, inline model, structured output and managers
             _rewrite_spec_field(agent_def, config_dir)
             _rewrite_spec_field(agent_def.get("model"), config_dir, key="provider")
+            _rewrite_spec_field(agent_def.get("structured_output"), config_dir, key="model")
             _rewrite_spec_field(agent_def.get("session_manager"), config_dir)
             _rewrite_spec_field(agent_def.get("conversation_manager"), config_dir)
 

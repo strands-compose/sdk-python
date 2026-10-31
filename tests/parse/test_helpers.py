@@ -203,6 +203,24 @@ def test_parse_single_source_anchors_manager_spec_to_config_dir(
     assert Path(path_part) == (tmp_path / file_name).resolve()
 
 
+def test_parse_single_source_anchors_structured_output_to_config_dir(tmp_path):
+    path = write_config(
+        tmp_path,
+        """
+        agents:
+          a:
+            system_prompt: hi
+            structured_output:
+              model: ./schemas.py:Forecast
+        entry: a
+        """,
+    )
+    raw = parse_single_source(path)
+    path_part, sep, name = raw["agents"]["a"]["structured_output"]["model"].rpartition(":")
+    assert (sep, name) == (":", "Forecast")
+    assert Path(path_part) == (tmp_path / "schemas.py").resolve()
+
+
 def test_parse_single_source_anchors_inline_model_provider_to_config_dir(tmp_path):
     path = write_config(
         tmp_path,

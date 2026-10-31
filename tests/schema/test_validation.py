@@ -125,6 +125,8 @@ def test_model_cache_wrong_type_or_params_cache_config_raises(model_lines):
         "system_prompt",
         "conversation_manager",
         "tools",
+        "structured_output_model",
+        "structured_output_prompt",
         "load_tools_from_directory",
     ],
 )
@@ -166,6 +168,11 @@ entry: team
 def test_agent_kwargs_with_regular_agent_parameter_validates():
     config = app_config(agents={"a": agent_def(agent_kwargs={"record_direct_tool_call": False})})
     assert config.agents["a"].agent_kwargs == {"record_direct_tool_call": False}
+
+
+def test_structured_output_without_a_model_raises_validation_error():
+    with pytest.raises(ValidationError):
+        agent_def(structured_output={"prompt": "Fill the schema."})
 
 
 # ── snapshot session providers check their params at parse time ────────────

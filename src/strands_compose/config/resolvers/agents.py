@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
+from pydantic import BaseModel
 from strands import Agent
 
 from ...exceptions import ConfigurationError
@@ -30,6 +31,28 @@ if TYPE_CHECKING:
     from ..schema import AgentDef, SessionManagerDef
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_structured_output_model(spec: str) -> type[BaseModel]:
+    """Load the pydantic model class named by ``AgentDef.structured_output.model``.
+
+    Args:
+        spec: Import spec (``module.path:Name`` or ``./file.py:Name``).
+
+    Returns:
+        The ``BaseModel`` subclass.
+
+    Raises:
+        ImportResolutionError: If the spec cannot be imported.
+        TypeError: If the imported object is not a ``BaseModel`` subclass.
+    """
+    model_cls = load_object(spec, target="structured output model")
+    if not (isinstance(model_cls, type) and issubclass(model_cls, BaseModel)):
+        raise TypeError(
+            f"structured_output.model '{spec}' must be a pydantic BaseModel subclass, "
+            f"got {model_cls!r}."
+        )
+    return model_cls
 
 
 def build_agent_from_def(
@@ -71,7 +94,8 @@ def build_agent_from_def(
     Raises:
         ConfigurationError: If a swarm or graph agent has a session manager, or
             ``agent_kwargs.storage`` is set together with a snapshot provider.
-        TypeError: If a custom factory doesn't return an Agent.
+        TypeError: If a custom factory doesn't return an Agent, or
+            ``structured_output.model`` is not a pydantic ``BaseModel`` subclass.
     """
     # 1. Resolve model — inline ModelDef or global name ref
     model: Model | None = None
@@ -152,8 +176,14 @@ def build_agent_from_def(
         "conversation_manager": conversation_manager,
         "session_manager": agent_session,
     }
-    # storage is passed only when set, so a custom factory with a fixed signature keeps
-    # working without it.
+    # Optional keys are passed only when set, so a custom factory with a fixed signature
+    # keeps working without them.
+    if agent_def.structured_output is not None:
+        builder_kwargs["structured_output_model"] = _resolve_structured_output_model(
+            agent_def.structured_output.model
+        )
+        if agent_def.structured_output.prompt is not None:
+            builder_kwargs["structured_output_prompt"] = agent_def.structured_output.prompt
     if session_storage is not None:
         builder_kwargs["storage"] = session_storage
 
