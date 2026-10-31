@@ -120,40 +120,26 @@ def build_agent_from_def(
     if agent_def.conversation_manager is not None:
         conversation_manager = resolve_conversation_manager(agent_def.conversation_manager)
 
-    # 7. Build the agent
-    all_tools = tools + tool_providers + (extra_tools or [])
-    all_hooks = hooks + (extra_hooks or [])
+    # 7. Build the agent. Keep the keys below in sync with RESERVED_AGENT_KWARGS in
+    #    config/schema.py, which rejects them inside agent_kwargs at parse time.
+    builder_kwargs: dict[str, Any] = {
+        "name": name,
+        "agent_id": name,
+        "model": model,
+        "system_prompt": agent_def.system_prompt,
+        "description": agent_def.description,
+        "tools": tools + tool_providers + (extra_tools or []),
+        "hooks": hooks + (extra_hooks or []),
+        "plugins": plugins,
+        "conversation_manager": conversation_manager,
+        "session_manager": agent_session,
+    }
 
     if agent_def.type is not None:
         factory = load_object(agent_def.type, target="agent factory")
-        agent = factory(
-            name=name,
-            agent_id=name,
-            model=model,
-            system_prompt=agent_def.system_prompt,
-            description=agent_def.description,
-            tools=all_tools,
-            hooks=all_hooks,
-            plugins=plugins,
-            conversation_manager=conversation_manager,
-            session_manager=agent_session,
-            **agent_def.agent_kwargs,
-        )
+        agent = factory(**builder_kwargs, **agent_def.agent_kwargs)
     else:
-        agent = Agent(
-            name=name,
-            agent_id=name,
-            model=model,
-            system_prompt=agent_def.system_prompt,
-            description=agent_def.description,
-            tools=all_tools,
-            hooks=all_hooks,
-            plugins=plugins,
-            conversation_manager=conversation_manager,
-            session_manager=agent_session,
-            load_tools_from_directory=False,
-            **agent_def.agent_kwargs,
-        )
+        agent = Agent(**builder_kwargs, load_tools_from_directory=False, **agent_def.agent_kwargs)
 
     if not isinstance(agent, Agent):
         raise TypeError(

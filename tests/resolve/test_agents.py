@@ -7,15 +7,16 @@ from __future__ import annotations
 
 import pytest
 from strands import Agent
+from strands.models import Model
 
 from strands_compose.config.resolvers.agents import build_agent_from_def, resolve_agents
-from strands_compose.config.schema import SessionManagerDef
+from strands_compose.config.schema import RESERVED_AGENT_KWARGS, SessionManagerDef
 from strands_compose.exceptions import ConfigurationError
 from tests.factories import agent_def
 from tests.fakes import FakeModel
 
 
-def _models():
+def _models() -> dict[str, Model]:
     return {"fast": FakeModel()}
 
 
@@ -68,6 +69,29 @@ def test_custom_factory_returning_non_agent_raises_type_error():
     bad = agent_def(model="fast", type="builtins:dict")
     with pytest.raises(TypeError):
         build_agent_from_def("a", bad, _models(), {})
+
+
+def test_every_kwarg_compose_passes_to_a_factory_is_reserved_at_parse_time(tmp_path):
+    factory_file = tmp_path / "factory.py"
+    factory_file.write_text(
+        "from strands import Agent\n\n"
+        "def make(**kwargs):\n"
+        "    agent = Agent(**kwargs)\n"
+        "    agent.state.set('received', sorted(kwargs))\n"
+        "    return agent\n"
+    )
+
+    agent = build_agent_from_def(
+        "a",
+        agent_def(model="fast", type=f"{factory_file}:make"),
+        _models(),
+        {},
+    )
+
+    # load_tools_from_directory is reserved but only passed when there is no custom factory.
+    assert set(agent.state.get("received")) == set(RESERVED_AGENT_KWARGS) - {
+        "load_tools_from_directory"
+    }
 
 
 def test_swarm_or_graph_node_with_session_manager_fails_fast():

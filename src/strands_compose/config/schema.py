@@ -110,6 +110,47 @@ class MCPClientDef(BaseModel):
         return self
 
 
+# Agent keyword arguments that ``build_agent_from_def`` passes itself, so the same key in
+# ``agent_kwargs`` is rejected at parse time (it would reach ``Agent()`` twice). Each one
+# is set through the agent's key or its dedicated ``AgentDef`` field. Keep in sync with
+# ``builder_kwargs`` in ``config/resolvers/agents.py``.
+# ``load_tools_from_directory`` is only passed on the standard path (no custom ``type``),
+# but is reserved everywhere to keep one rule.
+RESERVED_AGENT_KWARGS = (
+    "name",
+    "agent_id",
+    "model",
+    "system_prompt",
+    "description",
+    "tools",
+    "hooks",
+    "plugins",
+    "conversation_manager",
+    "session_manager",
+    "load_tools_from_directory",
+)
+
+
+def _reject_reserved_agent_kwargs(agent_kwargs: dict[str, Any], owner: str) -> None:
+    """Raise if ``agent_kwargs`` contains a key strands-compose sets itself.
+
+    Args:
+        agent_kwargs: The ``agent_kwargs`` dict to check.
+        owner: Where the dict lives, for the error message.
+
+    Raises:
+        ValueError: If any reserved key is present.
+    """
+    clashing = sorted(set(agent_kwargs) & set(RESERVED_AGENT_KWARGS))
+    if clashing:
+        raise ValueError(
+            f"{owner}: agent_kwargs must not contain {clashing}; strands-compose sets these "
+            f"itself. name and agent_id come from the agent's key, the others from the "
+            f"matching agent fields.\n"
+            f"Reserved: {sorted(RESERVED_AGENT_KWARGS)}"
+        )
+
+
 class AgentDef(BaseModel):
     """Top-level agent definition.
 
@@ -143,14 +184,13 @@ class AgentDef(BaseModel):
     agent_kwargs: dict[str, Any] = Field(default_factory=dict)
     """Additional keyword arguments passed to strands.Agent() or custom factory.
 
-    Valid Agent parameters: messages, callback_handler,
-    record_direct_tool_call, trace_attributes, state,
-    structured_output_prompt, structured_output_model, tool_executor,
-    retry_strategy, concurrent_invocation_mode, load_tools_from_directory.
+    Keys that strands-compose passes itself (:data:`RESERVED_AGENT_KWARGS`) are
+    rejected at parse time. ``name`` and ``agent_id`` come from the agent's key; set the others as
+    fields on the agent.
 
-    Warning: Use at your own risk — no schema-level validation is performed.
-    Agent.__init__ has 24 explicit parameters and no **kwargs; any invalid
-    key will raise TypeError at construction time.
+    Warning: Use at your own risk — the remaining keys are not validated.
+    Agent.__init__ has no **kwargs; any invalid key will raise TypeError at
+    construction time.
     """
     model: str | ModelDef | None = None
     system_prompt: str | None = None
@@ -161,6 +201,12 @@ class AgentDef(BaseModel):
     mcp: list[str] = Field(default_factory=list)
     conversation_manager: ConversationManagerDef | None = None
     session_manager: SessionManagerDef | None = None
+
+    @model_validator(mode="after")
+    def _agent_kwargs_avoid_reserved_keys(self) -> AgentDef:
+        """Reject ``agent_kwargs`` keys that the agent builder already passes."""
+        _reject_reserved_agent_kwargs(self.agent_kwargs, "agent")
+        return self
 
 
 # --- Orchestration Models --- #
@@ -199,10 +245,16 @@ class DelegateOrchestrationDef(BaseModel):
     session_manager: SessionManagerDef | None = None
     hooks: list[HookDef | str] = Field(default_factory=list)
     agent_kwargs: dict[str, Any] = Field(default_factory=dict)
-    """Merged over the entry agent's ``agent_kwargs`` (orchestration wins).
+    """Extra ``Agent`` kwargs merged over the entry agent's ``agent_kwargs`` (orchestration wins).
 
-    Common uses: ``system_prompt``, ``callback_handler``, ``conversation_manager``.
+    Keys in :data:`RESERVED_AGENT_KWARGS` are rejected; change those on the entry agent.
     """
+
+    @model_validator(mode="after")
+    def _agent_kwargs_avoid_reserved_keys(self) -> DelegateOrchestrationDef:
+        """Reject ``agent_kwargs`` keys that the agent builder already passes."""
+        _reject_reserved_agent_kwargs(self.agent_kwargs, "delegate orchestration")
+        return self
 
     @classmethod
     def reference_fields(cls) -> dict[str, str]:
