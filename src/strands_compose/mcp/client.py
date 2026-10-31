@@ -52,7 +52,11 @@ def create_mcp_client(
             ``httpx_client_factory``
 
             **streamable-http**: ``headers``, ``http_client`` (pre-configured
-            ``httpx2.AsyncClient``), ``terminate_on_close``
+            ``httpx2.AsyncClient``), ``terminate_on_close``. When only
+            ``headers`` is set, strands' own ``MCPClient(url=, headers=)`` is
+            used, which also accepts ``auth`` and ``auth_provider`` through
+            ``**kwargs``. ``http_client`` and ``terminate_on_close`` need the
+            transport factory, which cannot be combined with ``auth``.
 
         **kwargs: Additional kwargs forwarded to strands MCPClient
             (startup_timeout, tool_filters, prefix, elicitation_callback,
@@ -62,8 +66,9 @@ def create_mcp_client(
         A strands MCPClient instance.
 
     Raises:
-        ValueError: If connection parameters are ambiguous, or if ``transport``
-            is not an HTTP transport while ``url`` is given.
+        ValueError: If connection parameters are ambiguous, if ``transport``
+            is not an HTTP transport while ``url`` is given, or if ``headers``
+            is set both in ``transport_options`` and in ``kwargs``.
     """
     modes = sum(x is not None for x in [url, command])
     if modes != 1:
@@ -89,6 +94,17 @@ def create_mcp_client(
             effective = "sse" if path.endswith("/sse") else "streamable-http"
 
         if effective == "streamable-http":
+            if set(opts) <= {"headers"}:
+                # Let strands build the transport: it owns the HTTP client and
+                # supports ``auth`` / ``auth_provider`` natively.
+                native_kwargs = dict(kwargs)
+                if "headers" in opts:
+                    if "headers" in kwargs:
+                        raise ValueError(
+                            "Set 'headers' in transport_options or in params, not in both."
+                        )
+                    native_kwargs["headers"] = opts["headers"]
+                return _MCPClient(url=url, **native_kwargs)
             transport_callable = streamable_http_transport(url, **opts)
         elif effective == "sse":
             transport_callable = sse_transport(url, **opts)

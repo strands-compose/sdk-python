@@ -11,11 +11,12 @@ yielding (read_stream, write_stream)). Pass the result to strands MCPClient:
 from __future__ import annotations
 
 import logging
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import AsyncGenerator, Callable
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +88,7 @@ def sse_transport(
         headers: Optional HTTP headers.
         timeout: HTTP timeout in seconds (default: 5).
         sse_read_timeout: Timeout waiting for SSE events in seconds (default: 300).
-        auth: Optional httpx.Auth instance (e.g., OAuth provider).
+        auth: Optional ``httpx2.Auth`` instance (e.g., OAuth provider).
         httpx_client_factory: Optional factory for creating httpx client.
 
     Returns:
@@ -121,6 +122,26 @@ def sse_transport(
         return sse_client(**kwargs)
 
     return factory
+
+
+@asynccontextmanager
+async def _owned_http_client_transport(
+    url: str, headers: dict[str, str], terminate_on_close: bool
+) -> AsyncGenerator[Any]:
+    """Open a streamable HTTP transport on a client with MCP's default timeouts.
+
+    ``streamable_http_client`` closes only a client it created itself, so the
+    client built here is closed together with the transport.
+    """
+    from mcp.client.streamable_http import create_mcp_http_client, streamable_http_client
+
+    async with (
+        create_mcp_http_client(headers=headers) as http_client,
+        streamable_http_client(
+            url=url, http_client=http_client, terminate_on_close=terminate_on_close
+        ) as streams,
+    ):
+        yield streams
 
 
 def streamable_http_transport(
@@ -165,14 +186,7 @@ def streamable_http_transport(
                 terminate_on_close=captured_terminate_on_close,
             )
         if captured_headers:
-            import httpx2
-
-            client = httpx2.AsyncClient(headers=captured_headers)
-            return streamable_http_client(
-                url=url,
-                http_client=client,
-                terminate_on_close=captured_terminate_on_close,
-            )
+            return _owned_http_client_transport(url, captured_headers, captured_terminate_on_close)
         return streamable_http_client(url=url, terminate_on_close=captured_terminate_on_close)
 
     return factory
