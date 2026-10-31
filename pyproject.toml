@@ -103,6 +103,11 @@ markers = [
     "bedrock: Tests requiring AWS Bedrock",
 ]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+filterwarnings = [
+    # Test graphs are deliberately minimal; strands advises limits for real graphs.
+    "ignore:graph has no max_node_executions or execution_timeout set:UserWarning",
+]
 
 [tool.commitizen]
 name = "cz_conventional_commits"

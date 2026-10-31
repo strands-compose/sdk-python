@@ -9,12 +9,20 @@ agent around one of these models instead.
 
 from __future__ import annotations
 
-from typing import Any
+from collections.abc import AsyncGenerator
+from typing import Any, TypeVar
 
+from pydantic import BaseModel
 from strands import tool
 from strands.models import Model
 from strands.plugins import Plugin
+from strands.types.content import Messages
+from strands.types.event_loop import Usage
 from strands.types.exceptions import ModelThrottledException
+from strands.types.streaming import StreamEvent
+from strands.types.tools import ToolSpec
+
+T = TypeVar("T", bound=BaseModel)
 
 
 class FakeModel(Model):
@@ -30,16 +38,17 @@ class FakeModel(Model):
         text_chunks: list[str] | None = None,
         *,
         model_id: str = "fake-model",
-        usage: dict[str, int] | None = None,
+        usage: Usage | None = None,
         reasoning_chunks: list[str] | None = None,
         cache_config: Any = None,
     ) -> None:
         """Store the chunks to stream, a model id, the usage to report and any cache config."""
         self._text_chunks = text_chunks if text_chunks is not None else ["Hello", " world"]
-        self._config: dict[str, Any] = {"model_id": model_id}
+        # A known context window, so strands' utilization estimate does not warn.
+        self._config: dict[str, Any] = {"model_id": model_id, "context_window_limit": 200_000}
         if cache_config is not None:
             self._config["cache_config"] = cache_config
-        self._usage = usage or {"inputTokens": 5, "outputTokens": 3, "totalTokens": 8}
+        self._usage: Usage = usage or {"inputTokens": 5, "outputTokens": 3, "totalTokens": 8}
         self._reasoning_chunks = reasoning_chunks or []
 
     def update_config(self, **model_config: Any) -> None:
@@ -51,14 +60,22 @@ class FakeModel(Model):
         return self._config
 
     async def structured_output(
-        self, output_model: Any, prompt: Any, system_prompt: Any = None, **kwargs: Any
-    ):
+        self,
+        output_model: type[T],
+        prompt: Messages,
+        system_prompt: str | None = None,
+        **kwargs: Any,
+    ) -> AsyncGenerator[dict[str, T | Any], None]:
         """Yield a single empty structured-output instance (unused by most tests)."""
         yield {"output": output_model()}
 
     async def stream(
-        self, messages: Any, tool_specs: Any = None, system_prompt: Any = None, **kwargs: Any
-    ):
+        self,
+        messages: Messages,
+        tool_specs: list[ToolSpec] | None = None,
+        system_prompt: str | None = None,
+        **kwargs: Any,
+    ) -> AsyncGenerator[StreamEvent, None]:
         """Stream a minimal text completion in the raw strands chunk protocol."""
         yield {"messageStart": {"role": "assistant"}}
         if self._reasoning_chunks:
@@ -93,14 +110,22 @@ class ToolThenTextModel(Model):
         return self._config
 
     async def structured_output(
-        self, output_model: Any, prompt: Any, system_prompt: Any = None, **kwargs: Any
-    ):
+        self,
+        output_model: type[T],
+        prompt: Messages,
+        system_prompt: str | None = None,
+        **kwargs: Any,
+    ) -> AsyncGenerator[dict[str, T | Any], None]:
         """Yield a single empty structured-output instance (unused)."""
         yield {"output": output_model()}
 
     async def stream(
-        self, messages: Any, tool_specs: Any = None, system_prompt: Any = None, **kwargs: Any
-    ):
+        self,
+        messages: Messages,
+        tool_specs: list[ToolSpec] | None = None,
+        system_prompt: str | None = None,
+        **kwargs: Any,
+    ) -> AsyncGenerator[StreamEvent, None]:
         """First turn: call the tool. Second turn: emit text and stop."""
         self._turn += 1
         yield {"messageStart": {"role": "assistant"}}
@@ -148,14 +173,22 @@ class AlwaysToolModel(Model):
         return self._config
 
     async def structured_output(
-        self, output_model: Any, prompt: Any, system_prompt: Any = None, **kwargs: Any
-    ):
+        self,
+        output_model: type[T],
+        prompt: Messages,
+        system_prompt: str | None = None,
+        **kwargs: Any,
+    ) -> AsyncGenerator[dict[str, T | Any], None]:
         """Yield a single empty structured-output instance (unused)."""
         yield {"output": output_model()}
 
     async def stream(
-        self, messages: Any, tool_specs: Any = None, system_prompt: Any = None, **kwargs: Any
-    ):
+        self,
+        messages: Messages,
+        tool_specs: list[ToolSpec] | None = None,
+        system_prompt: str | None = None,
+        **kwargs: Any,
+    ) -> AsyncGenerator[StreamEvent, None]:
         """Request the tool again, with a fresh tool-use id per turn."""
         self._turn += 1
         yield {"messageStart": {"role": "assistant"}}
@@ -190,15 +223,23 @@ class BoomModel(Model):
         return {"model_id": "boom-model"}
 
     async def structured_output(
-        self, output_model: Any, prompt: Any, system_prompt: Any = None, **kwargs: Any
-    ):
+        self,
+        output_model: type[T],
+        prompt: Messages,
+        system_prompt: str | None = None,
+        **kwargs: Any,
+    ) -> AsyncGenerator[dict[str, T | Any], None]:
         """Raise on structured output too."""
         raise RuntimeError(self._message)
         yield  # pragma: no cover — makes this an async generator
 
     async def stream(
-        self, messages: Any, tool_specs: Any = None, system_prompt: Any = None, **kwargs: Any
-    ):
+        self,
+        messages: Messages,
+        tool_specs: list[ToolSpec] | None = None,
+        system_prompt: str | None = None,
+        **kwargs: Any,
+    ) -> AsyncGenerator[StreamEvent, None]:
         """Raise a provider-style error mid-call."""
         raise RuntimeError(self._message)
         yield  # pragma: no cover — makes this an async generator
@@ -216,8 +257,12 @@ class FlakyOnceModel(FakeModel):
         self._failed_once = False
 
     async def stream(
-        self, messages: Any, tool_specs: Any = None, system_prompt: Any = None, **kwargs: Any
-    ):
+        self,
+        messages: Messages,
+        tool_specs: list[ToolSpec] | None = None,
+        system_prompt: str | None = None,
+        **kwargs: Any,
+    ) -> AsyncGenerator[StreamEvent, None]:
         """Raise ``ModelThrottledException`` once, then stream normally."""
         if not self._failed_once:
             self._failed_once = True

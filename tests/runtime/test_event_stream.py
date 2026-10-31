@@ -13,6 +13,7 @@ from strands import Agent, ModelRetryStrategy, tool
 from strands.hooks import BeforeToolCallEvent
 from strands.middleware import InvokeModelStage
 from strands.multiagent import GraphBuilder, Swarm
+from strands.types.event_loop import Usage
 
 from strands_compose.config import load
 from strands_compose.config.schema import AppConfig
@@ -179,7 +180,7 @@ async def test_tool_cancelled_by_a_hook_reports_error_status():
 
 
 async def test_agent_complete_reports_cache_tokens_and_stop_reason():
-    usage = {
+    usage: Usage = {
         "inputTokens": 10,
         "outputTokens": 5,
         "totalTokens": 135,
