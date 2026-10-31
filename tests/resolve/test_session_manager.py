@@ -3,17 +3,22 @@
 from __future__ import annotations
 
 import pytest
-from strands.session import FileSessionManager
+from strands.multiagent import Swarm
+from strands.multiagent.graph import Graph
+from strands.session import FileSessionManager, SnapshotSessionManager
 from strands.session.session_manager import SessionManager
+from strands.storage import LocalFileStorage, S3Storage
 
 from strands_compose.config import load
 from strands_compose.config.resolvers.session_manager import (
     resolve_leaf_session_manager,
     resolve_session_manager,
+    resolve_snapshot_storage,
 )
 from strands_compose.config.schema import AppConfig, SessionManagerDef
+from strands_compose.exceptions import ConfigurationError
 from strands_compose.manifest import build_manifest
-from tests.factories import agent_def, model_def
+from tests.factories import agent_def, graph_orchestration, model_def, swarm_orchestration
 
 
 def test_file_provider_resolves_to_file_session_manager(tmp_path):
@@ -122,3 +127,113 @@ def test_each_load_builds_isolated_agents(tmp_path, fake_runtime):
     r2 = load(config, session_id="s2")
 
     assert r1.agents["a"] is not r2.agents["a"]
+
+
+# ── snapshot providers ─────────────────────────────────────────────────────
+
+
+def _file_snapshot(tmp_path) -> SessionManagerDef:
+    return SessionManagerDef(provider="file-snapshot", params={"storage_dir": str(tmp_path)})
+
+
+def test_file_snapshot_provider_resolves_to_snapshot_session_manager(tmp_path):
+    sm = resolve_session_manager(_file_snapshot(tmp_path), session_id_override="s1")
+    assert isinstance(sm, SnapshotSessionManager)
+    assert sm.session_id == "s1"
+
+
+@pytest.mark.parametrize("prefix", [None, "", "p/"])
+def test_s3_snapshot_provider_builds_storage_without_network(prefix):
+    # No agent is built, so nothing reads S3: S3Storage creates its client lazily.
+    session_def = SessionManagerDef(
+        provider="s3-snapshot", params={"bucket": "b", "prefix": prefix}
+    )
+    assert isinstance(resolve_snapshot_storage(session_def), S3Storage)
+    assert isinstance(resolve_session_manager(session_def), SnapshotSessionManager)
+
+
+def test_repository_providers_build_no_snapshot_storage(tmp_path):
+    file_def = SessionManagerDef(provider="file", params={"storage_dir": str(tmp_path)})
+    assert resolve_snapshot_storage(file_def) is None
+
+
+def test_file_snapshot_agent_shares_its_storage_and_restores_history(tmp_path, fake_runtime):
+    config = AppConfig(
+        models={"m": model_def()},
+        agents={"a": agent_def(model="m")},
+        entry="a",
+        session_manager=_file_snapshot(tmp_path),
+    )
+    load(config, session_id="s1").agents["a"]("remember this")
+
+    restored = load(config, session_id="s1").agents["a"]
+
+    assert isinstance(restored.storage, LocalFileStorage)
+    assert restored.messages
+
+
+def test_snapshot_provider_works_with_a_context_manager(tmp_path, fake_runtime):
+    config = AppConfig(
+        models={"m": model_def()},
+        agents={"a": agent_def(model="m", agent_kwargs={"context_manager": "auto"})},
+        entry="a",
+        session_manager=_file_snapshot(tmp_path),
+    )
+    agent = load(config, session_id="s1").agents["a"]
+    agent("hi")
+    assert agent.context_manager is not None
+    assert agent.context_manager.stash_is_durable  # the stash uses the shared session storage
+
+
+def test_swarm_orchestration_accepts_a_snapshot_provider(tmp_path, fake_runtime):
+    config = AppConfig(
+        models={"m": model_def()},
+        agents={
+            "a": agent_def(model="m", description="first"),
+            "b": agent_def(model="m", description="second"),
+        },
+        orchestrations={
+            "team": swarm_orchestration("a", ["a", "b"], session_manager=_file_snapshot(tmp_path))
+        },
+        entry="team",
+    )
+    swarm = load(config, session_id="s1").orchestrators["team"]
+    assert isinstance(swarm, Swarm)
+    assert isinstance(swarm.session_manager, SnapshotSessionManager)
+    swarm("hi")  # proves manager-level storage is present; strands raises without it
+
+
+def test_graph_orchestration_accepts_a_snapshot_provider(tmp_path, fake_runtime):
+    config = AppConfig(
+        models={"m": model_def()},
+        agents={"a": agent_def(model="m"), "b": agent_def(model="m")},
+        orchestrations={
+            "flow": graph_orchestration("a", [("a", "b")], session_manager=_file_snapshot(tmp_path))
+        },
+        entry="flow",
+    )
+    graph = load(config, session_id="s1").orchestrators["flow"]
+    assert isinstance(graph, Graph)
+    assert isinstance(graph.session_manager, SnapshotSessionManager)
+    graph("hi")
+
+
+def test_custom_agent_factory_receives_the_snapshot_storage(tmp_path, fake_runtime):
+    config = AppConfig(
+        models={"m": model_def()},
+        agents={"a": agent_def(model="m", type="strands:Agent")},
+        entry="a",
+        session_manager=_file_snapshot(tmp_path),
+    )
+    assert isinstance(load(config).agents["a"].storage, LocalFileStorage)
+
+
+def test_agent_kwargs_storage_conflicts_with_a_snapshot_provider(tmp_path, fake_runtime):
+    config = AppConfig(
+        models={"m": model_def()},
+        agents={"a": agent_def(model="m", agent_kwargs={"storage": "x"})},
+        entry="a",
+        session_manager=_file_snapshot(tmp_path),
+    )
+    with pytest.raises(ConfigurationError, match="storage"):
+        load(config)

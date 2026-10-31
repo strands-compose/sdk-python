@@ -14,12 +14,17 @@ from .hooks import resolve_hook_entry
 from .mcp import resolve_tools
 from .models import resolve_model
 from .plugins import resolve_plugin_entry
-from .session_manager import resolve_leaf_session_manager
+from .session_manager import (
+    resolve_session_manager,
+    resolve_snapshot_storage,
+    select_session_manager_def,
+)
 
 if TYPE_CHECKING:
     from strands.agent.conversation_manager import ConversationManager
     from strands.models import Model
     from strands.session.session_manager import SessionManager
+    from strands.storage import Storage
     from strands.tools.mcp import MCPClient as StrandsMCPClient
 
     from ..schema import AgentDef, SessionManagerDef
@@ -64,7 +69,8 @@ def build_agent_from_def(
         A freshly constructed strands Agent.
 
     Raises:
-        ConfigurationError: If a swarm or graph agent has a session manager.
+        ConfigurationError: If a swarm or graph agent has a session manager, or
+            ``agent_kwargs.storage`` is set together with a snapshot provider.
         TypeError: If a custom factory doesn't return an Agent.
     """
     # 1. Resolve model — inline ModelDef or global name ref
@@ -85,17 +91,28 @@ def build_agent_from_def(
     # 4. MCP clients as tool providers
     tool_providers: list[Any] = [mcp_clients[n] for n in agent_def.mcp]
 
-    # 5. Resolve session manager (uniform leaf chain).
-    #   1. agent_def.session_manager set        → resolve it (per-agent override)
-    #   2. agent_def explicit opt-out (None)    → None
-    #   3. global_session_manager_def set       → resolve it (inherited global)
-    #   4. otherwise                            → None
-    agent_session: SessionManager | None = resolve_leaf_session_manager(
+    # 5. Resolve the session manager (uniform leaf chain: per-agent override, explicit
+    #    opt-out, global default, none). A snapshot provider's storage is shared with the
+    #    agent, so the context manager's stash is stored next to the session instead of
+    #    inside every snapshot.
+    session_def = select_session_manager_def(
         leaf_def=agent_def.session_manager,
         leaf_is_set="session_manager" in agent_def.model_fields_set,
         global_def=global_session_manager_def,
-        session_id=session_id,
     )
+    session_storage: Storage | None = None
+    agent_session: SessionManager | None = None
+    if session_def is not None:
+        session_storage = resolve_snapshot_storage(session_def)
+        if session_storage is not None and "storage" in agent_def.agent_kwargs:
+            raise ConfigurationError(
+                f"Agent '{name}': agent_kwargs.storage conflicts with session_manager provider "
+                f"'{session_def.provider}', which sets the agent's storage itself.\n"
+                "Fix: remove 'storage' from agent_kwargs."
+            )
+        agent_session = resolve_session_manager(
+            session_def, session_id_override=session_id, storage=session_storage
+        )
 
     # Fail fast: swarm/graph node agents cannot carry a session manager.
     if (
@@ -121,7 +138,8 @@ def build_agent_from_def(
         conversation_manager = resolve_conversation_manager(agent_def.conversation_manager)
 
     # 7. Build the agent. Keep the keys below in sync with RESERVED_AGENT_KWARGS in
-    #    config/schema.py, which rejects them inside agent_kwargs at parse time.
+    #    config/schema.py, which rejects them inside agent_kwargs at parse time. storage is
+    #    the exception: it comes with a snapshot provider and is checked in step 5.
     builder_kwargs: dict[str, Any] = {
         "name": name,
         "agent_id": name,
@@ -134,6 +152,10 @@ def build_agent_from_def(
         "conversation_manager": conversation_manager,
         "session_manager": agent_session,
     }
+    # storage is passed only when set, so a custom factory with a fixed signature keeps
+    # working without it.
+    if session_storage is not None:
+        builder_kwargs["storage"] = session_storage
 
     if agent_def.type is not None:
         factory = load_object(agent_def.type, target="agent factory")

@@ -9,7 +9,7 @@ import pytest
 from pydantic import ValidationError
 
 from strands_compose.config.loaders import load_config
-from strands_compose.config.schema import AppConfig, OrchestrationDef
+from strands_compose.config.schema import AppConfig, OrchestrationDef, SessionManagerDef
 from strands_compose.exceptions import SchemaValidationError
 from tests.factories import agent_def, app_config
 
@@ -166,3 +166,73 @@ entry: team
 def test_agent_kwargs_with_regular_agent_parameter_validates():
     config = app_config(agents={"a": agent_def(agent_kwargs={"record_direct_tool_call": False})})
     assert config.agents["a"].agent_kwargs == {"record_direct_tool_call": False}
+
+
+# ── snapshot session providers check their params at parse time ────────────
+
+
+def _snapshot_config(provider: str, params: str) -> str:
+    return f"""
+session_manager:
+  provider: {provider}
+  params: {params}
+agents:
+  a:
+    system_prompt: hi
+entry: a
+"""
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        "{}",  # no bucket
+        "{bucket: ''}",  # empty bucket, e.g. an unset ${BUCKET:-}
+        "{bucket: b, prefix: 123}",  # prefix must be a string or null
+        "{bucket: b, endpoint_url: 'http://localhost:9000'}",  # S3Storage has no endpoint_url
+    ],
+)
+def test_s3_snapshot_with_bad_params_raises_schema_validation_error(params):
+    with pytest.raises(SchemaValidationError):
+        load_config(_snapshot_config("s3-snapshot", params))
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        "{storage_dir: ./s, bucket: b}",  # an s3-snapshot param
+        "{storage_dir: ''}",
+        "{save_latest_on: trigger}",  # compose has no public handle for manual saves
+        "{save_latest_on: banana}",
+        "{multi_agent_save_latest_on: banana}",
+    ],
+)
+def test_file_snapshot_with_bad_params_raises_schema_validation_error(params):
+    with pytest.raises(SchemaValidationError):
+        load_config(_snapshot_config("file-snapshot", params))
+
+
+@pytest.mark.parametrize(
+    ("provider", "params"),
+    [
+        ("file-snapshot", "{}"),
+        ("file-snapshot", "{storage_dir: null}"),  # the default folder
+        ("file-snapshot", "{storage_dir: ./s, save_latest_on: message, session_id: s1}"),
+        ("s3-snapshot", "{bucket: b, prefix: null, region_name: eu-central-1}"),
+        ("s3-snapshot", "{bucket: b, multi_agent_save_latest_on: invocation}"),
+    ],
+)
+def test_snapshot_providers_accept_their_documented_params(provider, params):
+    config = load_config(_snapshot_config(provider, params))
+    assert config.session_manager is not None
+    assert config.session_manager.provider == provider
+
+
+def test_snapshot_params_are_not_checked_when_a_custom_type_is_set():
+    config = app_config(
+        session_manager=SessionManagerDef(
+            provider="s3-snapshot", type="my.module:Factory", params={"anything": 1}
+        )
+    )
+    assert config.session_manager is not None
+    assert config.session_manager.type == "my.module:Factory"

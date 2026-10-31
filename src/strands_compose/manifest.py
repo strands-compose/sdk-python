@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING
 from strands import Agent
 from strands.multiagent import Swarm
 from strands.multiagent.graph import Graph
-from strands.session import FileSessionManager, S3SessionManager
+from strands.session import FileSessionManager, S3SessionManager, SnapshotSessionManager
 
 from .types import (
     AgentCoreProviderDescriptor,
@@ -34,6 +34,7 @@ from .types import (
     S3ProviderDescriptor,
     SessionManagerDescriptor,
     SessionManifest,
+    SnapshotProviderDescriptor,
 )
 
 if TYPE_CHECKING:
@@ -55,9 +56,10 @@ def build_session_manager_descriptor(manager: SessionManager) -> SessionManagerD
 
     1. :class:`strands.session.FileSessionManager` → ``FileProviderDescriptor``
     2. :class:`strands.session.S3SessionManager` → ``S3ProviderDescriptor``
-    3. Duck-typed AgentCore (``manager.config`` carries ``memory_id``,
+    3. :class:`strands.session.SnapshotSessionManager` → ``SnapshotProviderDescriptor``
+    4. Duck-typed AgentCore (``manager.config`` carries ``memory_id``,
        ``actor_id``, ``session_id``) → ``AgentCoreProviderDescriptor``
-    4. Fallback → ``CustomProviderDescriptor``
+    5. Fallback → ``CustomProviderDescriptor``
 
     The function is pure: no I/O, no mutation.  It reads only public attributes
     on the manager and the class's ``__module__``/``__qualname__`` for the
@@ -67,7 +69,7 @@ def build_session_manager_descriptor(manager: SessionManager) -> SessionManagerD
         manager: A strands ``SessionManager`` instance.
 
     Returns:
-        A :class:`SessionManagerDescriptor` (one of the four concrete subtypes).
+        A :class:`SessionManagerDescriptor` (one of the five concrete subtypes).
 
     Raises:
         AttributeError: If a required attribute is missing on a ``File`` or
@@ -87,6 +89,9 @@ def build_session_manager_descriptor(manager: SessionManager) -> SessionManagerD
             bucket=manager.bucket,
             prefix=manager.prefix,
         )
+
+    if isinstance(manager, SnapshotSessionManager):
+        return SnapshotProviderDescriptor(provider="snapshot", session_id=manager.session_id)
 
     config = getattr(manager, "config", None)
     if config is not None and all(

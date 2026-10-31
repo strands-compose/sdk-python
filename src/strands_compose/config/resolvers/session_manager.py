@@ -6,14 +6,20 @@ import uuid
 from typing import TYPE_CHECKING, Any
 
 from ...utils import load_object
+from ..schema import SNAPSHOT_SESSION_PROVIDERS
 
 if TYPE_CHECKING:
     from bedrock_agentcore.memory.integrations.strands.session_manager import (
         AgentCoreMemorySessionManager,
     )
     from strands.session.session_manager import SessionManager
+    from strands.storage import Storage
 
     from ..schema import SessionManagerDef
+
+# SnapshotSessionManager arguments a snapshot provider takes from ``params``.
+# The other params are the session id and the storage settings read by resolve_snapshot_storage.
+_SNAPSHOT_MANAGER_PARAMS = ("save_latest_on", "multi_agent_save_latest_on")
 
 
 def _resolve_bedrock_agentcore_session_manager(
@@ -69,10 +75,47 @@ def _resolve_bedrock_agentcore_session_manager(
     return ACMManager(config, **constructor_params)
 
 
+def resolve_snapshot_storage(session_def: SessionManagerDef) -> Storage | None:
+    """Build the storage backend of a snapshot provider.
+
+    ``file-snapshot`` -> ``LocalFileStorage(storage_dir)`` (strands' default folder when
+    ``storage_dir`` is omitted). ``s3-snapshot`` -> ``S3Storage(bucket, prefix=, region_name=)``.
+    Every other provider, and any custom ``type``, owns its storage and returns ``None``.
+
+    Building either storage has no side effects: no folder is created and no S3 client is
+    opened until the first read or write.
+
+    Args:
+        session_def: Session definition from YAML; the schema has already checked its params.
+
+    Returns:
+        A new ``Storage`` instance, or ``None``.
+    """
+    if session_def.type is not None:
+        return None
+    provider = session_def.provider.lower()
+    params = session_def.params
+    if provider == "file-snapshot":
+        from strands.storage import LocalFileStorage
+
+        storage_dir = params.get("storage_dir")
+        return LocalFileStorage(storage_dir) if storage_dir is not None else LocalFileStorage()
+    if provider == "s3-snapshot":
+        from strands.storage import S3Storage
+
+        return S3Storage(
+            params["bucket"],
+            prefix=params.get("prefix") or "",
+            region_name=params.get("region_name"),
+        )
+    return None
+
+
 def resolve_session_manager(
     session_def: SessionManagerDef,
     *,
     session_id_override: str | None = None,
+    storage: Storage | None = None,
 ) -> SessionManager:
     """Resolve a SessionManagerDef to a strands SessionManager.
 
@@ -81,6 +124,8 @@ def resolve_session_manager(
     - ``"file"`` -> ``strands.session.FileSessionManager``
     - ``"s3"`` -> ``strands.session.S3SessionManager``
     - ``"agentcore"`` -> ``AgentCoreMemorySessionManager``
+    - ``"file-snapshot"`` -> ``strands.session.SnapshotSessionManager`` on ``LocalFileStorage``
+    - ``"s3-snapshot"`` -> ``strands.session.SnapshotSessionManager`` on ``S3Storage``
 
     Custom class: set ``type`` to an import path (``"mod:Class"``).  The
     class must be a subclass of ``strands.session.SessionManager`` and will
@@ -98,6 +143,9 @@ def resolve_session_manager(
         session_id_override: When provided, overrides the session ID.
             Used by the server to give each HTTP session its own
             isolated session manager.
+        storage: Storage for a snapshot provider, shared with the agent by
+            ``build_agent_from_def``. Built from ``params`` when ``None``. The other
+            providers own their storage and ignore it.
 
     Returns:
         Configured SessionManager instance.
@@ -140,9 +188,46 @@ def resolve_session_manager(
     if provider == "agentcore":
         return _resolve_bedrock_agentcore_session_manager(params, session_id)
 
+    if provider in SNAPSHOT_SESSION_PROVIDERS:
+        from strands.session import SnapshotSessionManager
+
+        manager_params = {k: v for k, v in params.items() if k in _SNAPSHOT_MANAGER_PARAMS}
+        return SnapshotSessionManager(
+            session_id,
+            storage=storage if storage is not None else resolve_snapshot_storage(session_def),
+            **manager_params,
+        )
+
     raise ValueError(
-        f"Unknown session provider '{provider}'.\nSupported: 'file', 's3', 'agentcore'."
+        f"Unknown session provider '{provider}'.\n"
+        "Supported: 'file', 's3', 'agentcore', 'file-snapshot', 's3-snapshot'."
     )
+
+
+def select_session_manager_def(
+    *,
+    leaf_def: SessionManagerDef | None,
+    leaf_is_set: bool,
+    global_def: SessionManagerDef | None,
+) -> SessionManagerDef | None:
+    """Pick the session manager def that applies to one leaf (agent or orchestration).
+
+    Precedence (top wins): the leaf's own def, an explicit opt-out
+    (``session_manager: ~``), the global def, none.
+
+    Args:
+        leaf_def: The leaf model's ``session_manager`` value.
+        leaf_is_set: ``"session_manager" in leaf_model.model_fields_set``.
+        global_def: The global ``AppConfig.session_manager`` def.
+
+    Returns:
+        The def to resolve, or ``None`` when the leaf has no session manager.
+    """
+    if leaf_def is not None:
+        return leaf_def
+    if leaf_is_set:
+        return None
+    return global_def
 
 
 def resolve_leaf_session_manager(
@@ -154,12 +239,9 @@ def resolve_leaf_session_manager(
 ) -> SessionManager | None:
     """Apply the uniform leaf chain to one Pydantic model's ``session_manager`` field.
 
-    Precedence (top wins):
-
-    1. ``leaf_def is not None`` → ``resolve_session_manager(leaf_def, session_id_override=session_id)``.
-    2. ``leaf_is_set and leaf_def is None`` → explicit opt-out → ``None``.
-    3. ``global_def is not None`` → ``resolve_session_manager(global_def, session_id_override=session_id)``.
-    4. otherwise → ``None``.
+    The def is picked by :func:`select_session_manager_def` (leaf, explicit opt-out,
+    global, none) and resolved with ``session_id`` as the override. A snapshot provider
+    builds its storage from its params.
 
     Args:
         leaf_def: The leaf model's ``session_manager`` value.
@@ -170,10 +252,9 @@ def resolve_leaf_session_manager(
     Returns:
         A new ``SessionManager`` instance or ``None``.
     """
-    if leaf_def is not None:
-        return resolve_session_manager(leaf_def, session_id_override=session_id)
-    if leaf_is_set:
+    session_def = select_session_manager_def(
+        leaf_def=leaf_def, leaf_is_set=leaf_is_set, global_def=global_def
+    )
+    if session_def is None:
         return None
-    if global_def is not None:
-        return resolve_session_manager(global_def, session_id_override=session_id)
-    return None
+    return resolve_session_manager(session_def, session_id_override=session_id)

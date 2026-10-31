@@ -212,6 +212,21 @@ class AgentCoreProviderDescriptor(BaseModel):
     actor_id: str
 
 
+class SnapshotProviderDescriptor(BaseModel):
+    """Session manager descriptor for strands' snapshot session manager.
+
+    Covers both ``file-snapshot`` and ``s3-snapshot``; strands keeps the storage
+    private, so only the session id is described.
+
+    Attributes:
+        provider: Literal "snapshot".
+        session_id: The session identifier.
+    """
+
+    provider: Literal["snapshot"]
+    session_id: str
+
+
 class CustomProviderDescriptor(BaseModel):
     """Session manager descriptor for custom session manager implementations.
 
@@ -230,6 +245,7 @@ SessionManagerDescriptor = Annotated[
     FileProviderDescriptor
     | S3ProviderDescriptor
     | AgentCoreProviderDescriptor
+    | SnapshotProviderDescriptor
     | CustomProviderDescriptor,
     Field(discriminator="provider"),
 ]

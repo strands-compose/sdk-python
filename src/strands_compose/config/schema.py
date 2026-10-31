@@ -13,6 +13,8 @@ from pydantic import (
     ConfigDict,
     Field,
     StrictBool,
+    StringConstraints,
+    ValidationError,
     model_validator,
 )
 
@@ -100,10 +102,54 @@ class ConversationManagerDef(BaseModel):
     params: dict[str, Any] = Field(default_factory=dict)
 
 
+_NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+
+# ``params`` of the built-in snapshot session providers, which run on strands'
+# SnapshotSessionManager: the storage fields first, then the manager arguments. The
+# defaults are strands' own and are never passed on. ``save_latest_on: trigger`` is left
+# out: compose exposes no public manager handle to call ``save_snapshot`` with, so nothing
+# would ever be saved.
+
+
+class FileSnapshotParamsDef(BaseModel):
+    """``params`` of the ``file-snapshot`` provider, stored in strands' ``LocalFileStorage``."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    storage_dir: _NonEmptyStr | None = None
+    session_id: str | None = None
+    save_latest_on: Literal["invocation", "message"] = "invocation"
+    multi_agent_save_latest_on: Literal["node", "invocation"] = "node"
+
+
+class S3SnapshotParamsDef(BaseModel):
+    """``params`` of the ``s3-snapshot`` provider, stored in strands' ``S3Storage``."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    bucket: _NonEmptyStr
+    prefix: str | None = None
+    region_name: str | None = None
+    session_id: str | None = None
+    save_latest_on: Literal["invocation", "message"] = "invocation"
+    multi_agent_save_latest_on: Literal["node", "invocation"] = "node"
+
+
+# Built-in session providers backed by strands' SnapshotSessionManager, each mapped to the
+# model that checks its ``params``.
+SNAPSHOT_SESSION_PROVIDERS: dict[str, type[BaseModel]] = {
+    "file-snapshot": FileSnapshotParamsDef,
+    "s3-snapshot": S3SnapshotParamsDef,
+}
+
+
 class SessionManagerDef(BaseModel):
     """Session manager configuration.
 
-    Built-in providers: ``"file"``, ``"s3"``, ``"agentcore"``.
+    Built-in providers: ``"file"``, ``"s3"``, ``"agentcore"``, and the snapshot
+    providers ``"file-snapshot"`` and ``"s3-snapshot"`` (see
+    :data:`SNAPSHOT_SESSION_PROVIDERS`). Snapshot provider ``params`` are checked
+    by :class:`FileSnapshotParamsDef` and :class:`S3SnapshotParamsDef`.
 
     For a custom class, set ``type`` to an import path
     (``"module.path:ClassName"``).  The class must be a subclass of
@@ -119,6 +165,27 @@ class SessionManagerDef(BaseModel):
     provider: str = "file"
     type: str | None = None
     params: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _snapshot_params_are_valid(self) -> SessionManagerDef:
+        """Check ``params`` of a built-in snapshot provider against its params model.
+
+        A custom ``type`` replaces ``provider``, so its params are left alone.
+        """
+        params_def = SNAPSHOT_SESSION_PROVIDERS.get(self.provider.lower())
+        if self.type is not None or params_def is None:
+            return self
+        try:
+            params_def.model_validate(self.params)
+        except ValidationError as exc:
+            problems = "; ".join(
+                f"{'.'.join(str(part) for part in error['loc'])}: {error['msg']}"
+                for error in exc.errors()
+            )
+            raise ValueError(
+                f"session_manager provider '{self.provider}' has invalid params: {problems}"
+            ) from None
+        return self
 
 
 class MCPClientDef(BaseModel):

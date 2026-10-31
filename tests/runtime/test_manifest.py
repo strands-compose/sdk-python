@@ -87,3 +87,15 @@ def test_swarm_topology_reports_nodes_and_entry():
     assert team.kind == "swarm"
     assert {n.id for n in team.nodes} == {"a", "b"}
     assert team.entry_node_id == "a"
+
+
+def test_agent_session_manager_descriptor_reports_snapshot_provider(tmp_path):
+    from strands.session import SnapshotSessionManager
+    from strands.storage import LocalFileStorage
+
+    sm = SnapshotSessionManager("s1", storage=LocalFileStorage(str(tmp_path)))
+    agent = Agent(model=FakeModel(), session_manager=sm)
+    manifest = build_manifest({"a": agent}, {}, agent)
+    descriptor = manifest.agents[0].session_manager
+    assert descriptor is not None
+    assert descriptor.provider == "snapshot"
