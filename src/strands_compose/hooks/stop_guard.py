@@ -1,8 +1,9 @@
 """External stop-signal hooks.
 
 Allows external code to signal an agent or multi-agent orchestration to
-stop processing.  :class:`StopGuard` checks at every tool-call boundary;
-:class:`MultiAgentStopGuard` checks at every node-call boundary.
+stop processing.  :class:`StopGuard` checks at every tool-call boundary and
+cancels the invocation; :class:`MultiAgentStopGuard` checks at every node-call
+boundary.
 """
 
 from __future__ import annotations
@@ -23,14 +24,26 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
 
+_STOP_MESSAGE = "Agent stopped by external signal"
+
+
 class StopGuard(HookProvider):
-    """Cancels the agent's event loop when an external stop condition is met."""
+    """Cancels the agent's invocation when an external stop condition is met.
+
+    The invocation ends with ``stop_reason="cancelled"`` and the stop message
+    as its text.  Inside a Graph the node fails and the graph stops.  Behind a
+    delegate tool, an agent connection or a Graph returns an error to the
+    calling agent, while a Swarm completes and returns the stop message as a
+    normal result.
+    """
 
     def __init__(self, stop_check: Callable[[], bool]) -> None:
         """Initialize the StopGuard.
 
         The stop condition is checked before every tool call.  When it returns
-        ``True``, the current tool is cancelled and the event loop is stopped.
+        ``True``, the current tool is cancelled and the invocation is aborted
+        with ``agent.cancel()``.  An agent that answers without calling a tool
+        is not stopped.
 
         Args:
             stop_check: Callable that returns ``True`` when the agent should stop.
@@ -48,12 +61,12 @@ class StopGuard(HookProvider):
         registry.add_callback(BeforeToolCallEvent, self._on_before_tool)
 
     def _on_before_tool(self, event: BeforeToolCallEvent) -> None:
-        """Cancel the tool and stop the event loop if the stop condition is met."""
+        """Cancel the tool and abort the invocation if the stop condition is met."""
         if not self._should_stop():
             return
 
-        event.cancel_tool = "Agent stopped by external signal"
-        event.invocation_state.setdefault("request_state", {})["stop_event_loop"] = True
+        event.cancel_tool = _STOP_MESSAGE
+        event.agent.cancel(message=_STOP_MESSAGE)
 
 
 def stop_guard_from_event(

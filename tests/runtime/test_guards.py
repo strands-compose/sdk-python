@@ -13,10 +13,11 @@ import pytest
 from strands import Agent, tool
 from strands.hooks import HookRegistry
 from strands.hooks.events import AfterModelCallEvent, BeforeToolCallEvent
+from strands.multiagent import GraphBuilder, Status
 from strands.types.content import Message
 
 from strands_compose.hooks import MaxToolCallsGuard, StopGuard, ToolNameSanitizer
-from tests.fakes import FakeModel
+from tests.fakes import AlwaysToolModel, FakeModel, ToolThenTextModel
 
 
 def _before_tool_event(agent: Agent, name: str, state: dict) -> BeforeToolCallEvent:
@@ -40,6 +41,16 @@ def agent() -> Agent:
     return Agent(model=FakeModel())
 
 
+@pytest.fixture
+def greet_tool():
+    @tool
+    def greet(name: str) -> str:
+        """Greet."""
+        return f"Hi {name}"
+
+    return greet
+
+
 # ── MaxToolCallsGuard ──────────────────────────────────────────────────────
 
 
@@ -57,12 +68,51 @@ def test_tool_call_over_limit_is_cancelled(agent):
     assert event.cancel_tool  # truthy cancel message
 
 
-def test_repeated_violation_requests_event_loop_stop(agent):
-    guard = MaxToolCallsGuard(max_calls=1)
-    state: dict = {}
-    for _ in range(3):  # 1 allowed, 2nd warns, 3rd hard-stops
-        _fire(guard, _before_tool_event(agent, "greet", state))
-    assert state["request_state"]["stop_event_loop"] is True
+@pytest.mark.filterwarnings("error:.*stop_event_loop.*:DeprecationWarning")
+def test_tool_loop_is_ended_with_cancelled_stop_reason(greet_tool):
+    agent = Agent(
+        model=AlwaysToolModel(tool_name="greet"), tools=[greet_tool], hooks=[MaxToolCallsGuard(1)]
+    )
+
+    result = agent("go")
+
+    assert result.stop_reason == "cancelled"
+    assert str(result)  # the stop message is the answer text, not empty
+
+
+def _tool_result_statuses(agent: Agent) -> list[str]:
+    return [
+        block["toolResult"]["status"]
+        for message in agent.messages
+        for block in message["content"]
+        if "toolResult" in block
+    ]
+
+
+def test_graph_nodes_count_tool_calls_independently(greet_tool):
+    first = Agent(
+        name="a",
+        model=ToolThenTextModel(tool_name="greet"),
+        tools=[greet_tool],
+        hooks=[MaxToolCallsGuard(1)],
+    )
+    second = Agent(
+        name="b",
+        model=ToolThenTextModel(tool_name="greet"),
+        tools=[greet_tool],
+        hooks=[MaxToolCallsGuard(1)],
+    )
+    builder = GraphBuilder()
+    builder.add_node(first, "a")
+    builder.add_node(second, "b")
+    builder.add_edge("a", "b")
+    builder.set_entry_point("a")
+
+    result = builder.build()("go")
+
+    assert result.status == Status.COMPLETED
+    assert _tool_result_statuses(first) == ["success"]
+    assert _tool_result_statuses(second) == ["success"]
 
 
 # ── StopGuard ──────────────────────────────────────────────────────────────
@@ -79,6 +129,47 @@ def test_stop_guard_allows_when_signal_clear(agent):
     stop = threading.Event()
     event = _fire(StopGuard(stop_check=stop.is_set), _before_tool_event(agent, "greet", {}))
     assert event.cancel_tool is False
+
+
+@pytest.mark.filterwarnings("error:.*stop_event_loop.*:DeprecationWarning")
+def test_stop_guard_cancels_the_invocation_and_the_agent_stays_reusable(greet_tool):
+    stop = threading.Event()
+    stop.set()
+    agent = Agent(
+        model=ToolThenTextModel(tool_name="greet"),
+        tools=[greet_tool],
+        hooks=[StopGuard(stop_check=stop.is_set)],
+    )
+
+    stopped = agent("go")
+    stop.clear()
+    resumed = agent("again")
+
+    assert stopped.stop_reason == "cancelled"
+    assert str(stopped)
+    assert resumed.stop_reason == "end_turn"
+
+
+def test_stop_guard_fails_a_graph_node_and_prunes_the_nodes_after_it(greet_tool):
+    stop = threading.Event()
+    stop.set()
+    first = Agent(
+        name="a",
+        model=ToolThenTextModel(tool_name="greet"),
+        tools=[greet_tool],
+        hooks=[StopGuard(stop_check=stop.is_set)],
+    )
+    second = Agent(name="b", model=FakeModel())
+    builder = GraphBuilder()
+    builder.add_node(first, "a")
+    builder.add_node(second, "b")
+    builder.add_edge("a", "b")
+    builder.set_entry_point("a")
+
+    result = builder.build()("go")
+
+    assert result.status == Status.FAILED
+    assert "b" not in result.results
 
 
 # ── ToolNameSanitizer ──────────────────────────────────────────────────────

@@ -16,11 +16,11 @@ from strands.multiagent import GraphBuilder, Swarm
 
 from strands_compose.config import load
 from strands_compose.config.schema import AppConfig
-from strands_compose.hooks import EventPublisher
+from strands_compose.hooks import EventPublisher, MaxToolCallsGuard
 from strands_compose.types import EventType, Node
 from strands_compose.wire import make_event_queue
 from tests.factories import agent_def
-from tests.fakes import BoomModel, FakeModel, FlakyOnceModel, ToolThenTextModel
+from tests.fakes import AlwaysToolModel, BoomModel, FakeModel, FlakyOnceModel, ToolThenTextModel
 
 logger = logging.getLogger(__name__)
 
@@ -211,6 +211,23 @@ async def test_agent_complete_cache_tokens_default_to_zero():
 
     assert usage["cache_read_input_tokens"] == 0
     assert usage["cache_write_input_tokens"] == 0
+
+
+async def test_guard_stopped_invocation_reports_cancelled_stop_reason():
+    @tool
+    def greet(name: str) -> str:
+        """Greet."""
+        return f"Hi {name}"
+
+    agent = Agent(
+        model=AlwaysToolModel(tool_name="greet"), tools=[greet], hooks=[MaxToolCallsGuard(1)]
+    )
+    eq = make_event_queue({"a": agent}, entry_name="a")
+
+    events = await _run_agent("hi", agent, eq)
+    complete = next(e for e in events if e.type == EventType.AGENT_COMPLETE)
+
+    assert complete.data["stop_reason"] == "cancelled"
 
 
 async def test_swarm_handoff_emits_handoff_between_the_node_events():

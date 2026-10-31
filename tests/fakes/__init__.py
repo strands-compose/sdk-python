@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .strands import (
+    AlwaysToolModel,
     BoomModel,
     FakeMCPClient,
     FakeModel,
@@ -13,6 +14,7 @@ from .strands import (
 )
 
 __all__ = [
+    "AlwaysToolModel",
     "BoomModel",
     "FakeMCPClient",
     "FakeModel",

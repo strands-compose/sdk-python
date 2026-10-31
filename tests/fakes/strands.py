@@ -123,6 +123,55 @@ class ToolThenTextModel(Model):
         }
 
 
+class AlwaysToolModel(Model):
+    """Requests the same tool on every turn and never answers with text.
+
+    Drives guards that must stop a runaway tool loop.
+    """
+
+    def __init__(self, *, tool_name: str, tool_input: str = '{"name": "Bob"}') -> None:
+        """Store the tool requested on every turn."""
+        self._config: dict[str, Any] = {"model_id": "fake-always-tool-model"}
+        self._tool_name = tool_name
+        self._tool_input = tool_input
+        self._turn = 0
+
+    def update_config(self, **model_config: Any) -> None:
+        """Merge overrides into the reported config."""
+        self._config.update(model_config)
+
+    def get_config(self) -> dict[str, Any]:
+        """Return the reported config."""
+        return self._config
+
+    async def structured_output(
+        self, output_model: Any, prompt: Any, system_prompt: Any = None, **kwargs: Any
+    ):
+        """Yield a single empty structured-output instance (unused)."""
+        yield {"output": output_model()}
+
+    async def stream(
+        self, messages: Any, tool_specs: Any = None, system_prompt: Any = None, **kwargs: Any
+    ):
+        """Request the tool again, with a fresh tool-use id per turn."""
+        self._turn += 1
+        yield {"messageStart": {"role": "assistant"}}
+        yield {
+            "contentBlockStart": {
+                "start": {"toolUse": {"name": self._tool_name, "toolUseId": f"call-{self._turn}"}}
+            }
+        }
+        yield {"contentBlockDelta": {"delta": {"toolUse": {"input": self._tool_input}}}}
+        yield {"contentBlockStop": {}}
+        yield {"messageStop": {"stopReason": "tool_use"}}
+        yield {
+            "metadata": {
+                "usage": {"inputTokens": 1, "outputTokens": 1, "totalTokens": 2},
+                "metrics": {"latencyMs": 1},
+            }
+        }
+
+
 class BoomModel(Model):
     """A model whose stream raises, to drive the ERROR event path."""
 
