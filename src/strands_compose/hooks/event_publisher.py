@@ -5,10 +5,13 @@ from __future__ import annotations
 import asyncio
 import logging
 import sys
-from collections.abc import Callable
+from collections.abc import AsyncGenerator, Callable
 from typing import Any
 
 from strands.hooks import HookProvider, HookRegistry
+from strands.middleware import InvokeModelContext, MiddlewareNext, TypedEvent
+from strands.multiagent.graph import Graph
+from strands.multiagent.swarm import Swarm
 
 if sys.version_info >= (3, 12):
     from typing import override
@@ -26,6 +29,7 @@ from strands.hooks.events import (
     BeforeNodeCallEvent,
     BeforeToolCallEvent,
 )
+from strands.types.event_loop import Usage
 
 from ..manifest import model_descriptor
 from ..types import EventType, StreamEvent
@@ -56,6 +60,28 @@ def _extract_result_text(result: Any, max_len: int = _MAX_RESULT_LEN) -> str | N
     if not raw:
         return None
     return raw[:max_len] + "..." if len(raw) > max_len else raw
+
+
+def _usage_payload(usage: Usage) -> dict[str, int]:
+    """Convert strands token usage to the ``usage`` payload of a stream event.
+
+    Values are passed through as strands reports them. Whether ``input_tokens``
+    includes the cache counts depends on the provider; see the streaming chapter.
+
+    Args:
+        usage: A strands ``Usage`` (camelCase keys, any of which may be absent).
+
+    Returns:
+        A dict with ``input_tokens``, ``output_tokens``, ``total_tokens``,
+        ``cache_read_input_tokens`` and ``cache_write_input_tokens``, each defaulting to 0.
+    """
+    return {
+        "input_tokens": usage.get("inputTokens", 0),
+        "output_tokens": usage.get("outputTokens", 0),
+        "total_tokens": usage.get("totalTokens", 0),
+        "cache_read_input_tokens": usage.get("cacheReadInputTokens", 0),
+        "cache_write_input_tokens": usage.get("cacheWriteInputTokens", 0),
+    }
 
 
 def _safe_callback(callback: EventCallback) -> EventCallback:
@@ -101,8 +127,8 @@ class EventPublisher(HookProvider):
         delivers them to an external callback.  Emits an AGENT_COMPLETE event at
         the end of each invocation with usage metrics from ``EventLoopMetrics``.
 
-        For TOKEN and REASONING events use :meth:`as_callback_handler` to
-        create a strands-compatible ``callback_handler``.
+        TOKEN and REASONING events come from :meth:`observe_model_stream`, a
+        model-stream middleware that must be registered separately.
 
         Args:
             callback: Called with each :class:`StreamEvent`.
@@ -113,10 +139,8 @@ class EventPublisher(HookProvider):
         Example::
 
             publisher = EventPublisher(callback=on_event, agent_name="analyzer")
-            agent = Agent(
-                hooks=[publisher],
-                callback_handler=publisher.as_callback_handler(),
-            )
+            agent = Agent(hooks=[publisher])
+            agent.add_middleware(InvokeModelStage, publisher.observe_model_stream)
         """
         self._callback = _safe_callback(callback)
         self._agent_name = agent_name
@@ -191,7 +215,7 @@ class EventPublisher(HookProvider):
     def _on_complete(self, event: AfterInvocationEvent) -> None:
         """Emit AGENT_COMPLETE with usage metrics from EventLoopMetrics.
 
-        Includes a ``model`` dict with ``model_id`` and ``provider`` (same
+        Includes ``stop_reason`` and a ``model`` dict with ``model_id`` and ``provider`` (same
         values reported in the session manifest) so consumers can compute
         cost directly from this event without a manifest round-trip.
 
@@ -225,11 +249,8 @@ class EventPublisher(HookProvider):
         model = model_descriptor(event.agent)
 
         data: dict[str, Any] = {
-            "usage": {
-                "input_tokens": usage.get("inputTokens", 0),
-                "output_tokens": usage.get("outputTokens", 0),
-                "total_tokens": usage.get("totalTokens", 0),
-            },
+            "usage": _usage_payload(usage),
+            "stop_reason": result.stop_reason if result is not None else None,
             "model": {
                 "model_id": model.model_id,
                 "provider": model.provider,
@@ -298,17 +319,43 @@ class EventPublisher(HookProvider):
         )
 
     def _on_node_stop(self, event: AfterNodeCallEvent) -> None:
-        """Emit NODE_STOP when a multi-agent orchestration finishes a node."""
+        """Emit NODE_STOP when a node finishes, then HANDOFF if a Swarm hands off from it.
+
+        NODE_STOP carries ``status``, ``execution_time_ms`` and ``usage`` from the
+        node's result. The usage is the node's total, which overlaps the node
+        agent's own AGENT_COMPLETE usage; do not sum both.
+
+        strands emits its native handoff event only on the orchestrator's own
+        stream, never to hooks or callback handlers. ``AfterNodeCallEvent`` fires
+        before strands applies the handoff, so the target is still on ``state``.
+        """
+        data: dict[str, Any] = {
+            "node_id": event.node_id,
+            "multiagent_type": event.source.__class__.__name__.lower(),
+        }
+        source = event.source
+        if isinstance(source, (Swarm, Graph)) and (
+            node_result := source.state.results.get(event.node_id)
+        ):
+            data["status"] = node_result.status.value
+            data["execution_time_ms"] = node_result.execution_time
+            data["usage"] = _usage_payload(node_result.accumulated_usage)
         self._callback(
-            StreamEvent(
-                type=EventType.NODE_STOP,
-                agent_name=self._agent_name,
-                data={
-                    "node_id": event.node_id,
-                    "multiagent_type": event.source.__class__.__name__.lower(),
-                },
-            ),
+            StreamEvent(type=EventType.NODE_STOP, agent_name=self._agent_name, data=data)
         )
+
+        if isinstance(source, Swarm) and (target := source.state.handoff_node) is not None:
+            self._callback(
+                StreamEvent(
+                    type=EventType.HANDOFF,
+                    agent_name=self._agent_name,
+                    data={
+                        "from_node_ids": [event.node_id],
+                        "to_node_ids": [target.node_id],
+                        "message": source.state.handoff_message or "Agent handoff occurred",
+                    },
+                ),
+            )
 
     def _on_multiagent_complete(self, event: AfterMultiAgentInvocationEvent) -> None:
         """Emit MULTIAGENT_COMPLETE when the orchestration finishes."""
@@ -322,32 +369,40 @@ class EventPublisher(HookProvider):
             ),
         )
 
-    # -- Callback handler for streaming chunks -------------------------------
+    # -- Model stream middleware ---------------------------------------------
 
-    def as_callback_handler(self) -> Callable[..., None]:
-        """Return a strands-compatible callback_handler for TOKEN, REASONING, and HANDOFF events.
+    async def observe_model_stream(
+        self,
+        context: InvokeModelContext,
+        next_fn: MiddlewareNext[InvokeModelContext, TypedEvent],
+    ) -> AsyncGenerator[TypedEvent, None]:
+        """``InvokeModelStage`` Wrap handler that emits TOKEN and REASONING events.
 
-        Handles the following kwarg patterns emitted by strands:
-        - ``data`` (str): A streamed text chunk -> TOKEN event.
-        - ``reasoningText`` (str): A reasoning chunk -> REASONING event.
-        - ``type == "multiagent_handoff"``: A :class:`~strands.types._events.MultiAgentHandoffEvent`
-          fired during Swarm/Graph node transitions -> HANDOFF event.
+        Every streamed event is forwarded unchanged. Text deltas arrive under
+        the ``data`` key and reasoning deltas under ``reasoningText``.
 
-        Returns:
-            A callable compatible with strands ``callback_handler`` interface.
+        No hook fires per streamed chunk, so TOKEN and REASONING need this
+        handler. Register it with
+        ``agent.add_middleware(InvokeModelStage, publisher.observe_model_stream)``.
+        The first middleware registered is the outermost, so this handler
+        sees rewrites by middleware registered after it, not by middleware
+        registered before it (for example by a plugin at construction).
+
+        Args:
+            context: The model call about to run.
+            next_fn: Continues the middleware chain and yields the model's events.
+
+        Yields:
+            Each event from ``next_fn``, unchanged.
         """
-
-        def _handler(**kwargs: Any) -> None:
-            text: str = kwargs.get("data", "")
-            if text:
+        async for event in next_fn(context):
+            if text := event.get("data"):
                 self._callback(
                     StreamEvent(
                         type=EventType.TOKEN, agent_name=self._agent_name, data={"text": text}
                     ),
                 )
-
-            reasoning: str = kwargs.get("reasoningText", "")
-            if reasoning:
+            if reasoning := event.get("reasoningText"):
                 self._callback(
                     StreamEvent(
                         type=EventType.REASONING,
@@ -355,18 +410,4 @@ class EventPublisher(HookProvider):
                         data={"text": reasoning},
                     ),
                 )
-
-            if kwargs.get("type") == "multiagent_handoff":
-                self._callback(
-                    StreamEvent(
-                        type=EventType.HANDOFF,
-                        agent_name=self._agent_name,
-                        data={
-                            "from_node_ids": kwargs.get("from_node_ids", []),
-                            "to_node_ids": kwargs.get("to_node_ids", []),
-                            "message": kwargs.get("message"),
-                        },
-                    )
-                )
-
-        return _handler
+            yield event

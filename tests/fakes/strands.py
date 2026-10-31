@@ -25,11 +25,18 @@ class FakeModel(Model):
     """
 
     def __init__(
-        self, text_chunks: list[str] | None = None, *, model_id: str = "fake-model"
+        self,
+        text_chunks: list[str] | None = None,
+        *,
+        model_id: str = "fake-model",
+        usage: dict[str, int] | None = None,
+        reasoning_chunks: list[str] | None = None,
     ) -> None:
-        """Store the text chunks to stream and a reportable model id."""
+        """Store the chunks to stream, a model id and the usage to report."""
         self._text_chunks = text_chunks if text_chunks is not None else ["Hello", " world"]
         self._config: dict[str, Any] = {"model_id": model_id}
+        self._usage = usage or {"inputTokens": 5, "outputTokens": 3, "totalTokens": 8}
+        self._reasoning_chunks = reasoning_chunks or []
 
     def update_config(self, **model_config: Any) -> None:
         """Merge overrides into the reported config."""
@@ -50,17 +57,17 @@ class FakeModel(Model):
     ):
         """Stream a minimal text completion in the raw strands chunk protocol."""
         yield {"messageStart": {"role": "assistant"}}
+        if self._reasoning_chunks:
+            yield {"contentBlockStart": {"start": {}}}
+            for chunk in self._reasoning_chunks:
+                yield {"contentBlockDelta": {"delta": {"reasoningContent": {"text": chunk}}}}
+            yield {"contentBlockStop": {}}
         yield {"contentBlockStart": {"start": {}}}
         for chunk in self._text_chunks:
             yield {"contentBlockDelta": {"delta": {"text": chunk}}}
         yield {"contentBlockStop": {}}
         yield {"messageStop": {"stopReason": "end_turn"}}
-        yield {
-            "metadata": {
-                "usage": {"inputTokens": 5, "outputTokens": 3, "totalTokens": 8},
-                "metrics": {"latencyMs": 1},
-            }
-        }
+        yield {"metadata": {"usage": self._usage, "metrics": {"latencyMs": 1}}}
 
 
 class ToolThenTextModel(Model):

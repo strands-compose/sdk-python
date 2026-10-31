@@ -23,6 +23,8 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from strands import Agent
+from strands.handlers import PrintingCallbackHandler, null_callback_handler
+from strands.middleware import InvokeModelStage
 from strands.multiagent import Swarm
 from strands.multiagent.graph import Graph
 
@@ -186,6 +188,19 @@ class EventQueue:
 # ── Wiring ───────────────────────────────────────────────────────────────────
 
 
+def _attach_publisher(agent: Agent, publisher: EventPublisher) -> None:
+    """Wire ``publisher`` into ``agent``: lifecycle hooks plus the model-stream middleware.
+
+    A custom ``callback_handler`` is left in place. Only strands' default
+    ``PrintingCallbackHandler`` is replaced, so a queue-wired agent does not
+    print its tokens to stdout.
+    """
+    agent.hooks.add_hook(publisher)
+    agent.add_middleware(InvokeModelStage, publisher.observe_model_stream)
+    if type(agent.callback_handler) is PrintingCallbackHandler:
+        agent.callback_handler = null_callback_handler
+
+
 def make_event_queue(
     agents: dict[str, Agent],
     *,
@@ -195,10 +210,12 @@ def make_event_queue(
 ) -> EventQueue:
     """Attach EventPublisher hooks to agents.
 
-    Every agent gets a publisher and a matching ``callback_handler`` so its
-    events flow into the returned queue.  Orchestrators (Swarm / Graph /
-    delegate Agent) additionally emit MULTIAGENT_START, NODE_START, NODE_STOP,
-    HANDOFF and MULTIAGENT_COMPLETE.
+    Every agent gets a publisher (lifecycle hooks plus a model-stream
+    middleware for TOKEN and REASONING) so its events flow into the returned
+    queue.  Orchestrators (Swarm / Graph / delegate Agent) additionally emit
+    MULTIAGENT_START, NODE_START, NODE_STOP, HANDOFF and MULTIAGENT_COMPLETE.
+    A custom ``callback_handler`` is kept; the default printing handler is
+    replaced by a silent one.
 
     Does **not** emit SESSION_START — use ``ResolvedConfig.wire_event_queue``
     for that, or call ``EventQueue.emit_session_start`` yourself.
@@ -206,8 +223,9 @@ def make_event_queue(
     .. warning::
 
         This function **mutates** the passed-in agents and orchestrators by
-        adding hooks and overwriting ``callback_handler``.  Call it only once
-        per set of agents.
+        adding hooks and middleware (which cannot be removed) and by silencing
+        the default printing ``callback_handler``.  Call it only once per set
+        of agents.
 
     Args:
         agents: Agents to wire, keyed by name.
@@ -229,8 +247,7 @@ def make_event_queue(
 
     for name, agent in agents.items():
         pub = EventPublisher(callback=event_queue._put, agent_name=name)
-        agent.hooks.add_hook(pub)
-        agent.callback_handler = pub.as_callback_handler()
+        _attach_publisher(agent, pub)
         logger.debug("agent=<%s> | wired EventPublisher", name)
 
     for orch_name, orch in (orchestrators or {}).items():
@@ -240,9 +257,10 @@ def make_event_queue(
             callback=event_queue._put,
             agent_name=orch_name,
         )
-        orch.hooks.add_hook(orch_pub)
         if isinstance(orch, Agent):
-            orch.callback_handler = orch_pub.as_callback_handler()
+            _attach_publisher(orch, orch_pub)
+        else:
+            orch.hooks.add_hook(orch_pub)
         logger.debug("orchestrator=<%s> | wired EventPublisher", orch_name)
 
     return event_queue

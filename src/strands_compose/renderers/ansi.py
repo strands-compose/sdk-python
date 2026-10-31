@@ -277,8 +277,9 @@ class AnsiRenderer(EventRenderer):
         )
 
     def _handle_node_stop(self, event: StreamEvent) -> None:
+        outcome = "failed" if event.data.get("status") == "failed" else "done"
         self._write_direct(
-            f"{self._cyan}←{self._reset}  node '{event.data.get('node_id')}'  done\n"
+            f"{self._cyan}←{self._reset}  node '{event.data.get('node_id')}'  {outcome}\n"
         )
 
     def _handle_handoff(self, event: StreamEvent) -> None:

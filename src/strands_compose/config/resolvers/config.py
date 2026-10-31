@@ -43,7 +43,8 @@ class ResolvedConfig:
         .. warning::
 
             **Mutates** the agents and orchestrators on this instance by adding
-            hooks and overwriting ``callback_handler``.  Call it only once.
+            hooks and middleware and by silencing the default printing
+            ``callback_handler``.  Call it only once.
 
         Args:
             session_id: Optional session ID to embed in events.

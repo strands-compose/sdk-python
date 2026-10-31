@@ -75,6 +75,12 @@ def test_node_events_show_node_id():
     assert "n1" in out
 
 
+def test_failed_node_stop_is_not_rendered_as_done():
+    out = _render(_ev(EventType.NODE_STOP, node_id="n1", status="failed"))
+    assert "failed" in out
+    assert "done" not in out
+
+
 def test_handoff_shows_target_nodes():
     assert "analyst" in _render(_ev(EventType.HANDOFF, to_node_ids=["analyst"]))
 
