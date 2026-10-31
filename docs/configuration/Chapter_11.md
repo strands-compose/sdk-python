@@ -26,20 +26,19 @@ orchestrations:
 
 ## Writing Condition Functions
 
-Condition functions receive the graph execution context and return `True` or `False`:
+Condition functions receive the graph's `GraphState` and return `True` or `False`. `state.results["<node>"].result` holds the result of a node that has finished:
 
 ```python
 # conditions.py
+from strands.multiagent.graph import GraphState
 
-def needs_revision(context: dict) -> bool:
+def needs_revision(state: GraphState) -> bool:
     """Route back to writer if reviewer says REVISE."""
-    last_output = str(context.get("last_output", ""))
-    return "REVISE" in last_output.upper()
+    return "REVISE" in str(state.results["reviewer"].result).upper()
 
-def is_approved(context: dict) -> bool:
+def is_approved(state: GraphState) -> bool:
     """Route to publisher if reviewer approves."""
-    last_output = str(context.get("last_output", ""))
-    return "APPROVED" in last_output.upper()
+    return "APPROVED" in str(state.results["reviewer"].result).upper()
 ```
 
 The condition spec format is the same as tools and hooks: `./file.py:function_name` or `module.path:function_name`.

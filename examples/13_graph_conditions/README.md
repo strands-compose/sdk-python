@@ -11,21 +11,22 @@
 ## How it works
 
 A regular graph edge always fires. A **conditional edge** fires only when its
-`condition:` callable returns `True`. The callable receives a context dict and
-returns a boolean:
+`condition:` callable returns `True`. The callable receives the graph's
+`GraphState` and returns a boolean:
 
 ```python
 # conditions.py
-def needs_revision(context: dict) -> bool:
+from strands.multiagent.graph import GraphState
+
+
+def needs_revision(state: GraphState) -> bool:
     """Route back to writer if the review says 'REVISE'."""
-    last_output = str(context.get("last_output", ""))
-    return "REVISE" in last_output.upper()
+    return "REVISE" in str(state.results["reviewer"].result).upper()
 
 
-def is_approved(context: dict) -> bool:
+def is_approved(state: GraphState) -> bool:
     """Route to publisher if the review says 'APPROVED'."""
-    last_output = str(context.get("last_output", ""))
-    return "APPROVED" in last_output.upper()
+    return "APPROVED" in str(state.results["reviewer"].result).upper()
 ```
 
 Wire them in YAML:
@@ -56,7 +57,8 @@ to publisher if approved).
 won't execute again — the edge is silently skipped.
 
 **Conditions are Python callables**, loaded via import path (`module:func` or
-`./file.py:func`). They receive a dict with the graph's execution context.
+`./file.py:func`). They receive the graph's `GraphState`, where
+`state.results["<node>"].result` holds a finished node's result.
 
 **If no conditional edge fires**, the graph stops at that node. Make sure your
 conditions are exhaustive — or add a fallback unconditional edge.
