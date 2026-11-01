@@ -12,7 +12,7 @@ Tasks for running code quality checks:
   uv run just check
   ```
 
-- `check-format`: Check code formatting (import order + ruff format)
+- `check-format`: Fix import order and format, then check the format
   ```bash
   uv run just check-format
   ```
@@ -116,6 +116,24 @@ Tasks for managing commits:
 - `commit-info`: Retrieve commit information using Commitizen
   ```bash
   uv run just commit-info
+  ```
+
+### Verify Tasks (`verify.just`)
+The same checks as `check`, but no file is changed. CI runs these:
+
+- `verify`: Run all checks without changing any file
+  ```bash
+  uv run just verify
+  ```
+
+- `verify-format`: Check import order and format without changing any file
+  ```bash
+  uv run just verify-format
+  ```
+
+- `verify-code`: Run linting checks without changing any file
+  ```bash
+  uv run just verify-code
   ```
 
 ### Format Tasks (`format.just`)
