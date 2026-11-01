@@ -33,17 +33,9 @@ jobs:
       - name: Install dev deps
         run: uv sync --all-groups --all-extras
 
-      - name: Ruff — format check
-        run: uv run just check-format
-
-      - name: Ruff — lint
-        run: uv run just check-code
-
-      - name: ty — type check
-        run: uv run just check-type
-
-      - name: Bandit — security scan
-        run: uv run just check-security
+      # Format, import order, lint, types, security. Changes no file.
+      - name: Python checks
+        run: uv run just verify
 
   # ── Tests ──────────────────────────────────────────────────────────────────
   test:
